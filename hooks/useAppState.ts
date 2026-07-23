@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MailItem, ParseApiResponse } from "@/lib/types";
+import { GeoPoint, MailItem, ParseApiResponse } from "@/lib/types";
 import { buildSeedMails } from "@/lib/seedMails";
 import { loadState, saveState } from "@/lib/storage";
-import { buildRail, railNodes, RailItem } from "@/lib/itinerary";
+import { buildRail, firstSeedGeo, lastSeedGeo, railNodes, RailItem, sortedGroupEvents } from "@/lib/itinerary";
 import { getDayOfState, DayOfState } from "@/lib/dayof";
 import { ManualEventInput, manualInputToEvent } from "@/lib/manualEntry";
+import { TransitEstimate, createPrecomputedEstimator, guessMode } from "@/lib/transit";
 
 export type Tab = "inbox" | "itin" | "today";
 
@@ -121,7 +122,123 @@ export function useAppState() {
     () => (mails ?? []).some((m) => m.status === "new" || m.status === "parsing" || m.status === "error"),
     [mails]
   );
-  const rail: RailItem[] = useMemo(() => buildRail(events, hasPendingReservation), [events, hasPendingReservation]);
+
+  // 地点テキスト（placeFrom/placeTo/title）を座標へジオコーディングし、mails内のイベントへ書き戻す。
+  // 実際の移動時間計算・周辺スポット検索の土台になる（Google Maps API 未設定時は無音でスキップ）。
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const toGeocode = new Map<string, string>();
+      events.forEach((ev) => {
+        if (ev.placeFrom && !ev.placeFromGeo) toGeocode.set(ev.placeFrom, ev.placeFrom);
+        if (ev.placeTo && !ev.placeToGeo) toGeocode.set(ev.placeTo, ev.placeTo);
+        if (!ev.placeFrom && !ev.placeTo && !ev.placeToGeo) toGeocode.set(ev.title, ev.title);
+      });
+      if (toGeocode.size === 0) return;
+
+      const entries = await Promise.all(
+        Array.from(toGeocode.values()).map(async (text) => {
+          try {
+            const res = await fetch("/api/geocode", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ query: text }),
+            });
+            const data = await res.json();
+            return [text, (data.point as GeoPoint | null) ?? null] as const;
+          } catch {
+            return [text, null] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      const geoByText = new Map(entries);
+      if (![...geoByText.values()].some(Boolean)) return;
+
+      setMails((prev) =>
+        prev
+          ? prev.map((m) => ({
+              ...m,
+              events: m.events.map((ev) => {
+                const fromGeo = ev.placeFrom && !ev.placeFromGeo ? geoByText.get(ev.placeFrom) : null;
+                const toGeo = ev.placeTo && !ev.placeToGeo ? geoByText.get(ev.placeTo) : null;
+                const titleGeo = !ev.placeFrom && !ev.placeTo && !ev.placeToGeo ? geoByText.get(ev.title) : null;
+                if (!fromGeo && !toGeo && !titleGeo) return ev;
+                return {
+                  ...ev,
+                  placeFromGeo: fromGeo ?? ev.placeFromGeo,
+                  placeToGeo: toGeo ?? titleGeo ?? ev.placeToGeo,
+                };
+              }),
+            }))
+          : prev
+      );
+    }
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [events]);
+
+  // ジオコーディング済みの隣接イベント間について、Google Directions API で実測の移動時間を取得しキャッシュする。
+  const [transitCache, setTransitCache] = useState<Record<string, TransitEstimate>>({});
+  const transitCacheRef = useRef(transitCache);
+  useEffect(() => {
+    transitCacheRef.current = transitCache;
+  }, [transitCache]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const sorted = sortedGroupEvents(events);
+      const pending: { key: string; origin: GeoPoint; destination: GeoPoint; mode: TransitEstimate["mode"] }[] = [];
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const prev = sorted[i];
+        const next = sorted[i + 1];
+        const key = `${prev.id}:${next.id}`;
+        if (transitCacheRef.current[key]) continue;
+        const origin = lastSeedGeo(prev);
+        const destination = firstSeedGeo(next);
+        if (!origin || !destination) continue;
+        const mode = guessMode(prev.placeTo ?? prev.title, next.placeFrom ?? next.title);
+        if (mode === "air") continue; // Directions APIでは空路は扱わない
+        pending.push({ key, origin, destination, mode });
+      }
+      if (pending.length === 0) return;
+
+      const results = await Promise.all(
+        pending.map(async (p) => {
+          try {
+            const res = await fetch("/api/directions", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ origin: p.origin, destination: p.destination, mode: p.mode }),
+            });
+            const data = await res.json();
+            if (data.result) return [p.key, { mode: p.mode, durationMin: data.result.durationMin }] as const;
+          } catch {
+            // フォールバック（ヒューリスティック推定）に委ねる
+          }
+          return null;
+        })
+      );
+      if (cancelled) return;
+      const updates = results.filter((r): r is readonly [string, TransitEstimate] => r !== null);
+      if (updates.length > 0) {
+        setTransitCache((prev) => ({ ...prev, ...Object.fromEntries(updates) }));
+      }
+    }
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [events]);
+
+  const transitEstimator = useMemo(() => createPrecomputedEstimator(transitCache), [transitCache]);
+  const rail: RailItem[] = useMemo(
+    () => buildRail(events, hasPendingReservation, transitEstimator),
+    [events, hasPendingReservation, transitEstimator]
+  );
   const dayOfState: DayOfState = useMemo(() => getDayOfState(rail, currentNodeKey), [rail, currentNodeKey]);
 
   const openSheet = useCallback((id: string) => {
@@ -155,6 +272,23 @@ export function useAppState() {
     return true;
   }, []);
 
+  /** メール解析を介さず、住所・時刻の直接入力だけで旅程に予定を追加する。 */
+  const addManualMail = useCallback((input: ManualEventInput) => {
+    const event = manualInputToEvent(genId("evt"), input);
+    if (!event) return null;
+    const mail: MailItem = {
+      id: genId("mail"),
+      source: "手入力",
+      subject: event.title,
+      body: "",
+      status: "done",
+      manual: true,
+      events: [event],
+    };
+    setMails((prev) => [...(prev ?? []), mail]);
+    return mail;
+  }, []);
+
   const recordArrival = useCallback((nodeKey: string, place: string) => {
     setCurrentNodeKey(nodeKey);
     setFlash({ visible: true, text: `${place} に到着\n到着を記録しました` });
@@ -180,6 +314,7 @@ export function useAppState() {
     parseMail,
     addPastedMail,
     addManualEvent,
+    addManualMail,
     recordArrival,
   };
 }

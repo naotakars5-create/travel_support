@@ -1,4 +1,4 @@
-import { ParsedEvent, TransportMode, isTransitMode } from "./types";
+import { GeoPoint, ParsedEvent, TransportMode, isTransitMode } from "./types";
 import { TransitEstimator, heuristicTransitEstimator } from "./transit";
 
 export const FREE_GAP_THRESHOLD_MIN = 60;
@@ -14,6 +14,8 @@ export interface RailNode {
   place: string;
   sub?: string;
   confidence: number;
+  /** この地点の座標（ジオコーディング済みの場合） */
+  geo?: GeoPoint;
 }
 
 export interface RailEdge {
@@ -38,19 +40,39 @@ interface NodeSeed {
   time: string;
   place: string;
   sub?: string;
+  geo?: GeoPoint;
 }
 
 function minutesBetween(aIso: string, bIso: string): number {
   return Math.round((new Date(bIso).getTime() - new Date(aIso).getTime()) / 60000);
 }
 
+function isLegEvent(event: ParsedEvent): boolean {
+  return Boolean(isTransitMode(event.mode) && event.placeFrom && event.placeTo && event.endAt && event.endAt !== event.startAt);
+}
+
+/** イベントを開始時刻順に並べたもの（buildRail と同じ並び順）。 */
+export function sortedGroupEvents(events: ParsedEvent[]): ParsedEvent[] {
+  return [...events].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+}
+
+/** そのイベントの最後のノード（＝次のイベントへ接続する側）の座標。 */
+export function lastSeedGeo(event: ParsedEvent): GeoPoint | undefined {
+  return isLegEvent(event) ? event.placeToGeo : event.placeToGeo ?? event.placeFromGeo;
+}
+
+/** そのイベントの最初のノード（＝前のイベントから接続される側）の座標。 */
+export function firstSeedGeo(event: ParsedEvent): GeoPoint | undefined {
+  return isLegEvent(event) ? event.placeFromGeo : event.placeToGeo ?? event.placeFromGeo;
+}
+
 /** イベント1件を1〜2個のノードシードに変換する（移動系は出発・到着の2点、それ以外は1点）。 */
 function eventToNodeSeeds(event: ParsedEvent): NodeSeed[] {
-  const isLeg = isTransitMode(event.mode) && event.placeFrom && event.placeTo && event.endAt && event.endAt !== event.startAt;
+  const isLeg = isLegEvent(event);
   if (isLeg) {
     return [
-      { event, key: `${event.id}:from`, time: event.startAt, place: event.placeFrom!, sub: event.detail },
-      { event, key: `${event.id}:to`, time: event.endAt!, place: event.placeTo!, sub: undefined },
+      { event, key: `${event.id}:from`, time: event.startAt, place: event.placeFrom!, sub: event.detail, geo: event.placeFromGeo },
+      { event, key: `${event.id}:to`, time: event.endAt!, place: event.placeTo!, sub: undefined, geo: event.placeToGeo },
     ];
   }
   return [
@@ -60,6 +82,7 @@ function eventToNodeSeeds(event: ParsedEvent): NodeSeed[] {
       time: event.startAt,
       place: event.placeTo ?? event.placeFrom ?? event.title,
       sub: event.detail,
+      geo: event.placeToGeo ?? event.placeFromGeo,
     },
   ];
 }
@@ -96,6 +119,7 @@ export function buildRail(
         place: seed.place,
         sub: seed.sub,
         confidence: seed.event.confidence,
+        geo: seed.geo,
       });
       nodeIndex += 1;
 

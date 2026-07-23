@@ -13,6 +13,11 @@ export interface ParsedField {
   value: string;
 }
 
+export interface GeoPoint {
+  lat: number;
+  lng: number;
+}
+
 export interface ParsedEvent {
   id: string;
   mode: TransportMode;
@@ -30,6 +35,10 @@ export interface ParsedEvent {
   fields: ParsedField[];
   /** 0-1 */
   confidence: number;
+  /** placeFrom の座標（ジオコーディング済みの場合） */
+  placeFromGeo?: GeoPoint;
+  /** placeTo の座標（ジオコーディング済みの場合） */
+  placeToGeo?: GeoPoint;
 }
 
 export type MailStatus = "new" | "parsing" | "done" | "skip" | "error";

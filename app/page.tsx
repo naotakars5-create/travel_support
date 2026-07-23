@@ -74,6 +74,11 @@ export default function Home() {
             setAddMailOpen(false);
             app.openSheet(mail.id);
           }}
+          onAddManual={(input) => {
+            const mail = app.addManualMail(input);
+            setAddMailOpen(false);
+            if (mail) app.openSheet(mail.id);
+          }}
         />
       )}
 

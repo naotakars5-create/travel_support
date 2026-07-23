@@ -6,7 +6,7 @@ import { computeCountdown } from "@/lib/dayof";
 import { formatDurationMin } from "@/lib/itinerary";
 import { formatJstTime, formatJstMonthDayJa } from "@/lib/date";
 import { MODE_COLOR, MODE_LABEL } from "@/lib/modeMeta";
-import { fixedSpotProvider, Spot } from "@/lib/spots";
+import { createSpotProvider, Spot } from "@/lib/spots";
 import { StatusBar } from "./StatusBar";
 
 export function DayOfScreen({
@@ -112,16 +112,18 @@ function FreeHero({
   onRecordArrival: (nodeKey: string, place: string) => void;
 }) {
   const [spots, setSpots] = useState<Spot[]>([]);
+  const geo = state.currentNode.geo;
 
   useEffect(() => {
     let cancelled = false;
-    fixedSpotProvider.nearby(0, 0, state.freeMin).then((res) => {
+    const provider = createSpotProvider(Boolean(geo));
+    provider.nearby(geo?.lat ?? 0, geo?.lng ?? 0, state.freeMin).then((res) => {
       if (!cancelled) setSpots(res);
     });
     return () => {
       cancelled = true;
     };
-  }, [state.freeMin]);
+  }, [state.freeMin, geo]);
 
   return (
     <div className="flex flex-col items-center text-center">

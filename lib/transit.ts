@@ -19,7 +19,7 @@ export interface TransitEstimator {
 const AIRPORT_RE = /空港|エアポート|Terminal|第[1-9１-９]/;
 const STATION_RE = /駅|Station/;
 
-function guessMode(fromPlace: string | undefined, toPlace: string | undefined): TransportMode {
+export function guessMode(fromPlace: string | undefined, toPlace: string | undefined): TransportMode {
   const a = fromPlace ?? "";
   const b = toPlace ?? "";
   if (AIRPORT_RE.test(a) || AIRPORT_RE.test(b)) return "bus";
@@ -44,3 +44,17 @@ export const heuristicTransitEstimator: TransitEstimator = {
     return { mode, durationMin: DEFAULT_DURATION_BY_MODE[mode] };
   },
 };
+
+/**
+ * event-id ペア（`${from.id}:${to.id}`）をキーに事前計算済みの実測値（Google Directions API 由来）を返す実装。
+ * キャッシュに無い区間はヒューリスティック実装にフォールバックする（取得中・API未設定・air区間など）。
+ */
+export function createPrecomputedEstimator(cache: Record<string, TransitEstimate>): TransitEstimator {
+  return {
+    estimate(from, to) {
+      const cached = cache[`${from.id}:${to.id}`];
+      if (cached) return cached;
+      return heuristicTransitEstimator.estimate(from, to);
+    },
+  };
+}

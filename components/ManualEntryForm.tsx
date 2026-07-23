@@ -15,7 +15,13 @@ const MODE_OPTIONS: { value: TransportMode; label: string }[] = [
   { value: "activity", label: "観光" },
 ];
 
-export function ManualEntryForm({ onSubmit }: { onSubmit: (input: ManualEventInput) => void }) {
+export function ManualEntryForm({
+  onSubmit,
+  intro = "自動解析できなかったため、内容を手入力してください。",
+}: {
+  onSubmit: (input: ManualEventInput) => void;
+  intro?: string;
+}) {
   const [mode, setMode] = useState<TransportMode>("stay");
   const [title, setTitle] = useState("");
   const [startAt, setStartAt] = useState("");
@@ -32,7 +38,7 @@ export function ManualEntryForm({ onSubmit }: { onSubmit: (input: ManualEventInp
         onSubmit({ mode, title, startAt, endAt: endAt || undefined, placeFrom: placeFrom || undefined, placeTo: placeTo || undefined, detail: detail || undefined });
       }}
     >
-      <p className="font-gothic text-[11px] text-muted">自動解析できなかったため、内容を手入力してください。</p>
+      <p className="font-gothic text-[11px] text-muted">{intro}</p>
       <label className="flex flex-col gap-1">
         <span className="font-gothic text-[10px] text-muted">種別</span>
         <select
@@ -78,26 +84,41 @@ export function ManualEntryForm({ onSubmit }: { onSubmit: (input: ManualEventInp
           />
         </label>
       </div>
-      {(mode === "air" || mode === "rail" || mode === "bus" || mode === "car") && (
+      {(mode === "air" || mode === "rail" || mode === "bus" || mode === "car") ? (
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
-            <span className="font-gothic text-[10px] text-muted">出発地</span>
+            <span className="font-gothic text-[10px] text-muted">出発地（住所推奨）</span>
             <input
               value={placeFrom}
               onChange={(e) => setPlaceFrom(e.target.value)}
+              placeholder="例: 東京都大田区羽田空港2-6-5"
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-2 py-2 font-mincho text-[13px] text-ink"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-gothic text-[10px] text-muted">到着地</span>
+            <span className="font-gothic text-[10px] text-muted">到着地（住所推奨）</span>
             <input
               value={placeTo}
               onChange={(e) => setPlaceTo(e.target.value)}
+              placeholder="例: 大阪府池田市空港2-1"
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-2 py-2 font-mincho text-[13px] text-ink"
             />
           </label>
         </div>
+      ) : (
+        <label className="flex flex-col gap-1">
+          <span className="font-gothic text-[10px] text-muted">場所・住所</span>
+          <input
+            value={placeTo}
+            onChange={(e) => setPlaceTo(e.target.value)}
+            placeholder="例: 大阪府大阪市北区堂島浜1-3-1"
+            className="rounded-[10px] border border-black/[.1] bg-white/60 px-2 py-2 font-mincho text-[13px] text-ink"
+          />
+        </label>
       )}
+      <p className="-mt-1 font-gothic text-[10px] text-muted-light">
+        住所を入力すると、地図情報をもとに移動時間や周辺スポットの提案精度が上がります（未入力でも登録できます）。
+      </p>
       <label className="flex flex-col gap-1">
         <span className="font-gothic text-[10px] text-muted">詳細</span>
         <input
