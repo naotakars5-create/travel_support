@@ -7,6 +7,11 @@ import { getDayOfState, DayOfState } from "@/lib/dayof";
 import { ManualEventInput, manualInputToEvent } from "@/lib/manualEntry";
 import { TransitEstimate, createPrecomputedEstimator, guessMode } from "@/lib/transit";
 import { apiUrl } from "@/lib/apiBase";
+import { haversineMeters } from "@/lib/geo";
+import { useLiveLocation } from "./useLiveLocation";
+
+/** この距離（メートル）以内に近づいたら、GPSで到着を自動記録する。 */
+const ARRIVAL_THRESHOLD_METERS = 120;
 
 export type Tab = "inbox" | "itin" | "today";
 
@@ -293,6 +298,24 @@ export function useAppState() {
     setTimeout(() => setFlash({ visible: false, text: "" }), 1700);
   }, []);
 
+  // 実機のGPS（外部システム）の変化に反応して到着を自動記録する。
+  /* eslint-disable react-hooks/set-state-in-effect -- GPS位置の変化という外部シグナルへの反応のため意図的 */
+  const { location: liveLocation, permission: locationPermission } = useLiveLocation();
+  const autoArrivedKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!liveLocation) return;
+    if (dayOfState.mode !== "move" && dayOfState.mode !== "free") return;
+    const nextNode = dayOfState.nextNode;
+    if (!nextNode.geo) return;
+    if (autoArrivedKeyRef.current === nextNode.key) return;
+    const distance = haversineMeters(liveLocation, nextNode.geo);
+    if (distance <= ARRIVAL_THRESHOLD_METERS) {
+      autoArrivedKeyRef.current = nextNode.key;
+      recordArrival(nextNode.key, nextNode.place);
+    }
+  }, [liveLocation, dayOfState, recordArrival]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   return {
     mails,
     tab,
@@ -314,6 +337,8 @@ export function useAppState() {
     addManualEvent,
     addManualMail,
     recordArrival,
+    liveLocation,
+    locationPermission,
   };
 }
 

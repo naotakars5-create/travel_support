@@ -6,6 +6,8 @@ import { formatDurationMin } from "@/lib/itinerary";
 import { formatJstTime, formatJstMonthDayJa } from "@/lib/date";
 import { MODE_COLOR, MODE_LABEL } from "@/lib/modeMeta";
 import { createSpotProvider, Spot } from "@/lib/spots";
+import { GeoPoint } from "@/lib/types";
+import { LocationPermissionState } from "@/hooks/useLiveLocation";
 import { Blinker } from "./animations";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
@@ -13,15 +15,20 @@ const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 export function DayOfScreen({
   state,
   now,
+  liveLocation,
+  locationPermission,
   onNavigateInbox,
   onRecordArrival,
 }: {
   state: DayOfState;
   now: Date;
+  liveLocation: GeoPoint | null;
+  locationPermission: LocationPermissionState;
   onNavigateInbox: () => void;
   onRecordArrival: (nodeKey: string, place: string) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const gpsActive = locationPermission === "granted" && Boolean(liveLocation);
   return (
     <View className="flex-1 bg-day-bg" style={{ paddingTop: insets.top }}>
       <View className="flex-row items-baseline justify-between px-[26px] pb-4 pt-4">
@@ -33,12 +40,19 @@ export function DayOfScreen({
 
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 26, paddingBottom: insets.bottom + 24 }}>
         {state.mode === "locked" && <LockedHero onNavigateInbox={onNavigateInbox} />}
-        {state.mode === "move" && <MoveHero state={state} now={now} onRecordArrival={onRecordArrival} />}
-        {state.mode === "free" && <FreeHero state={state} onRecordArrival={onRecordArrival} />}
+        {state.mode === "move" && <MoveHero state={state} now={now} gpsActive={gpsActive} onRecordArrival={onRecordArrival} />}
+        {state.mode === "free" && (
+          <FreeHero state={state} liveLocation={liveLocation} gpsActive={gpsActive} onRecordArrival={onRecordArrival} />
+        )}
         {state.mode === "done" && <DoneHero totalReservations={state.totalReservations} />}
       </ScrollView>
     </View>
   );
+}
+
+function GpsHint({ active }: { active: boolean }) {
+  if (!active) return null;
+  return <Text className="mt-3 font-gothic-400 text-[10px] text-day-text3">GPSでこの場所に近づくと自動で到着を記録します</Text>;
 }
 
 function OutlineButton({ label, onPress }: { label: string; onPress: () => void }) {
@@ -67,10 +81,12 @@ function LockedHero({ onNavigateInbox }: { onNavigateInbox: () => void }) {
 function MoveHero({
   state,
   now,
+  gpsActive,
   onRecordArrival,
 }: {
   state: Extract<DayOfState, { mode: "move" }>;
   now: Date;
+  gpsActive: boolean;
   onRecordArrival: (nodeKey: string, place: string) => void;
 }) {
   const { mm, ss } = computeCountdown(state.targetDepartAt, now);
@@ -105,19 +121,25 @@ function MoveHero({
       <Pressable onPress={() => onRecordArrival(state.nextNode.key, state.nextNode.place)} className="mt-6 w-full rounded-[12px] border border-day-text/40 py-3">
         <Text className="text-center font-gothic-400 text-[12px] text-day-text">{state.nextNode.place} に到着を記録</Text>
       </Pressable>
+      <GpsHint active={gpsActive && Boolean(state.nextNode.geo)} />
     </View>
   );
 }
 
 function FreeHero({
   state,
+  liveLocation,
+  gpsActive,
   onRecordArrival,
 }: {
   state: Extract<DayOfState, { mode: "free" }>;
+  liveLocation: GeoPoint | null;
+  gpsActive: boolean;
   onRecordArrival: (nodeKey: string, place: string) => void;
 }) {
   const [spots, setSpots] = useState<Spot[]>([]);
-  const geo = state.currentNode.geo;
+  // 実際の現在地（GPS）があればそちらを優先し、無ければ到着記録した地点の座標を使う。
+  const geo = liveLocation ?? state.currentNode.geo;
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +164,9 @@ function FreeHero({
 
       {spots.length > 0 && (
         <View className="mt-7 w-full">
-          <Text className="mb-2 font-gothic-400 text-[10px] tracking-[.15em] text-day-text3">近くに寄れる場所</Text>
+          <Text className="mb-2 font-gothic-400 text-[10px] tracking-[.15em] text-day-text3">
+            近くに寄れる場所{liveLocation ? "（現在地から）" : ""}
+          </Text>
           <View className="rounded-[16px] border border-day-text/10">
             {spots.map((s, i) => (
               <View key={s.name} className={`flex-row items-center justify-between px-4 py-3 ${i > 0 ? "border-t border-day-text/10" : ""}`}>
@@ -162,6 +186,7 @@ function FreeHero({
       <Pressable onPress={() => onRecordArrival(state.nextNode.key, state.nextNode.place)} className="mt-6 w-full rounded-[12px] border border-day-text/40 py-3">
         <Text className="text-center font-gothic-400 text-[12px] text-day-text">{state.nextNode.place} に到着を記録</Text>
       </Pressable>
+      <GpsHint active={gpsActive && Boolean(state.nextNode.geo)} />
     </View>
   );
 }

@@ -1,4 +1,5 @@
 import { GeoPoint, TransportMode } from "./types";
+import { haversineMeters } from "./geo";
 
 export function hasGoogleMapsKey(): boolean {
   return Boolean(process.env.GOOGLE_MAPS_API_KEY);
@@ -62,16 +63,6 @@ export async function getDirections(origin: GeoPoint, destination: GeoPoint, mod
     durationMin: Math.round(leg.duration.value / 60),
     distanceMeters: leg.distance.value,
   };
-}
-
-function haversineMeters(a: GeoPoint, b: GeoPoint): number {
-  const R = 6371000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const s =
-    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(s));
 }
 
 export interface PlaceResult {

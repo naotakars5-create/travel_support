@@ -35,7 +35,14 @@ export default function Home() {
         />
       )}
       {app.tab === "today" && (
-        <DayOfScreen state={app.dayOfState} now={app.now} onNavigateInbox={() => app.setTab("inbox")} onRecordArrival={app.recordArrival} />
+        <DayOfScreen
+          state={app.dayOfState}
+          now={app.now}
+          liveLocation={app.liveLocation}
+          locationPermission={app.locationPermission}
+          onNavigateInbox={() => app.setTab("inbox")}
+          onRecordArrival={app.recordArrival}
+        />
       )}
 
       <BottomNav tab={app.tab} onChange={app.setTab} dark={dark} />

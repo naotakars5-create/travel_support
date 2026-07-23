@@ -32,6 +32,12 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "現在地周辺の観光スポット提案と、到着の自動記録に使用します。"
+        }
       ]
     ],
     "experiments": {
