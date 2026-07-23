@@ -7,7 +7,7 @@ export interface DayOfMoveInfo {
   mode: "move";
   targetDepartAt: string;
   nextNode: RailNode;
-  currentNode: RailNode;
+  currentNode: RailNode | null;
   transitMode: TransportMode;
   transitMin: number;
 }
@@ -22,6 +22,7 @@ export interface DayOfFreeInfo {
 export interface DayOfLockedInfo {
   mode: "locked";
   currentNode: RailNode | null;
+  nextNode: RailNode | null;
 }
 
 export interface DayOfDoneInfo {
@@ -34,30 +35,35 @@ export type DayOfState = DayOfMoveInfo | DayOfFreeInfo | DayOfLockedInfo | DayOf
 
 /** currentNode と nextNode の間にある rail 要素（inline edge / gap+edge など）を取得する */
 function itemsBetween(rail: RailItem[], fromNodeIndex: number, toNodeIndex: number): RailItem[] {
-  const fromPos = rail.findIndex((i) => i.type === "node" && i.nodeIndex === fromNodeIndex);
+  const fromPos = fromNodeIndex < 0 ? -1 : rail.findIndex((i) => i.type === "node" && i.nodeIndex === fromNodeIndex);
   const toPos = rail.findIndex((i) => i.type === "node" && i.nodeIndex === toNodeIndex);
-  if (fromPos < 0 || toPos < 0) return [];
+  if (toPos < 0) return [];
   return rail.slice(fromPos + 1, toPos);
 }
 
-export function getDayOfState(rail: RailItem[], currentNodeIndex: number): DayOfState {
+/**
+ * @param currentNodeKey 到着記録済みの直近ノードのキー。まだ何も記録していない場合は null（先頭ノードより前）。
+ */
+export function getDayOfState(rail: RailItem[], currentNodeKey: string | null): DayOfState {
   const nodes = railNodes(rail);
-  const currentNode = nodes.find((n) => n.nodeIndex === currentNodeIndex) ?? null;
-  const nextNode = nodes.find((n) => n.nodeIndex === currentNodeIndex + 1) ?? null;
+  const currentPos = currentNodeKey ? nodes.findIndex((n) => n.key === currentNodeKey) : -1;
+  const currentNode = currentPos >= 0 ? nodes[currentPos] : null;
+  const nextNode = nodes[currentPos + 1] ?? null;
 
   if (!nextNode) {
-    return { mode: "done", currentNode, totalReservations: nodes.length > 0 ? new Set(nodes.map((n) => n.event.id)).size : 0 };
+    return { mode: "done", currentNode, totalReservations: new Set(nodes.map((n) => n.event.id)).size };
   }
 
+  const currentNodeIndex = currentNode ? currentNode.nodeIndex : -1;
   const between = itemsBetween(rail, currentNodeIndex, nextNode.nodeIndex);
   const unconfirmedGap = between.find((i) => i.type === "gap" && i.kind === "unconfirmed");
   if (unconfirmedGap) {
-    return { mode: "locked", currentNode };
+    return { mode: "locked", currentNode, nextNode };
   }
 
   const freeGap = between.find((i) => i.type === "gap" && i.kind === "free");
-  if (freeGap && freeGap.type === "gap") {
-    return { mode: "free", freeMin: freeGap.durationMin, currentNode: currentNode!, nextNode };
+  if (freeGap && currentNode) {
+    return { mode: "free", freeMin: (freeGap as { durationMin: number }).durationMin, currentNode, nextNode };
   }
 
   const edge = between.find((i) => i.type === "edge");
@@ -68,7 +74,7 @@ export function getDayOfState(rail: RailItem[], currentNodeIndex: number): DayOf
     mode: "move",
     targetDepartAt,
     nextNode,
-    currentNode: currentNode!,
+    currentNode,
     transitMode,
     transitMin,
   };

@@ -6,6 +6,8 @@ export const FREE_GAP_THRESHOLD_MIN = 60;
 export interface RailNode {
   type: "node";
   nodeIndex: number;
+  /** event.id + 出発/到着の別からなる安定キー（イベント再構築後も同一地点を追跡できる） */
+  key: string;
   event: ParsedEvent;
   /** この地点イベントの発生時刻（ISO） */
   time: string;
@@ -32,6 +34,7 @@ export type RailItem = RailNode | RailEdge | RailGap;
 
 interface NodeSeed {
   event: ParsedEvent;
+  key: string;
   time: string;
   place: string;
   sub?: string;
@@ -46,13 +49,14 @@ function eventToNodeSeeds(event: ParsedEvent): NodeSeed[] {
   const isLeg = isTransitMode(event.mode) && event.placeFrom && event.placeTo && event.endAt && event.endAt !== event.startAt;
   if (isLeg) {
     return [
-      { event, time: event.startAt, place: event.placeFrom!, sub: event.detail },
-      { event, time: event.endAt!, place: event.placeTo!, sub: undefined },
+      { event, key: `${event.id}:from`, time: event.startAt, place: event.placeFrom!, sub: event.detail },
+      { event, key: `${event.id}:to`, time: event.endAt!, place: event.placeTo!, sub: undefined },
     ];
   }
   return [
     {
       event,
+      key: `${event.id}:point`,
       time: event.startAt,
       place: event.placeTo ?? event.placeFrom ?? event.title,
       sub: event.detail,
@@ -86,6 +90,7 @@ export function buildRail(
       rail.push({
         type: "node",
         nodeIndex,
+        key: seed.key,
         event: seed.event,
         time: seed.time,
         place: seed.place,
@@ -112,14 +117,15 @@ export function buildRail(
     const intervalMin = minutesBetween(prevSeed.time, nextSeed.time);
     const prevNodeIndex = nodeIndex - 1;
 
-    const requiredMin = estimator.estimateRequiredMin(prevSeed.event, nextSeed.event);
-    if (intervalMin < 0 || (requiredMin != null && requiredMin > intervalMin)) {
+    const est = estimator.estimate(prevSeed.event, nextSeed.event);
+
+    // 前の予定の終了が次の開始を超えている、または見積もり移動時間が空き時間を超える＝間に合わない
+    if (intervalMin < 0 || est.durationMin > intervalMin) {
       rail.push({ type: "gap", kind: "conflict", durationMin: intervalMin, afterNodeIndex: prevNodeIndex });
       return;
     }
 
     if (intervalMin < FREE_GAP_THRESHOLD_MIN) {
-      const est = estimator.estimateFullInterval(prevSeed.event, nextSeed.event, intervalMin);
       rail.push({ type: "edge", mode: est.mode, durationMin: est.durationMin });
       return;
     }
@@ -130,11 +136,9 @@ export function buildRail(
       return;
     }
 
-    const lead = estimator.estimateLeadTime(prevSeed.event, nextSeed.event);
-    const leadMin = Math.min(lead.durationMin, intervalMin - 1);
-    const freeMin = intervalMin - leadMin;
+    const freeMin = intervalMin - est.durationMin;
     rail.push({ type: "gap", kind: "free", durationMin: freeMin, afterNodeIndex: prevNodeIndex });
-    rail.push({ type: "edge", mode: lead.mode, durationMin: leadMin });
+    rail.push({ type: "edge", mode: est.mode, durationMin: est.durationMin });
   });
 
   return rail;

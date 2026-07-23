@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 旅ナビ / TABI-NAVI
 
-## Getting Started
+日本の個人旅行者向け旅程アプリ。予約確認メールの本文を LLM で読み取って1日の旅程を組み、旅行当日は「次に何をするか」だけを示す。
 
-First, run the development server:
+Next.js (App Router) + TypeScript + Tailwind CSS。状態は React state + localStorage（DB・認証なし）。
+
+## セットアップ
 
 ```bash
+npm install
+cp .env.example .env.local   # ANTHROPIC_API_KEY を設定
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`/api/parse` は Anthropic API（`claude-sonnet-4-6`）でメール本文を解析します。`ANTHROPIC_API_KEY` が未設定の場合、解析は失敗し、UIは自動的に手入力フォームへフォールバックします（UI自体は確認可能）。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 環境変数
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| 変数 | 必須 | 説明 |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | ◯ | Anthropic API キー。`/api/parse` が使用する既定のプロバイダ。 |
+| `LLM_PROVIDER` | - | `openai` を指定すると `OPENAI_API_KEY`/`OPENAI_MODEL` を使う検証用プロバイダに切り替わる（開発時の暫定検証用。本番仕様は Anthropic）。 |
 
-## Learn More
+## 実装状況
 
-To learn more about Next.js, take a look at the following resources:
+- **フェーズ1（解析エンジン）**: `/api/parse`（`app/api/parse/route.ts`）実装済み。正規表現ではなくLLMに文面を読ませる方式。JSONのみを厳格に返すようプロンプトで指示し、コードフェンス混入を想定したstrip処理あり。複数イベント抽出・年の補完・skip判定・confidenceに対応。同一本文の再解析を避けるプロセスローカルキャッシュあり。
+  - **cURLでの実地検証は未実施**（このセッションでは `ANTHROPIC_API_KEY` を用意できなかったため）。`ANTHROPIC_API_KEY` を設定後、実在のJAL/じゃらん/えきねっと等のメール文面で検証することを推奨。
+- **フェーズ2（3画面）**: 受信箱・旅程（路線図）・当日（発車標）を実装済み。
+- **フェーズ3（状態遷移）**: locked→move→free→done の想定デモ動線を実装済み（`hooks/useAppState.ts`）。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## アーキテクチャメモ
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `lib/types.ts` — `ParsedEvent` 等の共通スキーマ。
+- `lib/itinerary.ts` — イベント配列から node/edge/gap の路線図データを構築。所要時間は実時刻の差分から計算、60分以上の空きは「空き時間」、見積もり移動時間が空き時間を超える場合や前後が重なる場合は「矛盾（間に合わない）」として検出。
+- `lib/transit.ts` — 移動手段・所要時間の見積もりインターフェース（`TransitEstimator`）。現在は簡易ヒューリスティック実装。Google Maps Directions API に差し替え可能な形にしてある。
+- `lib/spots.ts` — 空き時間の周辺スポット取得インターフェース（`SpotProvider`）。現在は固定データ実装。Google Places API に差し替え可能な形にしてある。
+- `lib/dayof.ts` — 当日画面の状態（locked/move/free/done）を rail と現在地から導出し、出発カウントダウンを計算。
+- `hooks/useAppState.ts` — 受信箱メールの状態管理、解析API呼び出し、到着記録、localStorage永続化を集約。
 
-## Deploy on Vercel
+## やっていないこと（スコープ外）
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- ユーザー認証・課金・プッシュ通知
+- Gmail / Outlook 連携（貼り付け方式のみ）
+- 予約サイトのAPI連携
+- 複数日程（1日のみ）
+- 天気表示（デザインには存在するが、天気APIがスコープ外のため実データを捏造せず省略）
