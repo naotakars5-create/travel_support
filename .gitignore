@@ -13,9 +13,15 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
+# expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# native builds (only present if ejected/prebuilt)
+/ios
+/android
 
 # production
 /build
@@ -34,9 +40,5 @@ yarn-error.log*
 .env*
 !.env.example
 
-# vercel
-.vercel
-
 # typescript
 *.tsbuildinfo
-next-env.d.ts
