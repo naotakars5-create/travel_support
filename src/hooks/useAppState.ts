@@ -204,6 +204,13 @@ export function useAppState() {
   const dayOfState: DayOfState = useMemo(() => getDayOfState(rail, currentNodeKey), [rail, currentNodeKey]);
   const totals = useMemo(() => computePlanTotals(entries ?? []), [entries]);
 
+  // 組み上げた各行き先の到着予定時刻（entryId → ISO）。計画画面で「自動」の予定にも時刻を表示するため。
+  const scheduleByEntry = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const ev of events) m.set(ev.id.replace(/^evt-/, ""), ev.startAt);
+    return m;
+  }, [events]);
+
   // 行き先を追加した時のハイライト演出
   const flashNewEvent = useCallback((entryId: string) => {
     const evId = `evt-${entryId}`;
@@ -296,6 +303,10 @@ export function useAppState() {
         scheduleSigRef.current = scheduleSignature(list);
         setSuggestions(data.suggestions);
         setPlanNotes(data.notes ?? null);
+        // 反映が分かるように：旅程タブへ切り替え＋通知
+        setTab("itin");
+        setFlash({ visible: true, text: "AIが旅程を組みました\n旅程を確認してください" });
+        setTimeout(() => setFlash({ visible: false, text: "" }), 1800);
       } else {
         setComposeError(data.message);
       }
@@ -357,6 +368,7 @@ export function useAppState() {
     dayOfState,
     currentNodeKey,
     totals,
+    scheduleByEntry,
     suggestions,
     planNotes,
     composing,

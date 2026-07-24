@@ -195,7 +195,7 @@ function NodeRow({
       </View>
       <View className="flex-1 pb-4 pl-1">
         <View className="flex-row flex-wrap items-center gap-2">
-          <Text className={`font-mincho-600 text-[15px] ${isPast ? "text-muted-light" : "text-ink"}`}>{item.place}</Text>
+          <Text className={`font-mincho-600 text-[15px] ${isPast ? "text-muted-light" : "text-ink"}`}>{item.event.title || item.place}</Text>
           {isCurrent && (
             <View className="rounded-full border border-ink px-2 py-[1px]">
               <Text className="font-gothic-400 text-[9px] text-ink">現在地</Text>
@@ -207,6 +207,9 @@ function NodeRow({
             </View>
           )}
         </View>
+        {item.place && item.place !== item.event.title && (
+          <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted-light">{item.place}</Text>
+        )}
         {item.sub && <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted">{item.sub}</Text>}
       </View>
     </Animated.View>

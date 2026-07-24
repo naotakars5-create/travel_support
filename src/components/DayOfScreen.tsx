@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DayOfState, computeCountdown } from "@/lib/dayof";
-import { formatDurationMin } from "@/lib/itinerary";
+import { formatDurationMin, RailNode } from "@/lib/itinerary";
 import { formatJstTime, formatJstMonthDayJa } from "@/lib/date";
 import { MODE_COLOR, MODE_LABEL } from "@/lib/modeMeta";
 import { createSpotProvider, Spot } from "@/lib/spots";
@@ -13,6 +13,16 @@ import { LocationPermissionState } from "@/hooks/useLiveLocation";
 import { Blinker } from "./animations";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
+
+/** 地点の「名前」（行き先名）。イベントの title を使う。 */
+function nodeName(node: RailNode): string {
+  return node.event.title || node.place;
+}
+
+/** 地点の「住所」。名前と異なる場合のみ返す（同じなら住所表示は省く）。 */
+function nodeAddress(node: RailNode): string | null {
+  return node.place && node.place !== node.event.title ? node.place : null;
+}
 
 /** state から天気取得の基点になる座標を選ぶ（GPS優先、無ければ次/現在ノード）。 */
 function weatherGeoFor(state: DayOfState, liveLocation: GeoPoint | null): GeoPoint | null {
@@ -137,18 +147,21 @@ function MoveHero({
       <Text className="mt-2 font-gothic-400 text-[10px] tracking-[.15em] text-day-text3">分 秒</Text>
 
       <View className="mt-8 w-full rounded-[16px] border border-day-text/10 bg-day-text/[.04] p-4">
-        <Text className="font-mincho-600 text-[23px] text-day-text">{state.nextNode.place}</Text>
+        <Text className="font-mincho-600 text-[23px] text-day-text">{nodeName(state.nextNode)}</Text>
+        {nodeAddress(state.nextNode) && (
+          <Text className="mt-1 font-gothic-400 text-[11px] text-day-text3">{nodeAddress(state.nextNode)}</Text>
+        )}
         <View className="mt-2 flex-row items-center gap-2">
           <View className="h-2 w-2 rounded-full" style={{ backgroundColor: modeColor }} />
           <Text className="font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
-            {state.currentNode?.place ?? "現在地"} → {state.nextNode.place} · {MODE_LABEL[state.transitMode]}
+            {state.currentNode ? nodeName(state.currentNode) : "現在地"} → {nodeName(state.nextNode)} · {MODE_LABEL[state.transitMode]}
             {state.transitMin > 0 ? formatDurationMin(state.transitMin) : ""}
           </Text>
         </View>
       </View>
 
-      <Pressable onPress={() => onRecordArrival(state.nextNode.key, state.nextNode.place)} className="mt-6 w-full rounded-[12px] border border-day-text/40 py-3">
-        <Text className="text-center font-gothic-400 text-[12px] text-day-text">{state.nextNode.place} に到着を記録</Text>
+      <Pressable onPress={() => onRecordArrival(state.nextNode.key, nodeName(state.nextNode))} className="mt-6 w-full rounded-[12px] border border-day-text/40 py-3">
+        <Text className="text-center font-gothic-400 text-[12px] text-day-text">{nodeName(state.nextNode)} に到着を記録</Text>
       </Pressable>
       <GpsHint active={gpsActive && Boolean(state.nextNode.geo)} />
     </View>
@@ -191,7 +204,7 @@ function FreeHero({
         {formatDurationMin(state.freeMin)}
       </Text>
       <Text className="mt-2 font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
-        次の予約 {formatJstTime(new Date(state.nextNode.time))} {state.nextNode.place} まで
+        次の予約 {formatJstTime(new Date(state.nextNode.time))} {nodeName(state.nextNode)} まで
       </Text>
 
       {spots.length > 0 && (
@@ -202,12 +215,13 @@ function FreeHero({
           </Text>
           <View className="rounded-[16px] border border-day-text/10">
             {spots.map((s, i) => (
-              <View key={s.name} className={`flex-row items-center justify-between px-4 py-3 ${i > 0 ? "border-t border-day-text/10" : ""}`}>
+              <View key={s.name} className={`flex-row items-start justify-between px-4 py-3 ${i > 0 ? "border-t border-day-text/10" : ""}`}>
                 <View className="flex-1 pr-2">
                   <Text className="font-mincho-400 text-[14px] text-day-text">{s.name}</Text>
-                  <Text className="mt-0.5 font-gothic-400 text-[10px] text-day-text2">{s.note}</Text>
+                  <Text className="mt-0.5 font-gothic-400 text-[10px] text-day-text2">{[s.category, s.note].filter(Boolean).join(" · ")}</Text>
+                  {s.address && <Text className="mt-0.5 font-gothic-400 text-[10px] text-day-text3">{s.address}</Text>}
                 </View>
-                <Text className="font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
+                <Text className="mt-0.5 font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
                   徒歩 {s.walkMin}分
                 </Text>
               </View>
@@ -216,8 +230,8 @@ function FreeHero({
         </View>
       )}
 
-      <Pressable onPress={() => onRecordArrival(state.nextNode.key, state.nextNode.place)} className="mt-6 w-full rounded-[12px] border border-day-text/40 py-3">
-        <Text className="text-center font-gothic-400 text-[12px] text-day-text">{state.nextNode.place} に到着を記録</Text>
+      <Pressable onPress={() => onRecordArrival(state.nextNode.key, nodeName(state.nextNode))} className="mt-6 w-full rounded-[12px] border border-day-text/40 py-3">
+        <Text className="text-center font-gothic-400 text-[12px] text-day-text">{nodeName(state.nextNode)} に到着を記録</Text>
       </Pressable>
       <GpsHint active={gpsActive && Boolean(state.nextNode.geo)} />
     </View>
