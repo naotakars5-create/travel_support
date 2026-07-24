@@ -271,6 +271,18 @@ export function useAppState() {
     setEntries((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
   }, []);
 
+  /** 追加済みの行き先を、フォーム入力の内容で上書き更新する（再編集）。 */
+  const editEntry = useCallback(
+    (id: string, input: PlanEntryInput) => {
+      const full = inputToEntry("_", input);
+      if (!full) return;
+      // id と source は既存を維持し、それ以外を差し替える
+      const { id: _id, source: _source, ...patch } = full;
+      updateEntry(id, patch);
+    },
+    [updateEntry]
+  );
+
   /** 予約メール本文を解析し、確定アンカーの行き先として取り込む（補助機能）。 */
   const importFromMail = useCallback(async (body: string, source: string): Promise<{ ok: boolean; message?: string }> => {
     let result: ParseApiResponse;
@@ -421,6 +433,7 @@ export function useAppState() {
     addEntry,
     addSuggestion,
     updateEntry,
+    editEntry,
     removeEntry,
     importFromMail,
     composeWithAi,

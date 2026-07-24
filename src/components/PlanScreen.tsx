@@ -27,6 +27,7 @@ export function PlanScreen({
   onOpenAdd,
   onCompose,
   onRemoveEntry,
+  onEditEntry,
   onAddSuggestion,
   onShare,
   onImportShared,
@@ -42,6 +43,7 @@ export function PlanScreen({
   onOpenAdd: () => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
+  onEditEntry: (id: string) => void;
   onAddSuggestion: (s: SpotSuggestion) => void;
   onShare: () => void;
   onImportShared: () => void;
@@ -105,42 +107,47 @@ export function PlanScreen({
           const ps = PRIORITY_STYLE[e.priority];
           return (
             <View key={e.id} className="flex-row gap-3 border-b border-black/[.06] py-3.5">
-              <View className="w-[46px] pt-0.5">
-                {timeOf(e) ? (
-                  <Text className="font-mincho-600 text-[14px] text-ink" style={TNUM}>
-                    {formatJstTime(new Date(timeOf(e)!))}
-                  </Text>
-                ) : (
-                  <Text className="font-gothic-400 text-[10px] text-muted-light">—</Text>
-                )}
-                {e.fixedTime ? (
-                  <Text className="mt-0.5 font-gothic-400 text-[9px] text-accent">固定</Text>
-                ) : (
-                  !e.arriveBy && timeOf(e) && <Text className="mt-0.5 font-gothic-400 text-[9px] text-muted-light">予定</Text>
-                )}
-              </View>
-              <View className="flex-1">
-                <Text className="font-mincho-600 text-[15px] text-ink">{e.title}</Text>
-                {e.place && (
-                  <Text numberOfLines={1} className="mt-0.5 font-gothic-400 text-[10px] text-muted-light">
-                    {e.place}
-                  </Text>
-                )}
-                <View className="mt-1.5 flex-row flex-wrap items-center gap-1.5">
-                  <View className={`rounded-full border px-2 py-[1px] ${ps.border}`}>
-                    <Text className={`font-gothic-400 text-[9px] ${ps.text}`}>{PRIORITY_META[e.priority].label}</Text>
-                  </View>
-                  <Text className="font-gothic-400 text-[10px] text-muted">{MODE_LABEL[e.mode]}</Text>
-                  <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
-                    · 滞在{formatDurationMin(effectiveStayMin(e))}
-                  </Text>
-                  {typeof e.cost === "number" && e.cost > 0 && (
-                    <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
-                      · {formatYen(e.cost)}
+              <Pressable disabled={readOnly} onPress={() => onEditEntry(e.id)} className="flex-1 flex-row gap-3">
+                <View className="w-[46px] pt-0.5">
+                  {timeOf(e) ? (
+                    <Text className="font-mincho-600 text-[14px] text-ink" style={TNUM}>
+                      {formatJstTime(new Date(timeOf(e)!))}
                     </Text>
+                  ) : (
+                    <Text className="font-gothic-400 text-[10px] text-muted-light">—</Text>
+                  )}
+                  {e.fixedTime ? (
+                    <Text className="mt-0.5 font-gothic-400 text-[9px] text-accent">固定</Text>
+                  ) : (
+                    !e.arriveBy && timeOf(e) && <Text className="mt-0.5 font-gothic-400 text-[9px] text-muted-light">予定</Text>
                   )}
                 </View>
-              </View>
+                <View className="flex-1">
+                  <View className="flex-row items-center gap-1.5">
+                    <Text className="font-mincho-600 text-[15px] text-ink">{e.title}</Text>
+                    {!readOnly && <Text className="font-gothic-400 text-[10px] text-muted-light">編集 ›</Text>}
+                  </View>
+                  {e.place && (
+                    <Text numberOfLines={1} className="mt-0.5 font-gothic-400 text-[10px] text-muted-light">
+                      {e.place}
+                    </Text>
+                  )}
+                  <View className="mt-1.5 flex-row flex-wrap items-center gap-1.5">
+                    <View className={`rounded-full border px-2 py-[1px] ${ps.border}`}>
+                      <Text className={`font-gothic-400 text-[9px] ${ps.text}`}>{PRIORITY_META[e.priority].label}</Text>
+                    </View>
+                    <Text className="font-gothic-400 text-[10px] text-muted">{MODE_LABEL[e.mode]}</Text>
+                    <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                      · 滞在{formatDurationMin(effectiveStayMin(e))}
+                    </Text>
+                    {typeof e.cost === "number" && e.cost > 0 && (
+                      <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                        · {formatYen(e.cost)}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </Pressable>
               {!readOnly && (
                 <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8} className="pt-0.5">
                   <Text className="font-gothic-400 text-[16px] text-muted-light">×</Text>

@@ -35,17 +35,39 @@ function Chip({ active, label, onPress }: { active: boolean; label: string; onPr
   );
 }
 
-/** 行き先（行き先名・住所・重要度・滞在時間・目安到着時刻・費用）を入力して1件追加するフォーム。 */
-export function PlanEntryForm({ onSubmit }: { onSubmit: (input: PlanEntryInput) => void }) {
-  const [title, setTitle] = useState("");
-  const [place, setPlace] = useState("");
-  const [mode, setMode] = useState<TransportMode>("activity");
-  const [priority, setPriority] = useState<Priority>("want");
-  const [stayMin, setStayMin] = useState<number | null>(60);
-  const [arriveAt, setArriveAt] = useState<Date | null>(null);
-  const [fixedTime, setFixedTime] = useState(false);
-  const [cost, setCost] = useState("");
-  const [detail, setDetail] = useState("");
+export interface PlanEntryFormInitial {
+  title: string;
+  place?: string;
+  mode: TransportMode;
+  priority: Priority;
+  stayMin?: number;
+  arriveBy?: string;
+  fixedTime?: boolean;
+  cost?: number;
+  detail?: string;
+}
+
+/** 行き先を入力するフォーム。initial を渡すと「編集」モードになる（既存値を初期表示）。 */
+export function PlanEntryForm({
+  onSubmit,
+  initial,
+  submitLabel = "行き先を追加",
+  resetAfterSubmit = true,
+}: {
+  onSubmit: (input: PlanEntryInput) => void;
+  initial?: PlanEntryFormInitial;
+  submitLabel?: string;
+  resetAfterSubmit?: boolean;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [place, setPlace] = useState(initial?.place ?? "");
+  const [mode, setMode] = useState<TransportMode>(initial?.mode ?? "activity");
+  const [priority, setPriority] = useState<Priority>(initial?.priority ?? "want");
+  const [stayMin, setStayMin] = useState<number | null>(initial ? initial.stayMin ?? null : 60);
+  const [arriveAt, setArriveAt] = useState<Date | null>(initial?.arriveBy ? new Date(initial.arriveBy) : null);
+  const [fixedTime, setFixedTime] = useState(initial?.fixedTime ?? false);
+  const [cost, setCost] = useState(typeof initial?.cost === "number" ? String(initial.cost) : "");
+  const [detail, setDetail] = useState(initial?.detail ?? "");
 
   const canSubmit = title.trim().length > 0;
 
@@ -62,6 +84,7 @@ export function PlanEntryForm({ onSubmit }: { onSubmit: (input: PlanEntryInput) 
       cost: cost ? Number(cost.replace(/[^0-9]/g, "")) || undefined : undefined,
       detail: detail || undefined,
     });
+    if (!resetAfterSubmit) return;
     // 連続追加しやすいようリセット
     setTitle("");
     setPlace("");
@@ -166,7 +189,7 @@ export function PlanEntryForm({ onSubmit }: { onSubmit: (input: PlanEntryInput) 
         onPress={submit}
         className={`mt-1 rounded-[12px] px-4 py-3 ${canSubmit ? "bg-ink" : "bg-ink/30"}`}
       >
-        <Text className="text-center font-gothic-500 text-[12px] text-kinari">行き先を追加</Text>
+        <Text className="text-center font-gothic-500 text-[12px] text-kinari">{submitLabel}</Text>
       </Pressable>
     </View>
   );
