@@ -1,59 +1,116 @@
-# スマホで使えるように公開する手順（EAS Hosting・固定URL）
+# 自分で公開する手順（初めてでもコピペでOK・Windows向け）
 
-Web版として固定URL（`https://…`）で公開し、スマホの Safari で開いて「ホーム画面に追加」すればアプリのように使えます。
-毎回 QR を読む必要はありません。以下は**あなたのPCのターミナル**で、このプロジェクトのフォルダ内で実行します。
+このアプリを、スマホで開ける固定URL（`https://…`）として公開する手順です。
+所要 15〜20分。**コマンドはコピペでOK**。詰まったらエラー文をそのままClaudeに貼れば直せます。
 
-> 前提: [expo.dev](https://expo.dev) で無料アカウントを作成しておく（初回のみ）。
+> ✅ 環境変数（GOOGLE_MAPS_API_KEY / LLM_PROVIDER / OPENAI_API_KEY）は、すでに Expo の
+> 「環境変数」ページに登録済みなので、この手順では触りません。
 
-## 1. Expo にログイン（初回のみ）
+---
+
+## 0. 準備するもの
+
+- Windowsパソコン
+- Expoアカウント（作成済み：直高0131）
+
+---
+
+## 1. Node.js を入れる（初回だけ）
+
+1. https://nodejs.org を開く
+2. 左側の **「LTS」** のボタンをクリックしてインストーラをダウンロード
+3. ダウンロードしたファイルを開き、**「Next」を押していくだけ**でインストール完了
+
+> これで `npm` `npx` というコマンドが使えるようになります（アプリを動かす土台）。
+
+---
+
+## 2. アプリのコードをパソコンに置く（ZIPでOK・gitは不要）
+
+1. ブラウザで下記を開く（**このブランチが最新版です**）:
+   `https://github.com/naotakars5-create/travel_support/tree/claude/travel-itinerary-ai-suggestions-vf1m8k`
+2. 緑色の **「Code」** ボタン → **「Download ZIP」**
+3. ダウンロードした ZIP を右クリック →「すべて展開」。分かりやすい場所（例：デスクトップ）に展開
+4. 展開してできたフォルダ（`travel_support-...`）を開く
+
+---
+
+## 3. そのフォルダで「ターミナル」を開く
+
+1. 手順2で開いたフォルダの中で、**上部のアドレス欄**（フォルダの場所が書かれている白い帯）をクリック
+2. そこに `powershell` と入力して **Enter**
+3. 黒い（または青い）ウィンドウが開きます。これが「ターミナル」です
+
+> 以降は、このウィンドウにコマンドを**コピペ→Enter**していくだけです。
+
+---
+
+## 4. 必要な部品をインストール
+
+```bash
+npm install
+```
+
+（少し時間がかかります。完了するまで待つ）
+
+---
+
+## 5. Expo にログイン
 
 ```bash
 npx eas login
 ```
 
-## 2. サーバー用の環境変数を EAS に登録（初回のみ）
+- メールアドレス（または「直高0131」のユーザー名）とパスワードを聞かれるので入力
+- ※ パスワードを打っても画面には何も表示されません（仕様です）。そのまま Enter
 
-`.env.local` はデプロイに含まれないため、公開サーバーが使うキーは EAS 側に登録します。
-`<...>` は自分の値に置き換えてください。
+---
+
+## 6. プロジェクトを紐づける
 
 ```bash
-# Google Maps（住所→座標・移動時間・周辺スポット・全行程マップ）
-npx eas env:create --environment production --name GOOGLE_MAPS_API_KEY --value "<GoogleマップのAPIキー>" --visibility secret
-
-# AI（旅程作成・メール解析）を OpenAI で使う
-npx eas env:create --environment production --name LLM_PROVIDER --value "openai" --visibility plaintext
-npx eas env:create --environment production --name OPENAI_API_KEY --value "<OpenAIのAPIキー>" --visibility secret
-# 任意: モデルを固定したい場合
-# npx eas env:create --environment production --name OPENAI_MODEL --value "gpt-4.1" --visibility plaintext
+npx eas init
 ```
 
-## 3. Web版としてビルド
+- 「Would you like to create a project?（プロジェクトを作りますか）」等と聞かれたら **Yes**
+- アカウントを選ぶ画面が出たら **naotaka0131** を選ぶ
+- 既存の「移動支援」を選べる場合はそれを選んでもOK
+
+---
+
+## 7. Web版をビルド
 
 ```bash
 npx expo export --platform web
 ```
 
-## 4. デプロイ
+---
+
+## 8. 公開（デプロイ）
 
 ```bash
 npx eas deploy --prod
 ```
 
-成功すると `https://<プロジェクト名>.expo.app` のような固定URLが発行されます。
+成功すると `https://xxxxx.expo.app` のような **URL** が表示されます。これがあなたのアプリのURLです🎉
 
-## 5. スマホで開く
+---
 
-- 発行された URL をスマホの Safari で開く
-- 共有ボタン →「ホーム画面に追加」→ アプリアイコンとして起動できます
-- 位置情報を許可すると、周辺スポット提案と到着の自動記録が有効になります（https 上なので iOS でも動作）
+## 9. スマホで開く
 
-## 更新のしかた（2回目以降）
+1. 表示された URL をスマホのブラウザ（iPhoneならSafari）で開く
+2. 共有ボタン →「ホーム画面に追加」→ アプリのアイコンとして起動できます
+3. 位置情報を「許可」すると、当日の周辺スポット提案と到着の自動記録が有効になります
 
-コードやキーを変えたら、`3 → 4`（`export` → `deploy --prod`）をやり直せば同じURLに反映されます。
-環境変数を変えたい場合は `npx eas env:create ...` を再実行（または EXPO の Web ダッシュボードで編集）してから再デプロイします。
+---
 
-## キーの取り扱い
+## 更新したくなったら（2回目以降）
 
-- APIキーは `--visibility secret` で登録し、コードや Git には**書かない**（`.env.local` は Git 管理外）。
-- Google Maps キーは Google Cloud Console で「HTTP リファラー制限」＋「使用APIの制限」をかけると安全です。
-- OpenAI キーは従量課金です。使いすぎ防止に、OpenAI の管理画面で使用上限（Usage limits）を設定しておくと安心です。
+同じフォルダのターミナルで、`7 → 8`（`export` → `deploy --prod`）をやり直すだけ。同じURLに反映されます。
+
+## うまくいかない時
+
+- 赤い文字（エラー）が出たら、**その文章をまるごとコピーして Claude に貼ってください**。原因と直し方を返します。
+- よくあるやつ:
+  - `npm install` が途中で止まる → もう一度 `npm install`
+  - ログインできない → `npx eas whoami` で今のログイン状態を確認
