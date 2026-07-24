@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "旅ナビ",
-    "slug": "tabinavi",
+    "slug": "travel-support",
+    "owner": "naotaka0131",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

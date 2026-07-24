@@ -10,7 +10,7 @@ export interface Spot {
  * 空き時間に寄れる周辺スポットを取得するインターフェース。
  */
 export interface SpotProvider {
-  nearby(lat: number, lng: number, freeMinutes: number): Promise<Spot[]>;
+  nearby(lat: number, lng: number, freeMinutes: number, preferIndoor?: boolean): Promise<Spot[]>;
 }
 
 const FIXED_SPOTS: Spot[] = [
@@ -19,20 +19,27 @@ const FIXED_SPOTS: Spot[] = [
   { name: "適塾", note: "重要文化財", walkMin: 7 },
 ];
 
+const FIXED_INDOOR_SPOTS: Spot[] = [
+  { name: "中之島美術館", note: "屋内 · 企画展", walkMin: 4 },
+  { name: "こども本の森 中之島", note: "屋内 · 図書施設", walkMin: 5 },
+  { name: "大阪市立科学館", note: "屋内 · 雨でも快適", walkMin: 9 },
+];
+
 /** 固定データ実装。座標が無い場合や API キー未設定時のフォールバックに使う。 */
 export const fixedSpotProvider: SpotProvider = {
-  async nearby(_lat, _lng, freeMinutes) {
-    return FIXED_SPOTS.filter((s) => s.walkMin * 2 <= freeMinutes || freeMinutes >= 30);
+  async nearby(_lat, _lng, freeMinutes, preferIndoor) {
+    const base = preferIndoor ? FIXED_INDOOR_SPOTS : FIXED_SPOTS;
+    return base.filter((s) => s.walkMin * 2 <= freeMinutes || freeMinutes >= 30);
   },
 };
 
 /** Google Places API（/api/nearby-spots 経由）で実際の周辺観光スポットを取得する実装。 */
 export const googlePlacesSpotProvider: SpotProvider = {
-  async nearby(lat, lng, freeMinutes) {
+  async nearby(lat, lng, freeMinutes, preferIndoor) {
     const res = await fetch(apiUrl("/api/nearby-spots"), {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lat, lng, freeMinutes }),
+      body: JSON.stringify({ lat, lng, freeMinutes, preferIndoor: Boolean(preferIndoor) }),
     });
     if (!res.ok) throw new Error(`nearby-spots API error ${res.status}`);
     const data = await res.json();
@@ -49,13 +56,13 @@ export const googlePlacesSpotProvider: SpotProvider = {
 export function createSpotProvider(hasCoordinates: boolean): SpotProvider {
   if (!hasCoordinates) return fixedSpotProvider;
   return {
-    async nearby(lat, lng, freeMinutes) {
+    async nearby(lat, lng, freeMinutes, preferIndoor) {
       try {
-        const spots = await googlePlacesSpotProvider.nearby(lat, lng, freeMinutes);
+        const spots = await googlePlacesSpotProvider.nearby(lat, lng, freeMinutes, preferIndoor);
         if (spots.length > 0) return spots;
-        return fixedSpotProvider.nearby(lat, lng, freeMinutes);
+        return fixedSpotProvider.nearby(lat, lng, freeMinutes, preferIndoor);
       } catch {
-        return fixedSpotProvider.nearby(lat, lng, freeMinutes);
+        return fixedSpotProvider.nearby(lat, lng, freeMinutes, preferIndoor);
       }
     },
   };

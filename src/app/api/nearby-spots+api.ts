@@ -4,6 +4,8 @@ interface NearbyRequest {
   lat?: number;
   lng?: number;
   freeMinutes?: number;
+  /** 雨天時は屋内スポットを優先する */
+  preferIndoor?: boolean;
 }
 
 const cache = new Map<string, Awaited<ReturnType<typeof nearbyTouristSpots>>>();
@@ -22,7 +24,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "リクエストの形式が不正です" }, { status: 400 });
   }
 
-  const { lat, lng, freeMinutes } = payload;
+  const { lat, lng, freeMinutes, preferIndoor } = payload;
   if (typeof lat !== "number" || typeof lng !== "number") {
     return Response.json({ error: "lat / lng が必要です" }, { status: 400 });
   }
@@ -32,13 +34,13 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const radius = radiusForFreeMinutes(freeMinutes ?? 60);
-  const key = `${lat.toFixed(4)},${lng.toFixed(4)}|${radius}`;
+  const key = `${lat.toFixed(4)},${lng.toFixed(4)}|${radius}|${preferIndoor ? "in" : "out"}`;
   if (cache.has(key)) {
     return Response.json({ spots: cache.get(key) });
   }
 
   try {
-    const spots = await nearbyTouristSpots({ lat, lng }, radius);
+    const spots = await nearbyTouristSpots({ lat, lng }, radius, Boolean(preferIndoor));
     cache.set(key, spots);
     return Response.json({ spots });
   } catch (err) {

@@ -75,12 +75,15 @@ export interface PlaceResult {
 
 const WALK_METERS_PER_MIN = 80;
 
-/** 周辺の観光スポットを検索する（Places Nearby Search API）。 */
-export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number): Promise<PlaceResult[]> {
+/** 雨天時に優先する屋内スポットの Places タイプ。 */
+const INDOOR_PLACE_TYPE = "museum";
+
+/** 周辺の観光スポットを検索する（Places Nearby Search API）。preferIndoor=true で雨天向けに屋内施設を優先。 */
+export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number, preferIndoor = false): Promise<PlaceResult[]> {
   const url = new URL("https://maps.googleapis.com/maps/api/place/nearbysearch/json");
   url.searchParams.set("location", `${origin.lat},${origin.lng}`);
   url.searchParams.set("radius", String(radiusMeters));
-  url.searchParams.set("type", "tourist_attraction");
+  url.searchParams.set("type", preferIndoor ? INDOOR_PLACE_TYPE : "tourist_attraction");
   url.searchParams.set("language", "ja");
   url.searchParams.set("key", apiKey());
 
@@ -112,4 +115,28 @@ export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number)
       };
     })
     .sort((a, b) => a.walkMin - b.walkMin);
+}
+
+/**
+ * 旅程の全地点を結ぶ経路を描いた静的地図（Static Maps API）の画像URLを組み立てる。
+ * APIキーはサーバー側にのみ埋め込む（クライアントへは露出させない）。
+ */
+export function staticRouteMapUrl(points: GeoPoint[], width: number, height: number): string | null {
+  if (points.length === 0) return null;
+  const url = new URL("https://maps.googleapis.com/maps/api/staticmap");
+  url.searchParams.set("size", `${width}x${height}`);
+  url.searchParams.set("scale", "2");
+  url.searchParams.set("language", "ja");
+  url.searchParams.set("maptype", "roadmap");
+
+  const path = points.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join("|");
+  if (points.length > 1) {
+    url.searchParams.append("path", `color:0xc2492dcc|weight:4|${path}`);
+  }
+  points.forEach((p, i) => {
+    const label = points.length <= 9 ? String(i + 1) : "";
+    url.searchParams.append("markers", `color:0x2a2622|label:${label}|${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
+  });
+  url.searchParams.set("key", apiKey());
+  return url.toString();
 }

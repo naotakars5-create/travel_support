@@ -1,13 +1,19 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MailItem } from "./types";
+import { PackingItem, PlanEntry, ScheduleSlot } from "./types";
 
-const STORAGE_KEY = "tabinavi.state.v1";
+const STORAGE_KEY = "tabinavi.state.v2";
 
 export interface PersistedState {
-  version: 1;
-  mails: MailItem[];
+  version: 2;
+  /** ユーザーが追加した行き先リスト（主入力） */
+  entries: PlanEntry[];
+  /** 直近に組み上げた時刻割り当て（旅程イベントは entries+slots から都度導出する） */
+  slots: ScheduleSlot[];
+  /** 当日画面の到着記録済みノードキー */
   currentNodeKey: string | null;
-  seedGeneratedAt: string;
+  /** 持ち物チェックリスト */
+  packing: PackingItem[];
+  savedAt: string;
 }
 
 export async function loadState(): Promise<PersistedState | null> {
@@ -15,7 +21,7 @@ export async function loadState(): Promise<PersistedState | null> {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed?.version !== 1) return null;
+    if (parsed?.version !== 2) return null;
     return parsed as PersistedState;
   } catch {
     return null;
