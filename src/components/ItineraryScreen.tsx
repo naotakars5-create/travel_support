@@ -55,11 +55,13 @@ export function ItineraryScreen({
   rail,
   currentNodeKey,
   justAddedEventId,
+  liveLocation,
   onNavigatePlan,
 }: {
   rail: RailItem[];
   currentNodeKey: string | null;
   justAddedEventId: string | null;
+  liveLocation: GeoPoint | null;
   onNavigatePlan: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -86,7 +88,7 @@ export function ItineraryScreen({
       <View className="h-px w-full bg-black/[.08]" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 80 }}>
-        {mapPoints.length > 0 && <RouteMap points={mapPoints} />}
+        {(mapPoints.length > 0 || liveLocation) && <RouteMap points={mapPoints} me={liveLocation} />}
         {rail.length === 0 && (
           <Pressable onPress={onNavigatePlan} className="mt-10 self-center rounded-[12px] border border-ink/25 px-5 py-3">
             <Text className="text-center font-gothic-400 text-[12px] text-muted">

@@ -18,14 +18,22 @@ export async function GET(request: Request): Promise<Response> {
     .map(([lat, lng]) => ({ lat: Number(lat), lng: Number(lng) }))
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
 
-  if (points.length === 0) {
+  // 現在地（任意）: me=lat,lng
+  const meParam = url.searchParams.get("me");
+  let me: GeoPoint | null = null;
+  if (meParam) {
+    const [mlat, mlng] = meParam.split(",").map(Number);
+    if (Number.isFinite(mlat) && Number.isFinite(mlng)) me = { lat: mlat, lng: mlng };
+  }
+
+  if (points.length === 0 && !me) {
     return new Response("no points", { status: 400 });
   }
   if (!hasGoogleMapsKey()) {
     return new Response("no key", { status: 404 });
   }
 
-  const mapUrl = staticRouteMapUrl(points, width, height);
+  const mapUrl = staticRouteMapUrl(points, width, height, me);
   if (!mapUrl) return new Response("no map", { status: 400 });
 
   try {

@@ -9,15 +9,17 @@ import { GeoPoint } from "./types";
  * Web では getApiBaseUrl() が空文字（相対URL）を返すが、react-native-web の <Image> は
  * 相対URLを解決できないことがあるため、window.location.origin を足して絶対URLにする。
  */
-export function routeMapImageUrl(points: GeoPoint[], width = 640, height = 320): string | null {
+export function routeMapImageUrl(points: GeoPoint[], me?: GeoPoint | null, width = 640, height = 320): string | null {
   const valid = points.filter((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng));
-  if (valid.length === 0) return null;
+  const hasMe = Boolean(me && Number.isFinite(me.lat) && Number.isFinite(me.lng));
+  if (valid.length === 0 && !hasMe) return null;
   const pts = valid.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join(";");
 
   let base = getApiBaseUrl();
   if (!base && Platform.OS === "web" && typeof window !== "undefined") {
     base = window.location.origin;
   }
-  const query = `pts=${encodeURIComponent(pts)}&w=${width}&h=${height}`;
-  return `${base}/api/staticmap?${query}`;
+  const params = [`pts=${encodeURIComponent(pts)}`, `w=${width}`, `h=${height}`];
+  if (hasMe) params.push(`me=${me!.lat.toFixed(5)},${me!.lng.toFixed(5)}`);
+  return `${base}/api/staticmap?${params.join("&")}`;
 }
