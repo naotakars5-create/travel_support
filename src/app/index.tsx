@@ -44,6 +44,7 @@ export default function Home() {
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
+          onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
           onAddSuggestion={app.addSuggestion}
           onShare={app.shareCurrentPlan}
           onImportShared={app.importSharedToOwn}

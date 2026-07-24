@@ -34,6 +34,7 @@ export function PlanScreen({
   onCompose,
   onRemoveEntry,
   onEditEntry,
+  onBumpPriority,
   onAddSuggestion,
   onShare,
   onImportShared,
@@ -54,6 +55,7 @@ export function PlanScreen({
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
+  onBumpPriority: (id: string) => void;
   onAddSuggestion: (s: SpotSuggestion) => void;
   onShare: () => void;
   onImportShared: () => void;
@@ -66,6 +68,8 @@ export function PlanScreen({
     const tb = timeOf(b) ? new Date(timeOf(b)!).getTime() : Infinity;
     return ta - tb;
   });
+  // AIが組んだ結果、今の旅程に入りきらなかった予定（スケジュールに含まれていないもの）
+  const dropped = scheduleByEntry.size > 0 ? entries.filter((e) => !scheduleByEntry.has(e.id)) : [];
 
   return (
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
@@ -209,6 +213,32 @@ export function PlanScreen({
                 <Text className="mt-1 font-mincho-400 text-[13px] leading-[20px] text-ink">{planNotes}</Text>
               </View>
             )}
+          </View>
+        )}
+
+        {!readOnly && dropped.length > 0 && (
+          <View className="mt-6">
+            <Text className="mb-2 font-gothic-500 text-[10px] tracking-[.15em] text-accent">今の旅程に入りきらなかった予定</Text>
+            <View className="rounded-[16px] border border-accent/40">
+              {dropped.map((e, i) => (
+                <View key={e.id} className={`flex-row items-center justify-between px-4 py-3 ${i > 0 ? "border-t border-black/[.06]" : ""}`}>
+                  <View className="flex-1 pr-2">
+                    <Text className="font-mincho-400 text-[14px] text-ink">{e.title}</Text>
+                    <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{PRIORITY_META[e.priority].label}</Text>
+                  </View>
+                  {e.priority !== "must" ? (
+                    <Pressable onPress={() => onBumpPriority(e.id)} className="rounded-full border border-accent px-3 py-1">
+                      <Text className="font-gothic-500 text-[11px] text-accent">必ず行く</Text>
+                    </Pressable>
+                  ) : (
+                    <Text className="font-gothic-400 text-[10px] text-muted-light">時間が不足</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+            <Text className="mt-1.5 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+              「必ず行く」にすると優先して旅程へ組み込みます（時間が厳しい場合は他の任意予定が後回しになります）。
+            </Text>
           </View>
         )}
 

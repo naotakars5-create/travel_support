@@ -9,11 +9,13 @@ import DateTimePicker from "@react-native-community/datetimepicker";
  * - iOS/Android: DateTimePicker（mode="time"|"date"）。
  */
 
+// 他の TextInput（px-3 py-2.5 text-[14px]）と箱の高さ・余白を揃える。
 const WEB_INPUT_STYLE = {
   borderRadius: 10,
   border: "1px solid rgba(0,0,0,0.1)",
   background: "rgba(255,255,255,0.6)",
-  padding: "10px 12px",
+  padding: "0 12px",
+  height: 42,
   fontSize: 14,
   color: "#2a2622",
   fontFamily: "ZenOldMincho_400Regular, serif",
