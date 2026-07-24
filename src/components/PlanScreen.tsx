@@ -23,10 +23,13 @@ export function PlanScreen({
   planNotes,
   composing,
   composeError,
+  readOnly,
   onOpenAdd,
   onCompose,
   onRemoveEntry,
   onAddSuggestion,
+  onShare,
+  onImportShared,
 }: {
   entries: PlanEntry[];
   totals: PlanTotals;
@@ -35,10 +38,13 @@ export function PlanScreen({
   planNotes: string | null;
   composing: boolean;
   composeError: string | null;
+  readOnly: boolean;
   onOpenAdd: () => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
   onAddSuggestion: (s: SpotSuggestion) => void;
+  onShare: () => void;
+  onImportShared: () => void;
 }) {
   const insets = useSafeAreaInsets();
   // 表示時刻＝目安到着（指定があれば）または組み上げ済みの到着予定
@@ -55,14 +61,21 @@ export function PlanScreen({
         <View className="flex-row items-start justify-between">
           <View>
             <Text className="font-gothic-400 text-[10px] tracking-[.2em] text-muted">TABI-NAVI</Text>
-            <Text className="mt-1 font-mincho-600 text-[26px] text-ink">行き先リスト</Text>
+            <Text className="mt-1 font-mincho-600 text-[26px] text-ink">{readOnly ? "共有された旅程" : "行き先リスト"}</Text>
           </View>
-          <Pressable onPress={onOpenAdd} className="mt-1 h-7 w-7 items-center justify-center rounded-[8px] border border-ink/25">
-            <View className="relative h-[10px] w-[10px]">
-              <View className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-ink" />
-              <View className="absolute left-0 top-1/2 h-[1.5px] w-full -translate-y-1/2 bg-ink" />
+          {!readOnly && (
+            <View className="mt-1 flex-row items-center gap-2">
+              <Pressable onPress={onShare} className="h-7 items-center justify-center rounded-[8px] border border-ink/25 px-3">
+                <Text className="font-gothic-500 text-[11px] text-ink">共有</Text>
+              </Pressable>
+              <Pressable onPress={onOpenAdd} className="h-7 w-7 items-center justify-center rounded-[8px] border border-ink/25">
+                <View className="relative h-[10px] w-[10px]">
+                  <View className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-ink" />
+                  <View className="absolute left-0 top-1/2 h-[1.5px] w-full -translate-y-1/2 bg-ink" />
+                </View>
+              </Pressable>
             </View>
-          </Pressable>
+          )}
         </View>
         <Text className="mt-1 font-gothic-400 text-[11px] text-muted" style={TNUM}>
           行き先 {totals.entryCount}件{totals.totalCost > 0 ? ` · 予算 ${formatYen(totals.totalCost)}` : ""}
@@ -71,6 +84,17 @@ export function PlanScreen({
       <View className="h-px w-full bg-black/[.08]" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 12, paddingBottom: 90 }}>
+        {readOnly && (
+          <View className="mb-4 rounded-[12px] border border-ink/15 bg-white/50 px-4 py-3">
+            <Text className="font-gothic-500 text-[11px] text-ink">共有された旅程（閲覧のみ）</Text>
+            <Text className="mt-1 font-gothic-400 text-[10px] leading-[16px] text-muted">
+              旅程・当日ビュー（残り時間・近くのスポット）を見られます。編集はできません。
+            </Text>
+            <Pressable onPress={onImportShared} className="mt-2 self-start rounded-full bg-ink px-3 py-1.5">
+              <Text className="font-gothic-500 text-[11px] text-kinari">自分のプランに保存して編集</Text>
+            </Pressable>
+          </View>
+        )}
         {sorted.length === 0 && (
           <Text className="mt-10 text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
             右上の＋から行きたい場所を追加してください。{"\n"}追加していくと、AIが一日の順路に組み上げます。
@@ -117,14 +141,16 @@ export function PlanScreen({
                   )}
                 </View>
               </View>
-              <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8} className="pt-0.5">
-                <Text className="font-gothic-400 text-[16px] text-muted-light">×</Text>
-              </Pressable>
+              {!readOnly && (
+                <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8} className="pt-0.5">
+                  <Text className="font-gothic-400 text-[16px] text-muted-light">×</Text>
+                </Pressable>
+              )}
             </View>
           );
         })}
 
-        {entries.length > 0 && (
+        {!readOnly && entries.length > 0 && (
           <View className="mt-5">
             <Pressable
               disabled={composing}

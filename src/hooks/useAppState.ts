@@ -16,6 +16,7 @@ import {
   suggestionToEntry,
 } from "@/lib/plan";
 import { buildDefaultPacking } from "@/lib/packing";
+import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM } from "@/lib/share";
 import { TransitEstimate, createPrecomputedEstimator, guessMode } from "@/lib/transit";
 import { apiUrl } from "@/lib/apiBase";
 import { haversineMeters } from "@/lib/geo";
@@ -50,6 +51,8 @@ export function useAppState() {
   const [planNotes, setPlanNotes] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const [composeError, setComposeError] = useState<string | null>(null);
+  // 共有リンクで開かれた「閲覧のみ」状態か
+  const [readOnly, setReadOnly] = useState(false);
 
   const initializedRef = useRef(false);
   // 「構造」が既にスケジュール済みかを追跡し、座標だけ埋まった時の不要な再ローカル化を防ぐ。
@@ -60,6 +63,16 @@ export function useAppState() {
     if (initializedRef.current) return;
     initializedRef.current = true;
     void (async () => {
+      // 共有リンクで開かれた場合は、URLのプランを「閲覧のみ」で読み込む（保存済みは上書きしない）
+      const shared = readSharedPlanFromUrl();
+      if (shared) {
+        setEntries(shared.entries);
+        setSlots(shared.slots);
+        setPacking([]);
+        setReadOnly(true);
+        scheduleSigRef.current = scheduleSignature(shared.entries);
+        return;
+      }
       const persisted = await loadState();
       if (persisted) {
         setEntries(persisted.entries);
@@ -77,11 +90,11 @@ export function useAppState() {
     })();
   }, []);
 
-  // 永続化
+  // 永続化（共有リンクの閲覧中は保存しない＝受け取った人の自分のプランを壊さない）
   useEffect(() => {
-    if (!entries) return;
+    if (!entries || readOnly) return;
     void saveState({ version: 2, entries, slots, currentNodeKey, packing, savedAt: new Date().toISOString() });
-  }, [entries, slots, currentNodeKey, packing]);
+  }, [entries, slots, currentNodeKey, packing, readOnly]);
 
   // 現在時刻の更新（当日画面のカウントダウン用）
   useEffect(() => {
@@ -331,6 +344,35 @@ export function useAppState() {
     setPacking((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
+  /** 現在のプランの共有リンクを発行して送る（LINE等）／コピーする。 */
+  const shareCurrentPlan = useCallback(async () => {
+    const list = entries ?? [];
+    if (list.length === 0) return;
+    const url = buildShareUrl(list, slots);
+    const result = await sharePlanLink(url);
+    if (result === "copied") {
+      setFlash({ visible: true, text: "共有リンクをコピーしました\nLINEなどに貼り付けて送れます" });
+      setTimeout(() => setFlash({ visible: false, text: "" }), 2000);
+    } else if (result === "failed") {
+      setFlash({ visible: true, text: "共有リンクの発行に失敗しました" });
+      setTimeout(() => setFlash({ visible: false, text: "" }), 1700);
+    }
+  }, [entries, slots]);
+
+  /** 共有リンクで開いたプランを、自分用（編集可）として取り込む。 */
+  const importSharedToOwn = useCallback(() => {
+    setReadOnly(false);
+    scheduleSigRef.current = scheduleSignature(entries ?? []);
+    // 再読み込みで再び閲覧のみに戻らないよう、URLの共有パラメータを消す（Webのみ）
+    if (typeof window !== "undefined" && window.history?.replaceState) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete(SHARE_PARAM);
+      window.history.replaceState({}, "", url.toString());
+    }
+    setFlash({ visible: true, text: "自分のプランに保存しました\n編集できます" });
+    setTimeout(() => setFlash({ visible: false, text: "" }), 1900);
+  }, [entries]);
+
   const recordArrival = useCallback((nodeKey: string, place: string) => {
     setCurrentNodeKey(nodeKey);
     setFlash({ visible: true, text: `${place} に到着\n到着を記録しました` });
@@ -373,6 +415,9 @@ export function useAppState() {
     planNotes,
     composing,
     composeError,
+    readOnly,
+    shareCurrentPlan,
+    importSharedToOwn,
     addEntry,
     addSuggestion,
     updateEntry,

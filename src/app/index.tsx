@@ -32,10 +32,13 @@ export default function Home() {
           planNotes={app.planNotes}
           composing={app.composing}
           composeError={app.composeError}
+          readOnly={app.readOnly}
           onOpenAdd={() => setAddOpen(true)}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
           onAddSuggestion={app.addSuggestion}
+          onShare={app.shareCurrentPlan}
+          onImportShared={app.importSharedToOwn}
         />
       )}
       {app.tab === "itin" && (
