@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Platform, Pressable, Text, TextInput, View } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { Pressable, Text, TextInput, View } from "react-native";
 import { TransportMode } from "@/lib/types";
 import { ManualEventInput } from "@/lib/manualEntry";
+import { DateField } from "./DateField";
 
 const MODE_OPTIONS: { value: TransportMode; label: string }[] = [
   { value: "air", label: "飛行機" },
@@ -16,39 +16,6 @@ const MODE_OPTIONS: { value: TransportMode; label: string }[] = [
 ];
 
 const MUTED = "#8a8378";
-
-function formatDateTime(d: Date | null): string {
-  if (!d) return "日時を選択";
-  return d.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
-function DateField({ label, value, onChange, required }: { label: string; value: Date | null; onChange: (d: Date) => void; required?: boolean }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <View className="flex-1 gap-1">
-      <Text className="font-gothic-400 text-[10px] text-muted">
-        {label}
-        {required ? " *" : ""}
-      </Text>
-      <Pressable onPress={() => setOpen(true)} className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5">
-        <Text className={`font-mincho-400 text-[13px] ${value ? "text-ink" : "text-muted-light"}`} style={{ fontVariant: ["tabular-nums"] }}>
-          {formatDateTime(value)}
-        </Text>
-      </Pressable>
-      {open && (
-        <DateTimePicker
-          value={value ?? new Date()}
-          mode="datetime"
-          display={Platform.OS === "ios" ? "inline" : "default"}
-          onChange={(_, d) => {
-            setOpen(Platform.OS === "ios");
-            if (d) onChange(d);
-          }}
-        />
-      )}
-    </View>
-  );
-}
 
 export function ManualEntryForm({
   onSubmit,

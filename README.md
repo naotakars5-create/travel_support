@@ -14,7 +14,37 @@ cp .env.example .env.local   # ANTHROPIC_API_KEY / GOOGLE_MAPS_API_KEY を設定
 npx expo start
 ```
 
-ターミナルに表示される QR コードをスマホの **Expo Go** アプリ（App Store / Google Play）で読み取ると実機で動きます。このリポジトリのサンドボックス環境はネットワーク制限があり、スマホから直接 dev サーバーに繋げません（tunnel/ngrok も制限されています）。**実機確認は GitHub Codespaces かご自身のPC上で `npx expo start` を実行してください。**
+ターミナルに表示される QR コードをスマホの **Expo Go** アプリ（App Store / Google Play）で読み取ると実機で動きます。クラウド環境（Codespaces 等）から実機で確認する場合は、スマホと dev サーバーが同じLANに乗らないため `npx expo start --tunnel` を使ってください（`@expo/ngrok` が必要。初回は自動でインストールされます）。
+
+## Web版として固定URLで公開する（QR不要・推奨）
+
+毎回 QR を読む代わりに、Web版としてビルドして固定の `https://...` URL で公開できます。スマホの Safari で開いて「ホーム画面に追加」すれば、アプリのアイコンとして起動できます（サーバー起動も QR も不要）。React Native の画面がそのままブラウザで動きます（日時入力だけはブラウザ標準の `datetime-local` に自動で切り替わります）。
+
+このアプリはメール解析・地図用のサーバーAPI（`+api.ts`）とAPIキーを持つため、静的ホスティングではなくサーバー実行できる **EAS Hosting** を使います。
+
+```bash
+# 1. 無料の Expo アカウントでログイン（初回のみ）
+npx eas login
+
+# 2. サーバー用の環境変数を EAS 側に登録（初回のみ）
+#    production 環境にキーを保存する
+npx eas env:create --environment production --name ANTHROPIC_API_KEY --value "sk-ant-..." --visibility secret
+npx eas env:create --environment production --name GOOGLE_MAPS_API_KEY --value "AIza..." --visibility secret
+
+# 3. Web版としてビルド
+npx expo export --platform web
+
+# 4. デプロイ（初回は本番エイリアスに固定URLを付ける）
+npx eas deploy --prod
+```
+
+デプロイが成功すると `https://<プロジェクト名>.expo.app` のような固定URLが発行されます。以降はコードを変えたら `npx expo export --platform web && npx eas deploy --prod` を実行すれば同じURLに反映されます。
+
+> 注: EAS Hosting は無料枠があります。GPSはブラウザの位置情報許可で動作します（iOS Safari では https 必須なので、この公開URL上では有効）。
+
+## 実機ネイティブアプリにする（任意・有料）
+
+ホーム画面から起動する「本物のネイティブアプリ」にしたい場合は EAS Build を使います。ただし **iPhone に継続的にインストールするには Apple Developer Program（年額約$99）が必要** です（Apple の制約）。Android は無料で `.apk` を作って直接インストールできます。今回はここまでは未対応（Web版公開までを実装）。
 
 ### 環境変数（`.env.local`）
 
@@ -36,6 +66,7 @@ npx expo start
 - **Google Maps 連携**: 住所のジオコーディング（`/api/geocode`）、地点間の実測移動時間（`/api/directions`）、空き時間の周辺観光スポット（`/api/nearby-spots`）を実装済み。`GOOGLE_MAPS_API_KEY` 未設定時はヒューリスティック推定・固定スポットに自動フォールバックする。**実キーでE2E検証済み**（実際の住所→実測移動時間・実在スポット名で動作確認）。
 - **手入力での旅程登録**: メール解析を介さず場所（住所推奨）・時刻を直接入力して旅程に追加できる（受信箱の「＋」→「手入力で追加」）。
 - **GPS連携**: `expo-location` で実機の現在地を取得（`src/hooks/useLiveLocation.ts`）。空き時間の周辺スポット提案は、到着記録した地点の座標ではなく実際の現在地を優先して使う。また、当日画面が move/free 状態のとき、次の目的地（座標がジオコーディング済みの場合）から120m以内に近づくと「到着を記録」ボタンを押さなくても自動で到着記録される（`src/hooks/useAppState.ts`）。位置情報の許可が得られない場合は自動検知のみ無効化され、手動の到着記録ボタンは常に使える。
+- **Web版対応**: `npx expo export --platform web` でWeb版として書き出せる。日時入力は、ネイティブでは `@react-native-community/datetimepicker`、Webではブラウザ標準の `<input type="datetime-local">` に自動で切り替わる（`src/components/DateField.tsx` の `Platform.OS` 分岐）。Web版はブラウザ（iPhone幅）で受信箱→解析→旅程→当日の一連の流れ・日時ピッカーが動作することを確認済み。
 - **Expo Go 実機確認**: このサンドボックスからは tunnel 接続がネットワークポリシーでブロックされているため未実施。iOS/Android 双方の Metro バンドルが正常にビルドされること、4つのAPIルートがdevサーバー上で正しく応答することは確認済み。
 
 ## アーキテクチャメモ
