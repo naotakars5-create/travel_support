@@ -55,7 +55,7 @@ export function PackingScreen({
           </View>
         ))}
 
-        <View className="mt-4 flex-row gap-2">
+        <View className="mt-4 flex-row items-stretch gap-2">
           <TextInput
             value={input}
             onChangeText={setInput}
@@ -63,9 +63,12 @@ export function PackingScreen({
             returnKeyType="done"
             placeholder="持ち物を追加"
             placeholderTextColor={MUTED}
-            className="flex-1 rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
+            className="min-w-0 flex-1 rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
           />
-          <Pressable onPress={submit} className={`items-center justify-center rounded-[10px] px-4 ${input.trim() ? "bg-ink" : "bg-ink/30"}`}>
+          <Pressable
+            onPress={submit}
+            className={`shrink-0 items-center justify-center rounded-[10px] px-5 py-2.5 ${input.trim() ? "bg-ink" : "bg-ink/30"}`}
+          >
             <Text className="font-gothic-500 text-[12px] text-kinari">追加</Text>
           </Pressable>
         </View>

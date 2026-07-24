@@ -46,6 +46,7 @@ export default function Home() {
           rail={app.rail}
           currentNodeKey={app.currentNodeKey}
           justAddedEventId={app.justAddedEventId}
+          liveLocation={app.liveLocation}
           onNavigatePlan={() => app.setTab("plan")}
         />
       )}

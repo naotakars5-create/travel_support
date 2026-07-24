@@ -163,22 +163,27 @@ export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number,
  * 旅程の全地点を結ぶ経路を描いた静的地図（Static Maps API）の画像URLを組み立てる。
  * APIキーはサーバー側にのみ埋め込む（クライアントへは露出させない）。
  */
-export function staticRouteMapUrl(points: GeoPoint[], width: number, height: number): string | null {
-  if (points.length === 0) return null;
+export function staticRouteMapUrl(points: GeoPoint[], width: number, height: number, me?: GeoPoint | null): string | null {
+  if (points.length === 0 && !me) return null;
   const url = new URL("https://maps.googleapis.com/maps/api/staticmap");
   url.searchParams.set("size", `${width}x${height}`);
   url.searchParams.set("scale", "2");
   url.searchParams.set("language", "ja");
   url.searchParams.set("maptype", "roadmap");
 
-  const path = points.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join("|");
   if (points.length > 1) {
+    const path = points.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join("|");
     url.searchParams.append("path", `color:0xc2492dcc|weight:4|${path}`);
   }
   points.forEach((p, i) => {
     const label = points.length <= 9 ? String(i + 1) : "";
     url.searchParams.append("markers", `color:0x2a2622|label:${label}|${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
   });
+  // 現在地は青いマーカーで表示（ラベルなし）
+  if (me) {
+    url.searchParams.append("markers", `color:0x1a73e8|${me.lat.toFixed(5)},${me.lng.toFixed(5)}`);
+    if (points.length === 0) url.searchParams.set("zoom", "15");
+  }
   url.searchParams.set("key", apiKey());
   return url.toString();
 }
