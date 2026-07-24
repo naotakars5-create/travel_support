@@ -1,0 +1,15 @@
+name: Deploy
+
+# main ブランチに変更が入るたびに、Expo のサーバー上で
+# Web バンドルの書き出し → EAS Hosting への公開（本番）まで自動で行う。
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  deploy:
+    type: deploy
+    name: Deploy
+    environment: production
+    params:
+      prod: true
