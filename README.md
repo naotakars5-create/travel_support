@@ -50,12 +50,14 @@ npx eas deploy --prod
 
 | 変数 | 必須 | 説明 |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | ◯ | Anthropic API キー。`/api/parse`（メール解析）が使用する既定のプロバイダ。 |
-| `LLM_PROVIDER` | - | `openai` を指定すると `OPENAI_API_KEY`/`OPENAI_MODEL` を使う検証用プロバイダに切り替わる（開発時の暫定検証用。本番仕様は Anthropic）。 |
+| `ANTHROPIC_API_KEY` | △ | Anthropic API キー。AIの旅程作成（`/api/plan`）とメール解析（`/api/parse`）が使う既定プロバイダ。OpenAI を使う場合は不要。未設定でもローカル・ヒューリスティックで旅程は組める。 |
+| `LLM_PROVIDER` | - | `openai` を指定すると Anthropic の代わりに OpenAI（ChatGPT の API）を使う。旅程作成・メール解析の両方が切り替わる。 |
+| `OPENAI_API_KEY` | △ | `LLM_PROVIDER=openai` のとき必須。**platform.openai.com で発行する APIキー（従量課金）。ChatGPT Plus サブスクとは別物**。 |
+| `OPENAI_MODEL` | - | OpenAI 利用時のモデル名（未指定なら `gpt-4.1`）。 |
 | `GOOGLE_MAPS_API_KEY` | - | Google Maps Platform キー（**Geocoding API・Directions API・Places API（レガシー版、"Places API (New)" ではない）・Maps Static API** を有効化したもの）。未設定でもアプリは動作する（ヒューリスティック推定・固定スポットにフォールバックし、全行程マップは非表示）。設定すると住所→座標変換・地点間の実測移動時間・周辺観光スポット提案・全行程マップが実データになる。 |
 | `EXPO_PUBLIC_API_BASE_URL` | - | API呼び出しの起点URLを固定したい場合に指定（本番ビルド向け）。未指定時は開発中は Expo の dev server ホストを自動解決する（`src/lib/apiBase.ts`）。 |
 
-`ANTHROPIC_API_KEY` が未設定でも起動でき、解析ボタンを押すと自動的に手入力フォームへフォールバックします。
+`ANTHROPIC_API_KEY`・`OPENAI_API_KEY` のどちらか一方があれば AI 機能が動きます。両方とも未設定でも起動でき、その場合はローカル・ヒューリスティックで旅程を組み、メール解析は手入力フォームへフォールバックします。
 
 ## 実装状況
 

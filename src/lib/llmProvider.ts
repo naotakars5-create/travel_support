@@ -31,10 +31,10 @@ export const anthropicProvider: LlmProvider = {
 };
 
 /**
- * 検証用の暫定プロバイダ（本番仕様は Anthropic）。
- * ANTHROPIC_API_KEY が無い開発環境で、同一のプロンプト/スキーマのまま
- * OpenAI 互換 API を使って動作確認するためだけに用意している。
- * LLM_PROVIDER=openai かつ OPENAI_API_KEY がある場合のみ有効になる。
+ * OpenAI（ChatGPT の API）プロバイダ。Anthropic と同一のプロンプト/スキーマのまま利用できる。
+ * LLM_PROVIDER=openai かつ OPENAI_API_KEY がある場合に有効になり、旅程作成・メール解析の
+ * 両方がこちらを使う。モデルは OPENAI_MODEL（既定 gpt-4.1）。
+ * ※ 必要なのは OpenAI Platform の APIキー（従量課金）で、ChatGPT Plus サブスクとは別物。
  */
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1";
 
