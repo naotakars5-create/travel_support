@@ -36,6 +36,10 @@ export default function Home() {
           composing={app.composing}
           composeError={app.composeError}
           readOnly={app.readOnly}
+          tripDate={app.tripDate}
+          onSetTripDate={app.setTripDate}
+          baseMode={app.baseMode}
+          onSetBaseMode={app.setBaseMode}
           onOpenAdd={() => setAddOpen(true)}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
@@ -72,6 +76,7 @@ export default function Home() {
 
       {addOpen && (
         <AddEntrySheet
+          tripDate={app.tripDate}
           onClose={() => setAddOpen(false)}
           onAdd={(input) => {
             app.addEntry(input);
@@ -85,6 +90,7 @@ export default function Home() {
       {editingEntry && (
         <EditEntrySheet
           entry={editingEntry}
+          tripDate={app.tripDate}
           onClose={() => setEditId(null)}
           onSave={(input) => app.editEntry(editingEntry.id, input)}
           onDelete={() => {

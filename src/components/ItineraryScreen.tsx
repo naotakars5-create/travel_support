@@ -123,9 +123,20 @@ export function ItineraryScreen({
                   <LineFull style={style} />
                 </View>
                 <View className="flex-1 justify-center pb-2 pl-1">
-                  <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
-                    {MODE_LABEL[item.mode]} · {formatDurationMin(item.durationMin)}
-                  </Text>
+                  {item.driving != null || item.walking != null ? (
+                    <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
+                      {[
+                        item.driving != null ? `車 ${formatDurationMin(item.driving)}` : null,
+                        item.walking != null ? `徒歩 ${formatDurationMin(item.walking)}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" ／ ")}
+                    </Text>
+                  ) : (
+                    <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
+                      {MODE_LABEL[item.mode]} · {formatDurationMin(item.durationMin)}
+                    </Text>
+                  )}
                 </View>
               </View>
             );

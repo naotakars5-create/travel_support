@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { Priority, TransportMode } from "@/lib/types";
 import { PlanEntryInput } from "@/lib/plan";
-import { DateField } from "./DateField";
+import { combineDateAndTime, timeStrFromIso } from "@/lib/date";
+import { fetchPlacePredictions, PlacePrediction } from "@/lib/places";
+import { TimeField } from "./PlainFields";
 
 const MODE_OPTIONS: { value: TransportMode; label: string }[] = [
   { value: "activity", label: "観光" },
@@ -51,11 +53,14 @@ export interface PlanEntryFormInitial {
 export function PlanEntryForm({
   onSubmit,
   initial,
+  tripDate,
   submitLabel = "行き先を追加",
   resetAfterSubmit = true,
 }: {
   onSubmit: (input: PlanEntryInput) => void;
   initial?: PlanEntryFormInitial;
+  /** 旅行日（YYYY-MM-DD）。到着時刻はこの日付と結合する。 */
+  tripDate: string;
   submitLabel?: string;
   resetAfterSubmit?: boolean;
 }) {
@@ -64,23 +69,46 @@ export function PlanEntryForm({
   const [mode, setMode] = useState<TransportMode>(initial?.mode ?? "activity");
   const [priority, setPriority] = useState<Priority>(initial?.priority ?? "want");
   const [stayMin, setStayMin] = useState<number | null>(initial ? initial.stayMin ?? null : 60);
-  const [arriveAt, setArriveAt] = useState<Date | null>(initial?.arriveBy ? new Date(initial.arriveBy) : null);
+  const [arriveTime, setArriveTime] = useState<string>(timeStrFromIso(initial?.arriveBy));
   const [fixedTime, setFixedTime] = useState(initial?.fixedTime ?? false);
   const [cost, setCost] = useState(typeof initial?.cost === "number" ? String(initial.cost) : "");
   const [detail, setDetail] = useState(initial?.detail ?? "");
+  const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canSubmit = title.trim().length > 0;
 
+  // 行き先名の入力に合わせて住所つき候補を出す（オートコンプリート）
+  const onTitleChange = (v: string) => {
+    setTitle(v);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (v.trim().length < 2) {
+      setPredictions([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      const preds = await fetchPlacePredictions(v.trim());
+      setPredictions(preds);
+    }, 350);
+  };
+
+  const selectPrediction = (p: PlacePrediction) => {
+    setTitle(p.mainText);
+    setPlace(p.secondaryText || p.description);
+    setPredictions([]);
+  };
+
   const submit = () => {
     if (!canSubmit) return;
+    const arriveDate = arriveTime ? combineDateAndTime(tripDate, arriveTime) : null;
     onSubmit({
       title,
       place: place || undefined,
       mode,
       priority,
       stayMin: stayMin ?? undefined,
-      arriveBy: arriveAt ? arriveAt.toISOString() : undefined,
-      fixedTime: arriveAt ? fixedTime : false,
+      arriveBy: arriveDate ? arriveDate.toISOString() : undefined,
+      fixedTime: arriveDate ? fixedTime : false,
       cost: cost ? Number(cost.replace(/[^0-9]/g, "")) || undefined : undefined,
       detail: detail || undefined,
     });
@@ -90,23 +118,34 @@ export function PlanEntryForm({
     setPlace("");
     setPriority("want");
     setStayMin(60);
-    setArriveAt(null);
+    setArriveTime("");
     setFixedTime(false);
     setCost("");
     setDetail("");
+    setPredictions([]);
   };
 
   return (
     <View className="gap-3">
       <View className="gap-1">
-        <Text className="font-gothic-400 text-[10px] text-muted">行き先 *</Text>
+        <Text className="font-gothic-400 text-[10px] text-muted">行き先 *（名前を入れると住所候補が出ます）</Text>
         <TextInput
           value={title}
-          onChangeText={setTitle}
+          onChangeText={onTitleChange}
           placeholder="例: 中之島美術館"
           placeholderTextColor={MUTED}
           className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
         />
+        {predictions.length > 0 && (
+          <View className="mt-1 overflow-hidden rounded-[10px] border border-black/[.1] bg-white/90">
+            {predictions.map((p, i) => (
+              <Pressable key={p.placeId} onPress={() => selectPrediction(p)} className={`px-3 py-2 ${i > 0 ? "border-t border-black/[.06]" : ""}`}>
+                <Text className="font-mincho-400 text-[13px] text-ink">{p.mainText}</Text>
+                {p.secondaryText ? <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{p.secondaryText}</Text> : null}
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
 
       <View className="gap-1">
@@ -149,7 +188,7 @@ export function PlanEntryForm({
       </View>
 
       <View className="flex-row items-end gap-3">
-        <DateField label="目安到着時刻（任意）" value={arriveAt} onChange={setArriveAt} />
+        <TimeField label="到着時刻（任意）" value={arriveTime} onChange={setArriveTime} />
         <View className="flex-1 gap-1">
           <Text className="font-gothic-400 text-[10px] text-muted">費用（円・任意）</Text>
           <TextInput
@@ -164,7 +203,7 @@ export function PlanEntryForm({
         </View>
       </View>
 
-      {arriveAt && (
+      {arriveTime !== "" && (
         <Pressable onPress={() => setFixedTime((v) => !v)} className="flex-row items-center gap-2">
           <View className={`h-[18px] w-[18px] items-center justify-center rounded-[5px] border ${fixedTime ? "border-ink bg-ink" : "border-black/[.25]"}`}>
             {fixedTime && <View className="h-[8px] w-[8px] rounded-[2px] bg-kinari" />}

@@ -2,10 +2,12 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextStyle, View } from 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PlanEntry, Priority, SpotSuggestion } from "@/lib/types";
 import { PlanTotals, PRIORITY_META, effectiveStayMin } from "@/lib/plan";
+import { BaseMode } from "@/lib/transit";
 import { MODE_LABEL } from "@/lib/modeMeta";
 import { formatDurationMin } from "@/lib/itinerary";
 import { formatJstTime } from "@/lib/date";
 import { formatYen } from "@/lib/format";
+import { DateOnlyField } from "./PlainFields";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 
@@ -24,6 +26,10 @@ export function PlanScreen({
   composing,
   composeError,
   readOnly,
+  tripDate,
+  onSetTripDate,
+  baseMode,
+  onSetBaseMode,
   onOpenAdd,
   onCompose,
   onRemoveEntry,
@@ -40,6 +46,10 @@ export function PlanScreen({
   composing: boolean;
   composeError: string | null;
   readOnly: boolean;
+  tripDate: string;
+  onSetTripDate: (v: string) => void;
+  baseMode: BaseMode;
+  onSetBaseMode: (m: BaseMode) => void;
   onOpenAdd: () => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
@@ -86,6 +96,28 @@ export function PlanScreen({
       <View className="h-px w-full bg-black/[.08]" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 12, paddingBottom: 90 }}>
+        {!readOnly && (
+          <View className="mb-4 flex-row flex-wrap items-end justify-between gap-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
+            <DateOnlyField label="旅行日" value={tripDate} onChange={onSetTripDate} />
+            <View className="gap-1">
+              <Text className="font-gothic-400 text-[10px] text-muted">基本の移動手段</Text>
+              <View className="flex-row gap-2">
+                {(["car", "walk"] as BaseMode[]).map((m) => {
+                  const active = baseMode === m;
+                  return (
+                    <Pressable
+                      key={m}
+                      onPress={() => onSetBaseMode(m)}
+                      className={`rounded-full border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.12] bg-white/50"}`}
+                    >
+                      <Text className={`font-gothic-400 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>{m === "car" ? "車" : "徒歩・電車"}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+        )}
         {readOnly && (
           <View className="mb-4 rounded-[12px] border border-ink/15 bg-white/50 px-4 py-3">
             <Text className="font-gothic-500 text-[11px] text-ink">共有された旅程（閲覧のみ）</Text>

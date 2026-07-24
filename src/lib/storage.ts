@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PackingItem, PlanEntry, ScheduleSlot } from "./types";
+import { BaseMode } from "./transit";
 
 const STORAGE_KEY = "tabinavi.state.v2";
 
@@ -13,6 +14,10 @@ export interface PersistedState {
   currentNodeKey: string | null;
   /** 持ち物チェックリスト */
   packing: PackingItem[];
+  /** 旅行日（YYYY-MM-DD） */
+  tripDate?: string;
+  /** 基本の移動手段 */
+  baseMode?: BaseMode;
   savedAt: string;
 }
 

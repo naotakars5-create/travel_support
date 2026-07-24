@@ -159,6 +159,40 @@ export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number,
     .sort((a, b) => a.walkMin - b.walkMin);
 }
 
+export interface PlacePrediction {
+  description: string;
+  mainText: string;
+  secondaryText: string;
+  placeId: string;
+}
+
+/** 入力中の文字から場所の予測候補を返す（Places Autocomplete API・日本国内）。 */
+export async function placeAutocomplete(input: string): Promise<PlacePrediction[]> {
+  const url = new URL("https://maps.googleapis.com/maps/api/place/autocomplete/json");
+  url.searchParams.set("input", input);
+  url.searchParams.set("language", "ja");
+  url.searchParams.set("components", "country:jp");
+  url.searchParams.set("key", apiKey());
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`Places Autocomplete API error ${res.status}`);
+  const data = await res.json();
+  if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+    throw new Error(`Places Autocomplete status ${data.status}: ${data.error_message ?? ""}`);
+  }
+  const preds = (data.predictions ?? []) as {
+    description: string;
+    place_id: string;
+    structured_formatting?: { main_text?: string; secondary_text?: string };
+  }[];
+  return preds.slice(0, 5).map((p) => ({
+    description: p.description,
+    mainText: p.structured_formatting?.main_text ?? p.description,
+    secondaryText: p.structured_formatting?.secondary_text ?? "",
+    placeId: p.place_id,
+  }));
+}
+
 /**
  * 旅程の全地点を結ぶ経路を描いた静的地図（Static Maps API）の画像URLを組み立てる。
  * APIキーはサーバー側にのみ埋め込む（クライアントへは露出させない）。

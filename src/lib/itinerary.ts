@@ -22,6 +22,9 @@ export interface RailEdge {
   type: "edge";
   mode: TransportMode;
   durationMin: number;
+  /** 実測の車・徒歩時間（分・取得できた場合）。両方表示に使う。 */
+  driving?: number;
+  walking?: number;
 }
 
 export interface RailGap {
@@ -150,7 +153,7 @@ export function buildRail(
     }
 
     if (intervalMin < FREE_GAP_THRESHOLD_MIN) {
-      rail.push({ type: "edge", mode: est.mode, durationMin: est.durationMin });
+      rail.push({ type: "edge", mode: est.mode, durationMin: est.durationMin, driving: est.driving, walking: est.walking });
       return;
     }
 
@@ -162,7 +165,7 @@ export function buildRail(
 
     const freeMin = intervalMin - est.durationMin;
     rail.push({ type: "gap", kind: "free", durationMin: freeMin, afterNodeIndex: prevNodeIndex });
-    rail.push({ type: "edge", mode: est.mode, durationMin: est.durationMin });
+    rail.push({ type: "edge", mode: est.mode, durationMin: est.durationMin, driving: est.driving, walking: est.walking });
   });
 
   return rail;

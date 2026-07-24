@@ -1,14 +1,24 @@
 import { ParsedEvent, TransportMode } from "./types";
 
+/** 旅行全体の「基本の移動手段」。当日の出発カウントダウン等の計算に使う。 */
+export type BaseMode = "car" | "walk";
+
+/** 1区間の実測移動時間（分）。車・徒歩の両方を保持する。 */
+export interface EdgeTravel {
+  driving?: number;
+  walking?: number;
+}
+
 export interface TransitEstimate {
   mode: TransportMode;
   durationMin: number;
+  /** 実測の車・徒歩時間（分・取得できた場合）。両方表示に使う。 */
+  driving?: number;
+  walking?: number;
 }
 
 /**
  * 2地点間の移動手段・所要時間を見積もるインターフェース。
- * 現在は簡易ヒューリスティック実装。将来 Google Maps Directions API に差し替える。
- *
  * durationMin はその区間に実際に必要な移動時間の見積もり。
  * ノード間の空き時間（interval）がこれを下回る場合は「間に合わない」矛盾として扱われる。
  */
@@ -46,14 +56,19 @@ export const heuristicTransitEstimator: TransitEstimator = {
 };
 
 /**
- * event-id ペア（`${from.id}:${to.id}`）をキーに事前計算済みの実測値（Google Directions API 由来）を返す実装。
- * キャッシュに無い区間はヒューリスティック実装にフォールバックする（取得中・API未設定・air区間など）。
+ * event-id ペア（`${from.id}:${to.id}`）をキーに、事前計算済みの実測値（Directions API 由来・車/徒歩）を返す。
+ * baseMode に応じて所要時間を選び、driving/walking の両方も添える。
+ * キャッシュに無い区間はヒューリスティックにフォールバックする（取得中・API未設定・air区間など）。
  */
-export function createPrecomputedEstimator(cache: Record<string, TransitEstimate>): TransitEstimator {
+export function createPrecomputedEstimator(cache: Record<string, EdgeTravel>, baseMode: BaseMode = "car"): TransitEstimator {
   return {
     estimate(from, to) {
-      const cached = cache[`${from.id}:${to.id}`];
-      if (cached) return cached;
+      const t = cache[`${from.id}:${to.id}`];
+      if (t && (t.driving != null || t.walking != null)) {
+        const chosen = baseMode === "car" ? t.driving ?? t.walking : t.walking ?? t.driving;
+        const mode: TransportMode = baseMode === "car" ? "car" : "walk";
+        return { mode, durationMin: chosen ?? 0, driving: t.driving, walking: t.walking };
+      }
       return heuristicTransitEstimator.estimate(from, to);
     },
   };

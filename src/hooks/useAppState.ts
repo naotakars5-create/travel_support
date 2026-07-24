@@ -17,7 +17,8 @@ import {
 } from "@/lib/plan";
 import { buildDefaultPacking } from "@/lib/packing";
 import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM } from "@/lib/share";
-import { TransitEstimate, createPrecomputedEstimator, guessMode } from "@/lib/transit";
+import { BaseMode, EdgeTravel, createPrecomputedEstimator, guessMode } from "@/lib/transit";
+import { todayDateStr } from "@/lib/date";
 import { apiUrl } from "@/lib/apiBase";
 import { haversineMeters } from "@/lib/geo";
 import { useLiveLocation } from "./useLiveLocation";
@@ -53,6 +54,9 @@ export function useAppState() {
   const [composeError, setComposeError] = useState<string | null>(null);
   // 共有リンクで開かれた「閲覧のみ」状態か
   const [readOnly, setReadOnly] = useState(false);
+  // 旅行日（YYYY-MM-DD）と基本の移動手段
+  const [tripDate, setTripDate] = useState<string>(() => todayDateStr());
+  const [baseMode, setBaseMode] = useState<BaseMode>("car");
 
   const initializedRef = useRef(false);
   // 「構造」が既にスケジュール済みかを追跡し、座標だけ埋まった時の不要な再ローカル化を防ぐ。
@@ -79,6 +83,8 @@ export function useAppState() {
         setSlots(persisted.slots);
         setPacking(persisted.packing);
         setCurrentNodeKey(persisted.currentNodeKey);
+        if (persisted.tripDate) setTripDate(persisted.tripDate);
+        if (persisted.baseMode) setBaseMode(persisted.baseMode);
         scheduleSigRef.current = scheduleSignature(persisted.entries);
       } else {
         const seeded = buildSeedEntries(new Date());
@@ -93,8 +99,8 @@ export function useAppState() {
   // 永続化（共有リンクの閲覧中は保存しない＝受け取った人の自分のプランを壊さない）
   useEffect(() => {
     if (!entries || readOnly) return;
-    void saveState({ version: 2, entries, slots, currentNodeKey, packing, savedAt: new Date().toISOString() });
-  }, [entries, slots, currentNodeKey, packing, readOnly]);
+    void saveState({ version: 2, entries, slots, currentNodeKey, packing, tripDate, baseMode, savedAt: new Date().toISOString() });
+  }, [entries, slots, currentNodeKey, packing, tripDate, baseMode, readOnly]);
 
   // 現在時刻の更新（当日画面のカウントダウン用）
   useEffect(() => {
@@ -159,7 +165,7 @@ export function useAppState() {
   }, [entries]);
 
   // ジオコーディング済みの隣接イベント間について、Google Directions API で実測の移動時間を取得しキャッシュする。
-  const [transitCache, setTransitCache] = useState<Record<string, TransitEstimate>>({});
+  const [transitCache, setTransitCache] = useState<Record<string, EdgeTravel>>({});
   const transitCacheRef = useRef(transitCache);
   useEffect(() => {
     transitCacheRef.current = transitCache;
@@ -167,9 +173,25 @@ export function useAppState() {
 
   useEffect(() => {
     let cancelled = false;
+
+    async function fetchDir(origin: GeoPoint, destination: GeoPoint, mode: "car" | "walk"): Promise<number | null> {
+      try {
+        const res = await fetch(apiUrl("/api/directions"), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ origin, destination, mode }),
+        });
+        const data = await res.json();
+        if (data.result) return data.result.durationMin as number;
+      } catch {
+        // フォールバックに委ねる
+      }
+      return null;
+    }
+
     async function run() {
       const sorted = sortedGroupEvents(events);
-      const pending: { key: string; origin: GeoPoint; destination: GeoPoint; mode: TransitEstimate["mode"] }[] = [];
+      const pending: { key: string; origin: GeoPoint; destination: GeoPoint }[] = [];
       for (let i = 0; i < sorted.length - 1; i++) {
         const prev = sorted[i];
         const next = sorted[i + 1];
@@ -180,28 +202,26 @@ export function useAppState() {
         if (!origin || !destination) continue;
         const mode = guessMode(prev.placeTo ?? prev.title, next.placeFrom ?? next.title);
         if (mode === "air") continue; // Directions APIでは空路は扱わない
-        pending.push({ key, origin, destination, mode });
+        pending.push({ key, origin, destination });
       }
       if (pending.length === 0) return;
 
+      // 各区間について車・徒歩の両方の実測時間を取得する。
       const results = await Promise.all(
         pending.map(async (p) => {
-          try {
-            const res = await fetch(apiUrl("/api/directions"), {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ origin: p.origin, destination: p.destination, mode: p.mode }),
-            });
-            const data = await res.json();
-            if (data.result) return [p.key, { mode: p.mode, durationMin: data.result.durationMin }] as const;
-          } catch {
-            // フォールバック（ヒューリスティック推定）に委ねる
-          }
-          return null;
+          const [driving, walking] = await Promise.all([
+            fetchDir(p.origin, p.destination, "car"),
+            fetchDir(p.origin, p.destination, "walk"),
+          ]);
+          const travel: EdgeTravel = {};
+          if (driving != null) travel.driving = driving;
+          if (walking != null) travel.walking = walking;
+          if (travel.driving == null && travel.walking == null) return null;
+          return [p.key, travel] as const;
         })
       );
       if (cancelled) return;
-      const updates = results.filter((r): r is readonly [string, TransitEstimate] => r !== null);
+      const updates = results.filter((r): r is readonly [string, EdgeTravel] => r !== null);
       if (updates.length > 0) {
         setTransitCache((prev) => ({ ...prev, ...Object.fromEntries(updates) }));
       }
@@ -212,7 +232,7 @@ export function useAppState() {
     };
   }, [events]);
 
-  const transitEstimator = useMemo(() => createPrecomputedEstimator(transitCache), [transitCache]);
+  const transitEstimator = useMemo(() => createPrecomputedEstimator(transitCache, baseMode), [transitCache, baseMode]);
   const rail: RailItem[] = useMemo(() => buildRail(events, false, transitEstimator), [events, transitEstimator]);
   const dayOfState: DayOfState = useMemo(() => getDayOfState(rail, currentNodeKey), [rail, currentNodeKey]);
   const totals = useMemo(() => computePlanTotals(entries ?? []), [entries]);
@@ -423,6 +443,10 @@ export function useAppState() {
     currentNodeKey,
     totals,
     scheduleByEntry,
+    tripDate,
+    setTripDate,
+    baseMode,
+    setBaseMode,
     suggestions,
     planNotes,
     composing,

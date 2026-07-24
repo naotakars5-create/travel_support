@@ -8,11 +8,13 @@ import { SlideUp } from "./animations";
 /** 追加済みの行き先を編集する半モーダル。既存値を初期表示し、保存すると更新する。 */
 export function EditEntrySheet({
   entry,
+  tripDate,
   onClose,
   onSave,
   onDelete,
 }: {
   entry: PlanEntry;
+  tripDate: string;
   onClose: () => void;
   onSave: (input: PlanEntryInput) => void;
   onDelete: () => void;
@@ -35,6 +37,7 @@ export function EditEntrySheet({
             <ScrollView keyboardShouldPersistTaps="handled">
               <PlanEntryForm
                 initial={entry}
+                tripDate={tripDate}
                 submitLabel="保存"
                 resetAfterSubmit={false}
                 onSubmit={(input) => {

@@ -12,10 +12,12 @@ export function AddEntrySheet({
   onClose,
   onAdd,
   onImportMail,
+  tripDate,
 }: {
   onClose: () => void;
   onAdd: (input: PlanEntryInput) => void;
   onImportMail: (body: string, source: string) => Promise<{ ok: boolean; message?: string }>;
+  tripDate: string;
 }) {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>("manual");
@@ -56,7 +58,7 @@ export function AddEntrySheet({
 
             <ScrollView keyboardShouldPersistTaps="handled">
               {mode === "manual" ? (
-                <PlanEntryForm onSubmit={onAdd} />
+                <PlanEntryForm onSubmit={onAdd} tripDate={tripDate} />
               ) : (
                 <View className="gap-3">
                   <Text className="-mt-2 font-gothic-400 text-[11px] leading-[18px] text-muted">
