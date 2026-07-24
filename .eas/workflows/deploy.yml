@@ -1,10 +1,11 @@
 name: Deploy
 
-# main ブランチに変更が入るたびに、Expo のサーバー上で
+# デフォルトブランチに変更が入るたびに、Expo のサーバー上で
 # Web バンドルの書き出し → EAS Hosting への公開（本番）まで自動で行う。
+# （このリポジトリのデフォルトブランチは claude/tabi-navi-react-rwn79e。将来 main に統一した場合も動くよう併記）
 on:
   push:
-    branches: ['main']
+    branches: ['claude/tabi-navi-react-rwn79e', 'main']
 
 jobs:
   deploy:
