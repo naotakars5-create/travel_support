@@ -9,10 +9,68 @@ import { createSpotProvider, Spot } from "@/lib/spots";
 import { GeoPoint } from "@/lib/types";
 import { WeatherInfo } from "@/lib/weather";
 import { fetchWeather } from "@/lib/weatherClient";
+import { haversineMeters } from "@/lib/geo";
 import { LocationPermissionState } from "@/hooks/useLiveLocation";
 import { Blinker } from "./animations";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
+
+/** 距離（メートル）を「◯.◯km」「◯m」表記に。 */
+function formatDistance(meters: number): string {
+  if (meters >= 1000) return `${(meters / 1000).toFixed(1)}km`;
+  return `${Math.max(10, Math.round(meters / 10) * 10)}m`;
+}
+
+/** 現在地周辺の観光スポット一覧（当日画面・ダークテーマ）。移動中・空き時間どちらでも使う。 */
+function NearbySpots({
+  geo,
+  freeMinutes,
+  preferIndoor,
+  live,
+}: {
+  geo: GeoPoint | null;
+  freeMinutes: number;
+  preferIndoor: boolean;
+  live: boolean;
+}) {
+  const [spots, setSpots] = useState<Spot[]>([]);
+  const lat = geo?.lat;
+  const lng = geo?.lng;
+  useEffect(() => {
+    let cancelled = false;
+    const provider = createSpotProvider(lat != null && lng != null);
+    provider.nearby(lat ?? 0, lng ?? 0, freeMinutes, preferIndoor).then((res) => {
+      if (!cancelled) setSpots(res);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [lat, lng, freeMinutes, preferIndoor]);
+
+  if (spots.length === 0) return null;
+  return (
+    <View className="mt-7 w-full">
+      <Text className="mb-2 font-gothic-400 text-[10px] tracking-[.15em] text-day-text3">
+        {preferIndoor ? "近くの屋内スポット（雨のため）" : "近くの観光スポット"}
+        {live ? "（現在地から）" : ""}
+      </Text>
+      <View className="rounded-[16px] border border-day-text/10">
+        {spots.map((s, i) => (
+          <View key={s.name} className={`flex-row items-start justify-between px-4 py-3 ${i > 0 ? "border-t border-day-text/10" : ""}`}>
+            <View className="flex-1 pr-2">
+              <Text className="font-mincho-400 text-[14px] text-day-text">{s.name}</Text>
+              <Text className="mt-0.5 font-gothic-400 text-[10px] text-day-text2">{[s.category, s.note].filter(Boolean).join(" · ")}</Text>
+              {s.address && <Text className="mt-0.5 font-gothic-400 text-[10px] text-day-text3">{s.address}</Text>}
+            </View>
+            <Text className="mt-0.5 font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
+              徒歩 {s.walkMin}分
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 /** 地点の「名前」（行き先名）。イベントの title を使う。 */
 function nodeName(node: RailNode): string {
@@ -79,7 +137,9 @@ export function DayOfScreen({
 
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 26, paddingBottom: insets.bottom + 24 }}>
         {state.mode === "locked" && <LockedHero onNavigatePlan={onNavigatePlan} />}
-        {state.mode === "move" && <MoveHero state={state} now={now} gpsActive={gpsActive} onRecordArrival={onRecordArrival} />}
+        {state.mode === "move" && (
+          <MoveHero state={state} now={now} gpsActive={gpsActive} liveLocation={liveLocation} weather={weather} onRecordArrival={onRecordArrival} />
+        )}
         {state.mode === "free" && (
           <FreeHero state={state} liveLocation={liveLocation} gpsActive={gpsActive} weather={weather} onRecordArrival={onRecordArrival} />
         )}
@@ -121,15 +181,22 @@ function MoveHero({
   state,
   now,
   gpsActive,
+  liveLocation,
+  weather,
   onRecordArrival,
 }: {
   state: Extract<DayOfState, { mode: "move" }>;
   now: Date;
   gpsActive: boolean;
+  liveLocation: GeoPoint | null;
+  weather: WeatherInfo | null;
   onRecordArrival: (nodeKey: string, place: string) => void;
 }) {
   const { mm, ss } = computeCountdown(state.targetDepartAt, now);
   const modeColor = MODE_COLOR[state.transitMode];
+  // GPSで目的地までの残り距離
+  const remainingMeters = liveLocation && state.nextNode.geo ? haversineMeters(liveLocation, state.nextNode.geo) : null;
+  const geoForSpots = liveLocation ?? state.currentNode?.geo ?? state.nextNode.geo ?? null;
   return (
     <View className="items-center">
       <Text className="font-gothic-400 text-[11px] tracking-[.08em] text-day-text2">次の移動まで</Text>
@@ -158,12 +225,18 @@ function MoveHero({
             {state.transitMin > 0 ? formatDurationMin(state.transitMin) : ""}
           </Text>
         </View>
+        {remainingMeters != null && (
+          <Text className="mt-2 font-mincho-600 text-[13px] text-accent" style={TNUM}>
+            目的地まで あと {formatDistance(remainingMeters)}
+          </Text>
+        )}
       </View>
 
       <Pressable onPress={() => onRecordArrival(state.nextNode.key, nodeName(state.nextNode))} className="mt-6 w-full rounded-[12px] border border-day-text/40 py-3">
         <Text className="text-center font-gothic-400 text-[12px] text-day-text">{nodeName(state.nextNode)} に到着を記録</Text>
       </Pressable>
       <GpsHint active={gpsActive && Boolean(state.nextNode.geo)} />
+      <NearbySpots geo={geoForSpots} freeMinutes={30} preferIndoor={Boolean(weather?.rain)} live={Boolean(liveLocation)} />
     </View>
   );
 }
@@ -181,21 +254,9 @@ function FreeHero({
   weather: WeatherInfo | null;
   onRecordArrival: (nodeKey: string, place: string) => void;
 }) {
-  const [spots, setSpots] = useState<Spot[]>([]);
   // 実際の現在地（GPS）があればそちらを優先し、無ければ到着記録した地点の座標を使う。
-  const geo = liveLocation ?? state.currentNode.geo;
+  const geo = liveLocation ?? state.currentNode.geo ?? null;
   const preferIndoor = Boolean(weather?.rain);
-
-  useEffect(() => {
-    let cancelled = false;
-    const provider = createSpotProvider(Boolean(geo));
-    provider.nearby(geo?.lat ?? 0, geo?.lng ?? 0, state.freeMin, preferIndoor).then((res) => {
-      if (!cancelled) setSpots(res);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [state.freeMin, geo, preferIndoor]);
 
   return (
     <View className="items-center">
@@ -207,28 +268,7 @@ function FreeHero({
         次の予約 {formatJstTime(new Date(state.nextNode.time))} {nodeName(state.nextNode)} まで
       </Text>
 
-      {spots.length > 0 && (
-        <View className="mt-7 w-full">
-          <Text className="mb-2 font-gothic-400 text-[10px] tracking-[.15em] text-day-text3">
-            {preferIndoor ? "近くの屋内スポット（雨のため）" : "近くに寄れる場所"}
-            {liveLocation ? "（現在地から）" : ""}
-          </Text>
-          <View className="rounded-[16px] border border-day-text/10">
-            {spots.map((s, i) => (
-              <View key={s.name} className={`flex-row items-start justify-between px-4 py-3 ${i > 0 ? "border-t border-day-text/10" : ""}`}>
-                <View className="flex-1 pr-2">
-                  <Text className="font-mincho-400 text-[14px] text-day-text">{s.name}</Text>
-                  <Text className="mt-0.5 font-gothic-400 text-[10px] text-day-text2">{[s.category, s.note].filter(Boolean).join(" · ")}</Text>
-                  {s.address && <Text className="mt-0.5 font-gothic-400 text-[10px] text-day-text3">{s.address}</Text>}
-                </View>
-                <Text className="mt-0.5 font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
-                  徒歩 {s.walkMin}分
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
+      <NearbySpots geo={geo} freeMinutes={state.freeMin} preferIndoor={preferIndoor} live={Boolean(liveLocation)} />
 
       <Pressable onPress={() => onRecordArrival(state.nextNode.key, nodeName(state.nextNode))} className="mt-6 w-full rounded-[12px] border border-day-text/40 py-3">
         <Text className="text-center font-gothic-400 text-[12px] text-day-text">{nodeName(state.nextNode)} に到着を記録</Text>
