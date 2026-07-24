@@ -18,6 +18,7 @@ const PRIORITY_STYLE: Record<Priority, { border: string; text: string }> = {
 export function PlanScreen({
   entries,
   totals,
+  scheduleByEntry,
   suggestions,
   planNotes,
   composing,
@@ -29,6 +30,7 @@ export function PlanScreen({
 }: {
   entries: PlanEntry[];
   totals: PlanTotals;
+  scheduleByEntry: Map<string, string>;
   suggestions: SpotSuggestion[];
   planNotes: string | null;
   composing: boolean;
@@ -39,9 +41,11 @@ export function PlanScreen({
   onAddSuggestion: (s: SpotSuggestion) => void;
 }) {
   const insets = useSafeAreaInsets();
+  // 表示時刻＝目安到着（指定があれば）または組み上げ済みの到着予定
+  const timeOf = (e: PlanEntry): string | null => e.arriveBy ?? scheduleByEntry.get(e.id) ?? null;
   const sorted = [...entries].sort((a, b) => {
-    const ta = a.arriveBy ? new Date(a.arriveBy).getTime() : Infinity;
-    const tb = b.arriveBy ? new Date(b.arriveBy).getTime() : Infinity;
+    const ta = timeOf(a) ? new Date(timeOf(a)!).getTime() : Infinity;
+    const tb = timeOf(b) ? new Date(timeOf(b)!).getTime() : Infinity;
     return ta - tb;
   });
 
@@ -78,14 +82,18 @@ export function PlanScreen({
           return (
             <View key={e.id} className="flex-row gap-3 border-b border-black/[.06] py-3.5">
               <View className="w-[46px] pt-0.5">
-                {e.arriveBy ? (
+                {timeOf(e) ? (
                   <Text className="font-mincho-600 text-[14px] text-ink" style={TNUM}>
-                    {formatJstTime(new Date(e.arriveBy))}
+                    {formatJstTime(new Date(timeOf(e)!))}
                   </Text>
                 ) : (
-                  <Text className="font-gothic-400 text-[10px] text-muted-light">自動</Text>
+                  <Text className="font-gothic-400 text-[10px] text-muted-light">—</Text>
                 )}
-                {e.fixedTime && <Text className="mt-0.5 font-gothic-400 text-[9px] text-accent">固定</Text>}
+                {e.fixedTime ? (
+                  <Text className="mt-0.5 font-gothic-400 text-[9px] text-accent">固定</Text>
+                ) : (
+                  !e.arriveBy && timeOf(e) && <Text className="mt-0.5 font-gothic-400 text-[9px] text-muted-light">予定</Text>
+                )}
               </View>
               <View className="flex-1">
                 <Text className="font-mincho-600 text-[15px] text-ink">{e.title}</Text>

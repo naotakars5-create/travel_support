@@ -4,6 +4,10 @@ export interface Spot {
   name: string;
   note: string;
   walkMin: number;
+  /** 住所（Google Places の vicinity 由来。取得できた場合） */
+  address?: string;
+  /** 種別のかんたんな概要（例: 美術館・博物館）。取得できた場合 */
+  category?: string;
 }
 
 /**
@@ -44,8 +48,8 @@ export const googlePlacesSpotProvider: SpotProvider = {
     if (!res.ok) throw new Error(`nearby-spots API error ${res.status}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    const spots: { name: string; note: string; walkMin: number }[] = data.spots ?? [];
-    return spots.map((s) => ({ name: s.name, note: s.note, walkMin: s.walkMin }));
+    const spots: { name: string; note: string; walkMin: number; address?: string; category?: string }[] = data.spots ?? [];
+    return spots.map((s) => ({ name: s.name, note: s.note, walkMin: s.walkMin, address: s.address, category: s.category }));
   },
 };
 

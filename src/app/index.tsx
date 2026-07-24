@@ -27,6 +27,7 @@ export default function Home() {
         <PlanScreen
           entries={app.entries}
           totals={app.totals}
+          scheduleByEntry={app.scheduleByEntry}
           suggestions={app.suggestions}
           planNotes={app.planNotes}
           composing={app.composing}

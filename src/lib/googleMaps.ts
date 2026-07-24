@@ -71,9 +71,48 @@ export interface PlaceResult {
   lat: number;
   lng: number;
   walkMin: number;
+  /** 住所（Places の vicinity） */
+  address?: string;
+  /** 種別のかんたんな概要（日本語） */
+  category?: string;
 }
 
 const WALK_METERS_PER_MIN = 80;
+
+/** Places の types 配列を、日本語の短い概要ラベルに変換する。 */
+const PLACE_TYPE_LABEL_JA: Record<string, string> = {
+  museum: "美術館・博物館",
+  art_gallery: "美術館・ギャラリー",
+  aquarium: "水族館",
+  zoo: "動物園",
+  park: "公園",
+  amusement_park: "遊園地・テーマパーク",
+  tourist_attraction: "観光スポット",
+  place_of_worship: "寺社・教会",
+  church: "教会",
+  hindu_temple: "寺院",
+  library: "図書館",
+  book_store: "書店",
+  shopping_mall: "ショッピングモール",
+  department_store: "百貨店",
+  restaurant: "レストラン",
+  cafe: "カフェ",
+  bakery: "ベーカリー",
+  bar: "バー",
+  spa: "スパ・温浴",
+  stadium: "スタジアム",
+  movie_theater: "映画館",
+  night_club: "ナイトスポット",
+  point_of_interest: "見どころ",
+};
+
+function categoryFromTypes(types: string[] | undefined): string | undefined {
+  if (!types) return undefined;
+  for (const t of types) {
+    if (PLACE_TYPE_LABEL_JA[t]) return PLACE_TYPE_LABEL_JA[t];
+  }
+  return undefined;
+}
 
 /** 雨天時に優先する屋内スポットの Places タイプ。 */
 const INDOOR_PLACE_TYPE = "museum";
@@ -99,6 +138,7 @@ export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number,
     geometry?: { location?: { lat: number; lng: number } };
     types?: string[];
     rating?: number;
+    vicinity?: string;
   }[];
 
   return results
@@ -112,6 +152,8 @@ export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number,
         lat: loc.lat,
         lng: loc.lng,
         walkMin: Math.max(1, Math.round(distance / WALK_METERS_PER_MIN)),
+        address: r.vicinity,
+        category: categoryFromTypes(r.types),
       };
     })
     .sort((a, b) => a.walkMin - b.walkMin);
