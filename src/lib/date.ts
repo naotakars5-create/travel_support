@@ -55,3 +55,38 @@ export function formatJstHeadingJa(date: Date): string {
 export function formatJstTimeShort(date: Date): string {
   return formatJstTime(date);
 }
+
+// --- 旅行日（1日固定）＋時刻だけ入力するための補助 ---
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** 端末ローカルの今日の日付（YYYY-MM-DD）。 */
+export function todayDateStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** 旅行日（YYYY-MM-DD）と時刻（HH:mm）を結合して Date にする（ローカル時刻）。 */
+export function combineDateAndTime(dateStr: string, timeStr: string): Date | null {
+  if (!dateStr || !timeStr) return null;
+  const d = new Date(`${dateStr}T${timeStr}`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** ISO 日時から時刻（HH:mm・ローカル）を取り出す。 */
+export function timeStrFromIso(iso: string | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/** YYYY-MM-DD を「M月D日(曜)」表記にする（ローカル）。 */
+export function formatDateStrJa(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  const wd = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
+  return `${d.getMonth() + 1}月${d.getDate()}日(${wd})`;
+}

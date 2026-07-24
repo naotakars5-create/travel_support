@@ -8,12 +8,15 @@ import { ItineraryScreen } from "@/components/ItineraryScreen";
 import { DayOfScreen } from "@/components/DayOfScreen";
 import { PackingScreen } from "@/components/PackingScreen";
 import { AddEntrySheet } from "@/components/AddEntrySheet";
+import { EditEntrySheet } from "@/components/EditEntrySheet";
 import { FlashOverlay } from "@/components/FlashOverlay";
 
 export default function Home() {
   const app = useAppState();
   const [addOpen, setAddOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const dark = app.tab === "today";
+  const editingEntry = editId ? app.entries?.find((e) => e.id === editId) ?? null : null;
 
   if (!app.entries) {
     return <View className="flex-1 bg-kinari" />;
@@ -33,9 +36,14 @@ export default function Home() {
           composing={app.composing}
           composeError={app.composeError}
           readOnly={app.readOnly}
+          tripDate={app.tripDate}
+          onSetTripDate={app.setTripDate}
+          baseMode={app.baseMode}
+          onSetBaseMode={app.setBaseMode}
           onOpenAdd={() => setAddOpen(true)}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
+          onEditEntry={(id) => setEditId(id)}
           onAddSuggestion={app.addSuggestion}
           onShare={app.shareCurrentPlan}
           onImportShared={app.importSharedToOwn}
@@ -68,6 +76,7 @@ export default function Home() {
 
       {addOpen && (
         <AddEntrySheet
+          tripDate={app.tripDate}
           onClose={() => setAddOpen(false)}
           onAdd={(input) => {
             app.addEntry(input);
@@ -75,6 +84,19 @@ export default function Home() {
             app.setTab("plan");
           }}
           onImportMail={app.importFromMail}
+        />
+      )}
+
+      {editingEntry && (
+        <EditEntrySheet
+          entry={editingEntry}
+          tripDate={app.tripDate}
+          onClose={() => setEditId(null)}
+          onSave={(input) => app.editEntry(editingEntry.id, input)}
+          onDelete={() => {
+            app.removeEntry(editingEntry.id);
+            setEditId(null);
+          }}
         />
       )}
 
