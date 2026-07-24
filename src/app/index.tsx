@@ -3,35 +3,46 @@ import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useAppState } from "@/hooks/useAppState";
 import { BottomNav } from "@/components/BottomNav";
-import { InboxScreen } from "@/components/InboxScreen";
+import { PlanScreen } from "@/components/PlanScreen";
 import { ItineraryScreen } from "@/components/ItineraryScreen";
 import { DayOfScreen } from "@/components/DayOfScreen";
-import { MailSheet } from "@/components/MailSheet";
-import { AddMailSheet } from "@/components/AddMailSheet";
+import { PackingScreen } from "@/components/PackingScreen";
+import { AddEntrySheet } from "@/components/AddEntrySheet";
 import { FlashOverlay } from "@/components/FlashOverlay";
 
 export default function Home() {
   const app = useAppState();
-  const [addMailOpen, setAddMailOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const dark = app.tab === "today";
 
-  if (!app.mails) {
+  if (!app.entries) {
     return <View className="flex-1 bg-kinari" />;
   }
-
-  const selectedMail = app.mails.find((m) => m.id === app.selectedId) ?? null;
 
   return (
     <View className={`flex-1 ${dark ? "bg-day-bg" : "bg-kinari"}`}>
       <StatusBar style={dark ? "light" : "dark"} />
 
-      {app.tab === "inbox" && <InboxScreen mails={app.mails} onOpen={app.openSheet} onAddMail={() => setAddMailOpen(true)} />}
+      {app.tab === "plan" && (
+        <PlanScreen
+          entries={app.entries}
+          totals={app.totals}
+          suggestions={app.suggestions}
+          planNotes={app.planNotes}
+          composing={app.composing}
+          composeError={app.composeError}
+          onOpenAdd={() => setAddOpen(true)}
+          onCompose={app.composeWithAi}
+          onRemoveEntry={app.removeEntry}
+          onAddSuggestion={app.addSuggestion}
+        />
+      )}
       {app.tab === "itin" && (
         <ItineraryScreen
           rail={app.rail}
           currentNodeKey={app.currentNodeKey}
           justAddedEventId={app.justAddedEventId}
-          onNavigateInbox={() => app.setTab("inbox")}
+          onNavigatePlan={() => app.setTab("plan")}
         />
       )}
       {app.tab === "today" && (
@@ -40,42 +51,25 @@ export default function Home() {
           now={app.now}
           liveLocation={app.liveLocation}
           locationPermission={app.locationPermission}
-          onNavigateInbox={() => app.setTab("inbox")}
+          onNavigatePlan={() => app.setTab("plan")}
           onRecordArrival={app.recordArrival}
         />
+      )}
+      {app.tab === "packing" && (
+        <PackingScreen items={app.packing} onToggle={app.togglePacking} onAdd={app.addPacking} onRemove={app.removePacking} />
       )}
 
       <BottomNav tab={app.tab} onChange={app.setTab} dark={dark} />
 
-      {app.sheetOpen && selectedMail && (
-        <MailSheet
-          mail={selectedMail}
-          onClose={app.closeSheet}
-          onParse={() => app.parseMail(selectedMail)}
-          onManualSubmit={(input) => {
-            app.addManualEvent(selectedMail.id, input);
-            app.closeSheet();
+      {addOpen && (
+        <AddEntrySheet
+          onClose={() => setAddOpen(false)}
+          onAdd={(input) => {
+            app.addEntry(input);
+            setAddOpen(false);
+            app.setTab("plan");
           }}
-          onGoToItinerary={(t) => {
-            app.setTab(t);
-            app.closeSheet();
-          }}
-        />
-      )}
-
-      {addMailOpen && (
-        <AddMailSheet
-          onClose={() => setAddMailOpen(false)}
-          onAdd={(body, source) => {
-            const mail = app.addPastedMail(body, source);
-            setAddMailOpen(false);
-            app.openSheet(mail.id);
-          }}
-          onAddManual={(input) => {
-            const mail = app.addManualMail(input);
-            setAddMailOpen(false);
-            if (mail) app.openSheet(mail.id);
-          }}
+          onImportMail={app.importFromMail}
         />
       )}
 

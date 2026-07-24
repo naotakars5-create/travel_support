@@ -1,0 +1,29 @@
+import { useState } from "react";
+import { Image, Text, View } from "react-native";
+import { GeoPoint } from "@/lib/types";
+import { routeMapImageUrl } from "@/lib/routeMap";
+
+/**
+ * 旅程の全地点を結ぶ経路地図（/api/staticmap のプロキシ画像）。
+ * 座標がまだ無い / APIキー未設定 / 読み込み失敗時は、そっと非表示にする（フォールバック）。
+ */
+export function RouteMap({ points }: { points: GeoPoint[] }) {
+  const [failed, setFailed] = useState(false);
+  const uri = routeMapImageUrl(points);
+
+  if (!uri || failed || points.length === 0) return null;
+
+  return (
+    <View className="mb-4 overflow-hidden rounded-[16px] border border-black/[.08] bg-black/[.03]">
+      <Image
+        source={{ uri }}
+        onError={() => setFailed(true)}
+        resizeMode="cover"
+        style={{ width: "100%", aspectRatio: 2 }}
+      />
+      <View className="absolute left-3 top-3 rounded-full bg-kinari/90 px-2.5 py-[3px]">
+        <Text className="font-gothic-500 text-[9px] tracking-[.1em] text-ink">全行程マップ</Text>
+      </View>
+    </View>
+  );
+}

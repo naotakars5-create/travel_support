@@ -3,9 +3,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Tab } from "@/hooks/useAppState";
 
 const ITEMS: { id: Tab; label: string }[] = [
-  { id: "inbox", label: "受信箱" },
+  { id: "plan", label: "計画" },
   { id: "itin", label: "旅程" },
   { id: "today", label: "当日" },
+  { id: "packing", label: "持ち物" },
 ];
 
 export function BottomNav({ tab, onChange, dark }: { tab: Tab; onChange: (t: Tab) => void; dark?: boolean }) {

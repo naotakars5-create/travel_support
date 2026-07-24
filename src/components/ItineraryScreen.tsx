@@ -1,9 +1,11 @@
 import { Animated, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { RailItem, computeStats, formatDurationMin } from "@/lib/itinerary";
+import { RailItem, computeStats, formatDurationMin, railNodes } from "@/lib/itinerary";
 import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
 import { formatJstHeadingJa, formatJstTime } from "@/lib/date";
+import { GeoPoint } from "@/lib/types";
 import { RailNodeDot } from "./icons";
+import { RouteMap } from "./RouteMap";
 import { useNodeInStyle } from "./animations";
 
 const MUTED_LIGHT = "#b7b0a3";
@@ -53,12 +55,12 @@ export function ItineraryScreen({
   rail,
   currentNodeKey,
   justAddedEventId,
-  onNavigateInbox,
+  onNavigatePlan,
 }: {
   rail: RailItem[];
   currentNodeKey: string | null;
   justAddedEventId: string | null;
-  onNavigateInbox: () => void;
+  onNavigatePlan: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const stats = computeStats(rail);
@@ -66,16 +68,17 @@ export function ItineraryScreen({
   const currentNode = rail.find((i) => i.type === "node" && i.key === currentNodeKey);
   const currentIndex = currentNode && currentNode.type === "node" ? currentNode.nodeIndex : -1;
 
-  const subLine =
-    stats.unconfirmedCount > 0
-      ? `予約${stats.reservationCount}件 · 未確定${stats.unconfirmedCount}件`
-      : `予約${stats.reservationCount}件 · 空き${stats.gapCount}件 · 総移動${formatDurationMin(stats.totalTransitMin)}`;
+  const mapPoints: GeoPoint[] = railNodes(rail)
+    .map((n) => n.geo)
+    .filter((g): g is GeoPoint => Boolean(g));
+
+  const subLine = `予定${stats.reservationCount}件 · 空き${stats.gapCount}件 · 総移動${formatDurationMin(stats.totalTransitMin)}`;
 
   return (
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
       <View className="px-[26px] pb-3 pt-4">
         <Text className="font-gothic-400 text-[11px] text-muted">{heading}</Text>
-        <Text className="mt-1 font-mincho-600 text-[26px] text-ink">大阪 一日目</Text>
+        <Text className="mt-1 font-mincho-600 text-[26px] text-ink">本日の旅程</Text>
         <Text className="mt-1 font-gothic-400 text-[11px] text-muted" style={TNUM}>
           {subLine}
         </Text>
@@ -83,10 +86,13 @@ export function ItineraryScreen({
       <View className="h-px w-full bg-black/[.08]" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 80 }}>
+        {mapPoints.length > 0 && <RouteMap points={mapPoints} />}
         {rail.length === 0 && (
-          <Text className="mt-10 text-center font-gothic-400 text-[12px] text-muted">
-            まだ予定がありません。受信箱でメールを解析すると、ここに旅程が表示されます。
-          </Text>
+          <Pressable onPress={onNavigatePlan} className="mt-10 self-center rounded-[12px] border border-ink/25 px-5 py-3">
+            <Text className="text-center font-gothic-400 text-[12px] text-muted">
+              まだ予定がありません。{"\n"}「計画」で行き先を追加してください。
+            </Text>
+          </Pressable>
         )}
         {rail.map((item, i) => {
           const prev = rail[i - 1];
@@ -140,8 +146,8 @@ export function ItineraryScreen({
                     </Text>
                   </View>
                 ) : isUnconfirmed ? (
-                  <Pressable onPress={onNavigateInbox} className="self-start rounded-[10px] border border-ink px-3 py-1.5">
-                    <Text className="font-gothic-400 text-[11px] text-ink">未確定 · 受信箱で予約を解析</Text>
+                  <Pressable onPress={onNavigatePlan} className="self-start rounded-[10px] border border-ink px-3 py-1.5">
+                    <Text className="font-gothic-400 text-[11px] text-ink">未確定 · 計画で行き先を追加</Text>
                   </Pressable>
                 ) : (
                   <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">

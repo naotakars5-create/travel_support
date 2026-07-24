@@ -41,20 +41,67 @@ export interface ParsedEvent {
   placeToGeo?: GeoPoint;
 }
 
-export type MailStatus = "new" | "parsing" | "done" | "skip" | "error";
+/** 行き先の重要度（時間が足りない時にAIが取捨選択する優先度）。 */
+export type Priority = "must" | "want" | "optional";
 
-export interface MailItem {
+/**
+ * ユーザーが自分で追加する「行きたい場所／予定」1件。
+ * これを溜めていくと、AI（またはローカル・ヒューリスティック）が到着時刻順に
+ * 旅程へ組み上げる。予約メールから取り込んだ確定予定は fixedTime=true の anchor になる。
+ */
+export interface PlanEntry {
   id: string;
+  /** 行き先名（例: 中之島美術館） */
+  title: string;
+  /** 住所（ジオコーディング用。未指定なら title を使う） */
+  place?: string;
+  /** ジオコーディング済み座標（地図・移動時間・周辺提案に使う） */
+  placeGeo?: GeoPoint;
+  mode: TransportMode;
+  /** 重要度。時間が足りない時にAIが optional から外す判断に使う */
+  priority: Priority;
+  /** 滞在時間の目安（分） */
+  stayMin?: number;
+  /** 目安到着時間（ISO8601）。未指定なら前後関係から自動で割り当てる */
+  arriveBy?: string;
+  /** 予約など時刻が確定していて動かせない場合 true */
+  fixedTime?: boolean;
+  /** 費用（円）。予算メモ用 */
+  cost?: number;
+  detail?: string;
+  /** 由来。"手入力" | "メール" | 事業者名 など */
   source: string;
-  subject: string;
-  body: string;
-  status: MailStatus;
-  events: ParsedEvent[];
-  errorMessage?: string;
-  /** ユーザーが手入力した場合 true */
-  manual?: boolean;
 }
 
+/** AIが返す1件の時刻割り当て（どの行き先に、何時に着いて、何分居るか）。 */
+export interface ScheduleSlot {
+  entryId: string;
+  /** ISO8601 */
+  arriveAt: string;
+  stayMin: number;
+}
+
+/** AIが計画中に提案する立ち寄りスポット候補。 */
+export interface SpotSuggestion {
+  title: string;
+  area?: string;
+  note?: string;
+  mode?: TransportMode;
+  stayMin?: number;
+}
+
+export type PlanApiResponse =
+  | { kind: "plan"; schedule: ScheduleSlot[]; suggestions: SpotSuggestion[]; notes?: string }
+  | { kind: "error"; message: string };
+
+/** 持ち物チェックリストの1項目。 */
+export interface PackingItem {
+  id: string;
+  label: string;
+  checked: boolean;
+}
+
+/** 予約メール解析（補助機能・/api/parse）のレスポンス。 */
 export type ParseApiResponse =
   | { kind: "events"; events: ParsedEvent[] }
   | { kind: "skip" }
