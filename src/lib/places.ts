@@ -22,3 +22,27 @@ export async function fetchPlacePredictions(input: string): Promise<PlacePredict
     return [];
   }
 }
+
+export interface PlaceDetails {
+  address?: string;
+  geo?: { lat: number; lng: number };
+  openFrom?: string;
+  openTo?: string;
+  weekdayText?: string[];
+}
+
+/** place_id から詳細（番地までの住所・営業時間）を取得する（/api/place-details 経由）。失敗時は null。 */
+export async function fetchPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
+  try {
+    const res = await fetch(apiUrl("/api/place-details"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ placeId }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.details ?? null) as PlaceDetails | null;
+  } catch {
+    return null;
+  }
+}

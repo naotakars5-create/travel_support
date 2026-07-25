@@ -142,9 +142,16 @@ export function localSchedule(entries: PlanEntry[], referenceDate: Date): Schedu
     .filter((x): x is { e: PlanEntry; t: string } => x.t !== null)
     .sort((a, b) => new Date(a.t).getTime() - new Date(b.t).getTime());
 
+  // 「何日目」を優先し、その中では重要度順。時刻未指定でも指定日に置かれるようにする。
   const loose = entries
     .filter((e) => entryAnchorTime(e) === null)
-    .sort((a, b) => priorityWeight(a.priority) - priorityWeight(b.priority));
+    .sort((a, b) => (a.day ?? 1) - (b.day ?? 1) || priorityWeight(a.priority) - priorityWeight(b.priority));
+
+  // その行き先の「何日目」の朝（この時刻より前には置かない）。
+  const dayFloor = (e: PlanEntry): number => {
+    const d = (e.day && e.day > 0 ? e.day : 1) - 1;
+    return referenceDate.getTime() + d * 86400000;
+  };
 
   const bufferMs = TRAVEL_BUFFER_MIN * 60000;
   type Placed = { entry: PlanEntry; start: number };
@@ -156,19 +163,21 @@ export function localSchedule(entries: PlanEntry[], referenceDate: Date): Schedu
     // 固定が無ければ referenceDate（＝旅行初日の朝）から、常識的な時間帯で前詰め
     let cursor = notBeforeMorning(referenceDate.getTime());
     for (const e of loose) {
+      cursor = Math.max(cursor, dayFloor(e)); // 指定された「何日目」以降に置く
       if (new Date(cursor).getHours() >= DAY_END_HOUR) cursor = nextMorning(cursor); // 遅すぎたら翌朝へ
       const start = clampToOpenHours(cursor, e); // 営業時間内へ寄せる
       placed.push({ entry: e, start });
       cursor = start + (entryDurationMin(e) + TRAVEL_BUFFER_MIN) * 60000;
     }
   } else {
-    // loose を「空いている一番早い隙間」に差し込む（＝一番最後にしない）
+    // loose を「空いている一番早い隙間（指定日以降）」に差し込む（＝一番最後にしない）
     for (const e of loose) {
       const durMs = entryDurationMin(e) * 60000;
+      const floor = dayFloor(e);
       placed.sort((a, b) => a.start - b.start);
       let insertAt: number | null = null;
       for (let i = 0; i < placed.length; i++) {
-        const gapStart = endOf(placed[i]) + bufferMs;
+        const gapStart = Math.max(endOf(placed[i]) + bufferMs, floor);
         const nextStart = i + 1 < placed.length ? placed[i + 1].start : Infinity;
         const gapEnd = nextStart === Infinity ? Infinity : nextStart - bufferMs;
         if (gapEnd - gapStart >= durMs) {
@@ -178,7 +187,7 @@ export function localSchedule(entries: PlanEntry[], referenceDate: Date): Schedu
       }
       if (insertAt === null) {
         const last = placed.reduce((m, p) => (p.start > m.start ? p : m), placed[0]);
-        insertAt = endOf(last) + bufferMs;
+        insertAt = Math.max(endOf(last) + bufferMs, floor);
         if (new Date(insertAt).getHours() >= DAY_END_HOUR) insertAt = nextMorning(insertAt); // 遅すぎたら翌朝へ
       }
       placed.push({ entry: e, start: clampToOpenHours(insertAt, e) }); // 営業時間内へ寄せる

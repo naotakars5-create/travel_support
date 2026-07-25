@@ -28,7 +28,7 @@ import { useLiveLocation } from "./useLiveLocation";
 /** この距離（メートル）以内に近づいたら、GPSで到着を自動記録する。 */
 const ARRIVAL_THRESHOLD_METERS = 120;
 
-export type Tab = "plan" | "itin" | "today" | "packing";
+export type Tab = "plan" | "itin" | "today" | "packing" | "profile";
 
 interface FlashState {
   visible: boolean;
@@ -340,6 +340,31 @@ export function useAppState() {
     setEntries((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
   }, []);
 
+  /** 行き先を別の日（何日目）へ移動する。到着/出発/チェックアウトの日付も同じ日数だけずらす。 */
+  const setEntryDay = useCallback((id: string, day: number) => {
+    setEntries((prev) =>
+      prev
+        ? prev.map((e) => {
+            if (e.id !== id) return e;
+            const deltaDays = day - (e.day ?? 1);
+            const shift = (iso?: string) => {
+              if (!iso) return iso;
+              const t = new Date(iso).getTime();
+              if (Number.isNaN(t)) return iso;
+              return new Date(t + deltaDays * 86400000).toISOString();
+            };
+            return {
+              ...e,
+              day,
+              arriveBy: shift(e.arriveBy),
+              departAt: shift(e.departAt),
+              checkOut: shift(e.checkOut),
+            };
+          })
+        : prev
+    );
+  }, []);
+
   /** 追加済みの行き先を、フォーム入力の内容で上書き更新する（再編集）。 */
   const editEntry = useCallback(
     (id: string, input: PlanEntryInput) => {
@@ -580,6 +605,7 @@ export function useAppState() {
     updateEntry,
     editEntry,
     removeEntry,
+    setEntryDay,
     importFromMail,
     composeWithAi,
     togglePacking,

@@ -9,6 +9,7 @@ import { DayOfScreen } from "@/components/DayOfScreen";
 import { PackingScreen } from "@/components/PackingScreen";
 import { AddEntrySheet } from "@/components/AddEntrySheet";
 import { EditEntrySheet } from "@/components/EditEntrySheet";
+import { ProfileScreen } from "@/components/ProfileScreen";
 import { ProfileSheet } from "@/components/ProfileSheet";
 import { TripsSheet } from "@/components/TripsSheet";
 import { FlashOverlay } from "@/components/FlashOverlay";
@@ -54,6 +55,7 @@ export default function Home() {
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
           onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
+          onSetEntryDay={app.setEntryDay}
           onAddSuggestions={app.addSuggestions}
           onShare={app.shareCurrentPlan}
           onImportShared={app.importSharedToOwn}
@@ -82,6 +84,17 @@ export default function Home() {
       )}
       {app.tab === "packing" && (
         <PackingScreen items={app.packing} onToggle={app.togglePacking} onAdd={app.addPacking} onRemove={app.removePacking} />
+      )}
+      {app.tab === "profile" && (
+        <ProfileScreen
+          profile={app.profile}
+          onEditProfile={() => setProfileOpen(true)}
+          savedTrips={app.savedTrips}
+          canSaveTrip={(app.entries?.length ?? 0) > 0}
+          onSaveTrip={app.saveCurrentTrip}
+          onLoadTrip={app.loadTrip}
+          onDeleteTrip={app.deleteTrip}
+        />
       )}
 
       <BottomNav tab={app.tab} onChange={app.setTab} dark={dark} />

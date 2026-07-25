@@ -42,6 +42,7 @@ export function PlanScreen({
   onRemoveEntry,
   onEditEntry,
   onBumpPriority,
+  onSetEntryDay,
   onAddSuggestions,
   onShare,
   onImportShared,
@@ -68,6 +69,7 @@ export function PlanScreen({
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
   onBumpPriority: (id: string) => void;
+  onSetEntryDay: (id: string, day: number) => void;
   onAddSuggestions: (list: SpotSuggestion[]) => void;
   onShare: () => void;
   onImportShared: () => void;
@@ -221,7 +223,8 @@ export function PlanScreen({
         {sorted.map((e) => {
           const ps = PRIORITY_STYLE[e.priority];
           return (
-            <View key={e.id} className="flex-row gap-3 border-b border-black/[.06] py-3.5">
+            <View key={e.id} className="border-b border-black/[.06] py-3.5">
+              <View className="flex-row gap-3">
               <Pressable disabled={readOnly} onPress={() => onEditEntry(e.id)} className="flex-1 flex-row gap-3">
                 <View className="w-[46px] pt-0.5">
                   {timeOf(e) ? (
@@ -260,6 +263,11 @@ export function PlanScreen({
                         · {formatYen(e.cost)}
                       </Text>
                     )}
+                    {(e.openFrom || e.openTo) && (
+                      <Text className="font-gothic-400 text-[10px] text-mode-rail" style={TNUM}>
+                        · 営業{e.openFrom ?? "?"}〜{e.openTo ?? "?"}
+                      </Text>
+                    )}
                   </View>
                 </View>
               </Pressable>
@@ -267,6 +275,25 @@ export function PlanScreen({
                 <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8} className="pt-0.5">
                   <Text className="font-gothic-400 text-[16px] text-muted-light">×</Text>
                 </Pressable>
+              )}
+              </View>
+              {/* 複数日程では、行き先を何日目に置くか切り替えられる */}
+              {!readOnly && tripDayCount > 1 && (
+                <View className="mt-2 flex-row flex-wrap items-center gap-1.5 pl-[58px]">
+                  <Text className="font-gothic-400 text-[9px] text-muted-light">日:</Text>
+                  {Array.from({ length: tripDayCount }, (_, i) => i + 1).map((d) => {
+                    const active = (e.day ?? 1) === d;
+                    return (
+                      <Pressable
+                        key={d}
+                        onPress={() => onSetEntryDay(e.id, d)}
+                        className={`rounded-full border px-2.5 py-[3px] ${active ? "border-ink bg-ink" : "border-black/[.15] bg-white/50"}`}
+                      >
+                        <Text className={`font-gothic-400 text-[10px] ${active ? "text-kinari" : "text-muted"}`}>{d}日目</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               )}
             </View>
           );

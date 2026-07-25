@@ -160,6 +160,68 @@ export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number,
     .slice(0, 15);
 }
 
+export interface PlaceDetails {
+  /** 番地まで含む整形済み住所 */
+  address?: string;
+  geo?: GeoPoint;
+  /** 代表的な開店時刻 "HH:MM" */
+  openFrom?: string;
+  /** 代表的な閉店時刻 "HH:MM" */
+  openTo?: string;
+  /** 曜日別の営業時間テキスト（日本語） */
+  weekdayText?: string[];
+}
+
+/** "0930" → "09:30" */
+function hhmm(t: string | undefined): string | undefined {
+  if (!t || !/^\d{4}$/.test(t)) return undefined;
+  return `${t.slice(0, 2)}:${t.slice(2)}`;
+}
+
+/**
+ * place_id から詳細（番地までの住所・座標・営業時間）を取得する（Place Details API）。
+ * 営業時間は曜日で変わるため、代表として最も多い開閉時刻を openFrom/openTo に採用する。
+ */
+export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
+  const url = new URL("https://maps.googleapis.com/maps/api/place/details/json");
+  url.searchParams.set("place_id", placeId);
+  url.searchParams.set("fields", "formatted_address,geometry,opening_hours,name");
+  url.searchParams.set("language", "ja");
+  url.searchParams.set("region", "jp");
+  url.searchParams.set("key", apiKey());
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`Place Details API error ${res.status}`);
+  const data = await res.json();
+  if (data.status !== "OK" || !data.result) return null;
+  const r = data.result as {
+    formatted_address?: string;
+    geometry?: { location?: { lat: number; lng: number } };
+    opening_hours?: { periods?: { open?: { time?: string }; close?: { time?: string } }[]; weekday_text?: string[] };
+  };
+
+  const details: PlaceDetails = {
+    address: r.formatted_address,
+    geo: r.geometry?.location ? { lat: r.geometry.location.lat, lng: r.geometry.location.lng } : undefined,
+    weekdayText: r.opening_hours?.weekday_text,
+  };
+
+  // 代表的な開閉時刻：最頻の open.time / close.time を採用（曜日ごとの差は weekdayText で補える）。
+  const periods = r.opening_hours?.periods ?? [];
+  const opens = periods.map((p) => p.open?.time).filter((t): t is string => Boolean(t));
+  const closes = periods.map((p) => p.close?.time).filter((t): t is string => Boolean(t));
+  const mostCommon = (arr: string[]): string | undefined => {
+    if (arr.length === 0) return undefined;
+    const count = new Map<string, number>();
+    for (const t of arr) count.set(t, (count.get(t) ?? 0) + 1);
+    return [...count.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  };
+  details.openFrom = hhmm(mostCommon(opens));
+  details.openTo = hhmm(mostCommon(closes));
+
+  return details;
+}
+
 export interface PlacePrediction {
   description: string;
   mainText: string;
