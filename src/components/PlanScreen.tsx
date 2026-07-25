@@ -29,6 +29,8 @@ export function PlanScreen({
   scheduleByEntry,
   suggestions,
   areaSuggestions,
+  areaSuggestionsLoading,
+  hasGeoReference,
   planNotes,
   composing,
   composeError,
@@ -45,9 +47,9 @@ export function PlanScreen({
   onCompose,
   onRemoveEntry,
   onEditEntry,
-  onBumpPriority,
   onSetEntryDay,
   onMoveEntry,
+  onMoveEntryToEdge,
   onAddSuggestions,
   onShare,
   onImportShared,
@@ -57,6 +59,8 @@ export function PlanScreen({
   scheduleByEntry: Map<string, string>;
   suggestions: SpotSuggestion[];
   areaSuggestions: SpotSuggestion[];
+  areaSuggestionsLoading: boolean;
+  hasGeoReference: boolean;
   planNotes: string | null;
   composing: boolean;
   composeError: string | null;
@@ -73,9 +77,9 @@ export function PlanScreen({
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
-  onBumpPriority: (id: string) => void;
   onSetEntryDay: (id: string, day: number) => void;
   onMoveEntry: (id: string, dir: -1 | 1) => void;
+  onMoveEntryToEdge: (id: string, dir: -1 | 1) => void;
   onAddSuggestions: (list: SpotSuggestion[]) => void;
   onShare: () => void;
   onImportShared: () => void;
@@ -134,7 +138,6 @@ export function PlanScreen({
     if (dur <= 0) return `${startStr}〜`;
     return `${startStr}〜${formatJstTime(new Date(start.getTime() + dur * 60000))}`;
   };
-  const dropped: PlanEntry[] = [];
 
   return (
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
@@ -383,24 +386,26 @@ export function PlanScreen({
                     )}
                   </View>
                 </Pressable>
-                {/* 並び替え（上下）＋削除 */}
+                {/* 並び替え（上下タップ／長押しで先頭・末尾へ）＋削除 */}
                 {!readOnly && (
-                  <View className="items-center justify-center gap-1">
+                  <View className="items-center justify-center gap-1.5">
                     <Pressable
                       disabled={isFirstInDay(e)}
                       onPress={() => onMoveEntry(e.id, -1)}
-                      hitSlop={6}
-                      className={`h-6 w-6 items-center justify-center rounded-[6px] border ${isFirstInDay(e) ? "border-black/[.08]" : "border-ink/30"}`}
+                      onLongPress={() => onMoveEntryToEdge(e.id, -1)}
+                      hitSlop={8}
+                      className={`h-9 w-9 items-center justify-center rounded-[8px] border ${isFirstInDay(e) ? "border-black/[.08]" : "border-ink/30"}`}
                     >
-                      <Text className={`text-[12px] ${isFirstInDay(e) ? "text-muted-light" : "text-ink"}`}>▲</Text>
+                      <Text className={`text-[15px] ${isFirstInDay(e) ? "text-muted-light" : "text-ink"}`}>▲</Text>
                     </Pressable>
                     <Pressable
                       disabled={isLastInDay(e)}
                       onPress={() => onMoveEntry(e.id, 1)}
-                      hitSlop={6}
-                      className={`h-6 w-6 items-center justify-center rounded-[6px] border ${isLastInDay(e) ? "border-black/[.08]" : "border-ink/30"}`}
+                      onLongPress={() => onMoveEntryToEdge(e.id, 1)}
+                      hitSlop={8}
+                      className={`h-9 w-9 items-center justify-center rounded-[8px] border ${isLastInDay(e) ? "border-black/[.08]" : "border-ink/30"}`}
                     >
-                      <Text className={`text-[12px] ${isLastInDay(e) ? "text-muted-light" : "text-ink"}`}>▼</Text>
+                      <Text className={`text-[15px] ${isLastInDay(e) ? "text-muted-light" : "text-ink"}`}>▼</Text>
                     </Pressable>
                   </View>
                 )}
@@ -433,6 +438,10 @@ export function PlanScreen({
           );
         })}
 
+        {!readOnly && ordered.length > 1 && (
+          <Text className="mt-2 font-gothic-400 text-[10px] text-muted-light">▲▼で並び替え（長押しで先頭・末尾へ）。順番から時刻を自動計算します。</Text>
+        )}
+
         {!readOnly && entries.length > 0 && (
           <View className="mt-5">
             <Pressable
@@ -452,6 +461,25 @@ export function PlanScreen({
                 <Text className="font-gothic-500 text-[10px] tracking-[.1em] text-muted">AIのメモ</Text>
                 <Text className="mt-1 font-mincho-400 text-[13px] leading-[20px] text-ink">{planNotes}</Text>
               </View>
+            )}
+          </View>
+        )}
+
+        {/* 周辺おすすめの状態表示（取得中／候補未選択） */}
+        {!readOnly && entries.length > 0 && areaSuggestions.length === 0 && (
+          <View className="mt-6">
+            <Text className="mb-1 font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ</Text>
+            {areaSuggestionsLoading ? (
+              <View className="flex-row items-center gap-2">
+                <ActivityIndicator size="small" color="#8a8378" />
+                <Text className="font-gothic-400 text-[11px] text-muted-light">周辺のおすすめを探しています…</Text>
+              </View>
+            ) : (
+              <Text className="font-gothic-400 text-[11px] leading-[17px] text-muted-light">
+                {hasGeoReference
+                  ? "近くのおすすめが見つかりませんでした。"
+                  : "行き先や宿泊先を住所候補から選ぶと、その周辺のおすすめが出ます。"}
+              </Text>
             )}
           </View>
         )}
@@ -510,32 +538,6 @@ export function PlanScreen({
                 {pickedArea.size > 0 ? `選択した${pickedArea.size}件を追加` : "追加したいものを選択"}
               </Text>
             </Pressable>
-          </View>
-        )}
-
-        {!readOnly && dropped.length > 0 && (
-          <View className="mt-6">
-            <Text className="mb-2 font-gothic-500 text-[10px] tracking-[.15em] text-accent">今の旅程に入りきらなかった予定</Text>
-            <View className="rounded-[16px] border border-accent/40">
-              {dropped.map((e, i) => (
-                <View key={e.id} className={`flex-row items-center justify-between px-4 py-3 ${i > 0 ? "border-t border-black/[.06]" : ""}`}>
-                  <View className="flex-1 pr-2">
-                    <Text className="font-mincho-400 text-[14px] text-ink">{e.title}</Text>
-                    <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{PRIORITY_META[e.priority].label}</Text>
-                  </View>
-                  {e.priority !== "must" ? (
-                    <Pressable onPress={() => onBumpPriority(e.id)} className="rounded-full border border-accent px-3 py-1">
-                      <Text className="font-gothic-500 text-[11px] text-accent">必ず行く</Text>
-                    </Pressable>
-                  ) : (
-                    <Text className="font-gothic-400 text-[10px] text-muted-light">時間が不足</Text>
-                  )}
-                </View>
-              ))}
-            </View>
-            <Text className="mt-1.5 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
-              「必ず行く」にすると優先して旅程へ組み込みます（時間が厳しい場合は他の任意予定が後回しになります）。
-            </Text>
           </View>
         )}
 

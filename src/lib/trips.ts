@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PackingItem, PlanEntry, ScheduleSlot } from "./types";
 import { BaseMode } from "./transit";
+import { idbAvailable, idbGet, idbSet } from "./idbKv";
 
 const TRIPS_KEY = "tabinavi.trips.v1";
 
@@ -26,7 +27,7 @@ export interface SavedTrip {
 /** 思い出写真の上限枚数。 */
 export const MAX_TRIP_PHOTOS = 30;
 
-export async function loadTrips(): Promise<SavedTrip[]> {
+async function loadFromAsyncStorage(): Promise<SavedTrip[]> {
   try {
     const raw = await AsyncStorage.getItem(TRIPS_KEY);
     if (!raw) return [];
@@ -38,10 +39,37 @@ export async function loadTrips(): Promise<SavedTrip[]> {
   }
 }
 
-export async function saveTrips(trips: SavedTrip[]): Promise<void> {
+export async function loadTrips(): Promise<SavedTrip[]> {
+  // 写真は容量が大きいため、Web では IndexedDB を優先（localStorage の 5MB 制限を回避）。
+  if (idbAvailable()) {
+    const fromIdb = await idbGet<SavedTrip[]>(TRIPS_KEY);
+    if (Array.isArray(fromIdb)) return fromIdb;
+    // 旧 localStorage 保存分があれば IndexedDB へ移行する。
+    const legacy = await loadFromAsyncStorage();
+    if (legacy.length > 0) await idbSet(TRIPS_KEY, legacy);
+    return legacy;
+  }
+  return loadFromAsyncStorage();
+}
+
+/** 保存の成否を返す（true=成功）。失敗時は呼び出し側でユーザーに通知する。 */
+export async function saveTrips(trips: SavedTrip[]): Promise<boolean> {
+  if (idbAvailable()) {
+    const ok = await idbSet(TRIPS_KEY, trips);
+    if (ok) {
+      // 二重持ちを避け、旧 localStorage 分の容量を解放する。
+      try {
+        await AsyncStorage.removeItem(TRIPS_KEY);
+      } catch {
+        // 解放失敗は致命的でないため無視
+      }
+      return true;
+    }
+  }
   try {
     await AsyncStorage.setItem(TRIPS_KEY, JSON.stringify(trips));
+    return true;
   } catch {
-    // 書き込み失敗は無視
+    return false;
   }
 }

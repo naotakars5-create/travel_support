@@ -38,6 +38,8 @@ export default function Home() {
           scheduleByEntry={app.scheduleByEntry}
           suggestions={app.suggestions}
           areaSuggestions={app.areaSuggestions}
+          areaSuggestionsLoading={app.areaSuggestionsLoading}
+          hasGeoReference={app.hasGeoReference}
           planNotes={app.planNotes}
           composing={app.composing}
           composeError={app.composeError}
@@ -54,9 +56,9 @@ export default function Home() {
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
-          onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
           onSetEntryDay={app.setEntryDay}
           onMoveEntry={app.moveEntry}
+          onMoveEntryToEdge={app.moveEntryToEdge}
           onAddSuggestions={app.addSuggestions}
           onShare={app.shareCurrentPlan}
           onImportShared={app.importSharedToOwn}

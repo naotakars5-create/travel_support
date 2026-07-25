@@ -6,8 +6,6 @@ export const PRIORITY_META: Record<Priority, { label: string; short: string; wei
   optional: { label: "時間が余れば", short: "任意", weight: 2 },
 };
 
-export const PRIORITY_ORDER: Priority[] = ["must", "want", "optional"];
-
 /** mode ごとの既定滞在時間（分）。ユーザー未指定時のフォールバック。 */
 const DEFAULT_STAY_MIN: Record<TransportMode, number> = {
   air: 0,
@@ -24,27 +22,8 @@ const DEFAULT_STAY_MIN: Record<TransportMode, number> = {
 /** 立ち寄り間の移動に確保する既定バッファ（分）。実測は Directions API 側で補正される。 */
 const TRAVEL_BUFFER_MIN = 20;
 
-/** 常識的な行動時間帯（この範囲に収まるよう自動配置する）。 */
+/** 常識的な行動時間帯（各日の開始時刻）。 */
 const DAY_START_HOUR = 9;
-const DAY_END_HOUR = 20;
-
-/** 翌日の朝（DAY_START_HOUR 時）へ進めた時刻（ローカル）。 */
-function nextMorning(ms: number): number {
-  const d = new Date(ms);
-  d.setDate(d.getDate() + 1);
-  d.setHours(DAY_START_HOUR, 0, 0, 0);
-  return d.getTime();
-}
-
-/** 早すぎる時刻（朝 DAY_START_HOUR 時より前）は当日の朝に引き上げる。 */
-function notBeforeMorning(ms: number): number {
-  const d = new Date(ms);
-  if (d.getHours() < DAY_START_HOUR) {
-    d.setHours(DAY_START_HOUR, 0, 0, 0);
-    return d.getTime();
-  }
-  return ms;
-}
 
 /** "HH:MM" を {h, min} に。不正なら null。 */
 function parseHm(s: string | undefined): { h: number; min: number } | null {
@@ -123,85 +102,6 @@ export function entryAnchorTime(entry: PlanEntry): string | null {
   return entry.arriveBy ?? null;
 }
 
-function priorityWeight(p: Priority): number {
-  return PRIORITY_META[p].weight;
-}
-
-/**
- * AIを使わずに、行き先リストから到着時刻順のスケジュールを組む（ローカル・ヒューリスティック）。
- * - 到着目安（arriveBy）が指定された予定を時刻順のアンカーにする
- * - 目安が無い予定は重要度順に前詰めで挟み込む
- * - 各予定に滞在時間＋移動バッファを足しながら時刻を単調増加で割り当てる
- * APIキーが無い環境でも即座に旅程が成立するための土台。
- */
-export function localSchedule(entries: PlanEntry[], referenceDate: Date): ScheduleSlot[] {
-  if (entries.length === 0) return [];
-
-  const anchored = entries
-    .map((e) => ({ e, t: entryAnchorTime(e) }))
-    .filter((x): x is { e: PlanEntry; t: string } => x.t !== null)
-    .sort((a, b) => new Date(a.t).getTime() - new Date(b.t).getTime());
-
-  // 「何日目」を優先し、その中では重要度順。時刻未指定でも指定日に置かれるようにする。
-  const loose = entries
-    .filter((e) => entryAnchorTime(e) === null)
-    .sort((a, b) => (a.day ?? 1) - (b.day ?? 1) || priorityWeight(a.priority) - priorityWeight(b.priority));
-
-  // その行き先の「何日目」の朝（この時刻より前には置かない）。
-  const dayFloor = (e: PlanEntry): number => {
-    const d = (e.day && e.day > 0 ? e.day : 1) - 1;
-    return referenceDate.getTime() + d * 86400000;
-  };
-
-  const bufferMs = TRAVEL_BUFFER_MIN * 60000;
-  type Placed = { entry: PlanEntry; start: number };
-  const placed: Placed[] = anchored.map(({ e, t }) => ({ entry: e, start: new Date(t).getTime() }));
-
-  const endOf = (p: Placed) => p.start + entryDurationMin(p.entry) * 60000;
-
-  if (placed.length === 0) {
-    // 固定が無ければ referenceDate（＝旅行初日の朝）から、常識的な時間帯で前詰め
-    let cursor = notBeforeMorning(referenceDate.getTime());
-    for (const e of loose) {
-      cursor = Math.max(cursor, dayFloor(e)); // 指定された「何日目」以降に置く
-      if (new Date(cursor).getHours() >= DAY_END_HOUR) cursor = nextMorning(cursor); // 遅すぎたら翌朝へ
-      const start = clampToOpenHours(cursor, e); // 営業時間内へ寄せる
-      placed.push({ entry: e, start });
-      cursor = start + (entryDurationMin(e) + TRAVEL_BUFFER_MIN) * 60000;
-    }
-  } else {
-    // loose を「空いている一番早い隙間（指定日以降）」に差し込む（＝一番最後にしない）
-    for (const e of loose) {
-      const durMs = entryDurationMin(e) * 60000;
-      const floor = dayFloor(e);
-      placed.sort((a, b) => a.start - b.start);
-      let insertAt: number | null = null;
-      for (let i = 0; i < placed.length; i++) {
-        const gapStart = Math.max(endOf(placed[i]) + bufferMs, floor);
-        const nextStart = i + 1 < placed.length ? placed[i + 1].start : Infinity;
-        const gapEnd = nextStart === Infinity ? Infinity : nextStart - bufferMs;
-        if (gapEnd - gapStart >= durMs) {
-          insertAt = gapStart;
-          break;
-        }
-      }
-      if (insertAt === null) {
-        const last = placed.reduce((m, p) => (p.start > m.start ? p : m), placed[0]);
-        insertAt = Math.max(endOf(last) + bufferMs, floor);
-        if (new Date(insertAt).getHours() >= DAY_END_HOUR) insertAt = nextMorning(insertAt); // 遅すぎたら翌朝へ
-      }
-      placed.push({ entry: e, start: clampToOpenHours(insertAt, e) }); // 営業時間内へ寄せる
-    }
-  }
-
-  placed.sort((a, b) => a.start - b.start);
-  return placed.map((p) => ({
-    entryId: p.entry.id,
-    arriveAt: new Date(p.start).toISOString(),
-    stayMin: entryDurationMin(p.entry),
-  }));
-}
-
 /**
  * 「行き先リストの並び順」をそのまま行程の順序として、時刻を前から順に自動計算する。
  * - 日ごとにグループ化し、各日は朝（DAY_START_HOUR）から前詰め。
@@ -247,6 +147,11 @@ export function sequentialSchedule(
         start = Number.isNaN(anchorMs) ? clampToOpenHours(cursor, e) : anchorMs;
       } else {
         start = clampToOpenHours(cursor, e); // 営業時間内へ寄せる
+        // 非固定でも「到着目安」があれば、その時刻より前には置かない（並び順は保ちつつ下限として尊重）。
+        if (e.arriveBy) {
+          const abMs = new Date(e.arriveBy).getTime();
+          if (!Number.isNaN(abMs) && abMs > start) start = abMs;
+        }
       }
       slots.push({ entryId: e.id, arriveAt: new Date(start).toISOString(), stayMin: entryDurationMin(e) });
       cursor = Math.max(cursor, start) + (entryDurationMin(e) + TRAVEL_BUFFER_MIN) * 60000;
@@ -374,11 +279,6 @@ export function buildEventsFromSchedule(entries: PlanEntry[], slots: ScheduleSlo
     events.push(...entryToEvents(entry, slot));
   }
   return events.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-}
-
-/** ローカル・ヒューリスティックだけで entries を旅程イベントへ変換する簡便関数。 */
-export function composeLocally(entries: PlanEntry[], referenceDate: Date): ParsedEvent[] {
-  return buildEventsFromSchedule(entries, localSchedule(entries, referenceDate));
 }
 
 /** 予約メール解析で得た ParsedEvent を、確定アンカーの PlanEntry へ変換する。 */
