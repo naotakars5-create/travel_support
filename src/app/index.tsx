@@ -10,6 +10,7 @@ import { PackingScreen } from "@/components/PackingScreen";
 import { AddEntrySheet } from "@/components/AddEntrySheet";
 import { EditEntrySheet } from "@/components/EditEntrySheet";
 import { ProfileSheet } from "@/components/ProfileSheet";
+import { TripsSheet } from "@/components/TripsSheet";
 import { FlashOverlay } from "@/components/FlashOverlay";
 
 export default function Home() {
@@ -17,6 +18,7 @@ export default function Home() {
   const [addOpen, setAddOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [tripsOpen, setTripsOpen] = useState(false);
   const dark = app.tab === "today";
   const editingEntry = editId ? app.entries?.find((e) => e.id === editId) ?? null : null;
 
@@ -46,12 +48,13 @@ export default function Home() {
           onSetBaseMode={app.setBaseMode}
           profile={app.profile}
           onOpenProfile={() => setProfileOpen(true)}
+          onOpenTrips={() => setTripsOpen(true)}
           onOpenAdd={() => setAddOpen(true)}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
           onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
-          onAddSuggestion={app.addSuggestion}
+          onAddSuggestions={app.addSuggestions}
           onShare={app.shareCurrentPlan}
           onImportShared={app.importSharedToOwn}
         />
@@ -112,6 +115,17 @@ export default function Home() {
       )}
 
       {profileOpen && <ProfileSheet profile={app.profile} onClose={() => setProfileOpen(false)} onSave={app.setProfile} />}
+
+      {tripsOpen && (
+        <TripsSheet
+          trips={app.savedTrips}
+          canSave={(app.entries?.length ?? 0) > 0}
+          onSave={app.saveCurrentTrip}
+          onLoad={app.loadTrip}
+          onDelete={app.deleteTrip}
+          onClose={() => setTripsOpen(false)}
+        />
+      )}
 
       <FlashOverlay visible={app.flash.visible} text={app.flash.text} />
     </View>

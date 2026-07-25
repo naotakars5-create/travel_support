@@ -18,10 +18,78 @@ const DEFAULT_STAY_MIN: Record<TransportMode, number> = {
   stay: 30,
   dining: 60,
   activity: 60,
+  home: 0,
 };
 
 /** 立ち寄り間の移動に確保する既定バッファ（分）。実測は Directions API 側で補正される。 */
 const TRAVEL_BUFFER_MIN = 20;
+
+/** 常識的な行動時間帯（この範囲に収まるよう自動配置する）。 */
+const DAY_START_HOUR = 9;
+const DAY_END_HOUR = 20;
+
+/** 翌日の朝（DAY_START_HOUR 時）へ進めた時刻（ローカル）。 */
+function nextMorning(ms: number): number {
+  const d = new Date(ms);
+  d.setDate(d.getDate() + 1);
+  d.setHours(DAY_START_HOUR, 0, 0, 0);
+  return d.getTime();
+}
+
+/** 早すぎる時刻（朝 DAY_START_HOUR 時より前）は当日の朝に引き上げる。 */
+function notBeforeMorning(ms: number): number {
+  const d = new Date(ms);
+  if (d.getHours() < DAY_START_HOUR) {
+    d.setHours(DAY_START_HOUR, 0, 0, 0);
+    return d.getTime();
+  }
+  return ms;
+}
+
+/** "HH:MM" を {h, min} に。不正なら null。 */
+function parseHm(s: string | undefined): { h: number; min: number } | null {
+  if (!s) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return { h, min };
+}
+
+/**
+ * 開始時刻を施設の営業時間内へ寄せる。
+ * - 開店前なら開店時刻へ繰り下げ
+ * - 閉店までに滞在が収まらないなら翌日の開店（無ければ朝）へ
+ * 営業時間の指定が無ければそのまま返す。
+ */
+function clampToOpenHours(ms: number, entry: PlanEntry): number {
+  const from = parseHm(entry.openFrom);
+  const to = parseHm(entry.openTo);
+  if (!from && !to) return ms;
+  const d = new Date(ms);
+  const minutesOfDay = d.getHours() * 60 + d.getMinutes();
+  if (from) {
+    const fromMin = from.h * 60 + from.min;
+    if (minutesOfDay < fromMin) {
+      d.setHours(from.h, from.min, 0, 0);
+      return d.getTime();
+    }
+  }
+  if (to) {
+    const toMin = to.h * 60 + to.min;
+    const startMin = d.getHours() * 60 + d.getMinutes();
+    if (startMin + entryDurationMin(entry) > toMin) {
+      // 閉店までに収まらない → 翌日の開店（無ければ朝）へ
+      const nd = new Date(ms);
+      nd.setDate(nd.getDate() + 1);
+      if (from) nd.setHours(from.h, from.min, 0, 0);
+      else nd.setHours(DAY_START_HOUR, 0, 0, 0);
+      return nd.getTime();
+    }
+  }
+  return ms;
+}
 
 export function effectiveStayMin(entry: PlanEntry): number {
   if (typeof entry.stayMin === "number" && entry.stayMin > 0) return entry.stayMin;
@@ -36,6 +104,8 @@ export function entryPlaceText(entry: PlanEntry): string {
 
 /** その予定の所要時間（分）。移動=出発→到着、宿泊=チェックイン→アウト、その他=滞在時間。 */
 export function entryDurationMin(entry: PlanEntry): number {
+  // 自宅（出発・帰宅の地点イベント）は滞在時間を持たない
+  if (entry.mode === "home") return 0;
   if (isTransitMode(entry.mode) && entry.departAt && entry.arriveBy) {
     return Math.max(0, Math.round((new Date(entry.arriveBy).getTime() - new Date(entry.departAt).getTime()) / 60000));
   }
@@ -47,6 +117,8 @@ export function entryDurationMin(entry: PlanEntry): number {
 
 /** スケジュールの基準になる固定時刻（移動=出発、その他=到着/チェックイン）。無ければ null。 */
 export function entryAnchorTime(entry: PlanEntry): string | null {
+  // 自宅は出発時刻をアンカーにする（帰宅時刻は別イベントとして扱う）
+  if (entry.mode === "home") return entry.departAt ?? entry.arriveBy ?? null;
   if (isTransitMode(entry.mode)) return entry.departAt ?? entry.arriveBy ?? null;
   return entry.arriveBy ?? null;
 }
@@ -81,11 +153,13 @@ export function localSchedule(entries: PlanEntry[], referenceDate: Date): Schedu
   const endOf = (p: Placed) => p.start + entryDurationMin(p.entry) * 60000;
 
   if (placed.length === 0) {
-    // 固定が無ければ referenceDate から順に前詰め
-    let cursor = referenceDate.getTime();
+    // 固定が無ければ referenceDate（＝旅行初日の朝）から、常識的な時間帯で前詰め
+    let cursor = notBeforeMorning(referenceDate.getTime());
     for (const e of loose) {
-      placed.push({ entry: e, start: cursor });
-      cursor += (entryDurationMin(e) + TRAVEL_BUFFER_MIN) * 60000;
+      if (new Date(cursor).getHours() >= DAY_END_HOUR) cursor = nextMorning(cursor); // 遅すぎたら翌朝へ
+      const start = clampToOpenHours(cursor, e); // 営業時間内へ寄せる
+      placed.push({ entry: e, start });
+      cursor = start + (entryDurationMin(e) + TRAVEL_BUFFER_MIN) * 60000;
     }
   } else {
     // loose を「空いている一番早い隙間」に差し込む（＝一番最後にしない）
@@ -105,8 +179,9 @@ export function localSchedule(entries: PlanEntry[], referenceDate: Date): Schedu
       if (insertAt === null) {
         const last = placed.reduce((m, p) => (p.start > m.start ? p : m), placed[0]);
         insertAt = endOf(last) + bufferMs;
+        if (new Date(insertAt).getHours() >= DAY_END_HOUR) insertAt = nextMorning(insertAt); // 遅すぎたら翌朝へ
       }
-      placed.push({ entry: e, start: insertAt });
+      placed.push({ entry: e, start: clampToOpenHours(insertAt, e) }); // 営業時間内へ寄せる
     }
   }
 
@@ -118,8 +193,8 @@ export function localSchedule(entries: PlanEntry[], referenceDate: Date): Schedu
   }));
 }
 
-/** 1件の PlanEntry を、種別に応じた ParsedEvent へ変換する。 */
-function entryToEvent(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent | null {
+/** 1件の PlanEntry を、種別に応じた ParsedEvent（複数になる場合あり）へ変換する。 */
+function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
   const base = {
     id: `evt-${entry.id}`,
     mode: entry.mode,
@@ -131,48 +206,86 @@ function entryToEvent(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent | null 
     confidence: 1,
   };
 
+  // 自宅 → 「出発」と「帰宅」の2つの地点イベント（別々の日時になりうる）
+  if (entry.mode === "home") {
+    const placeText = entryPlaceText(entry);
+    const events: ParsedEvent[] = [];
+    const departMs = new Date(entry.departAt ?? slot.arriveAt).getTime();
+    if (!Number.isNaN(departMs)) {
+      events.push({
+        ...base,
+        id: `evt-${entry.id}-depart`,
+        title: `${entry.title || "自宅"}を出発`,
+        placeTo: placeText,
+        placeToGeo: entry.placeGeo,
+        startAt: new Date(departMs).toISOString(),
+      });
+    }
+    const returnMs = entry.arriveBy ? new Date(entry.arriveBy).getTime() : NaN;
+    if (!Number.isNaN(returnMs)) {
+      events.push({
+        ...base,
+        id: `evt-${entry.id}-return`,
+        title: `${entry.title || "自宅"}へ帰宅`,
+        placeTo: placeText,
+        placeToGeo: entry.placeGeo,
+        startAt: new Date(returnMs).toISOString(),
+      });
+    }
+    return events;
+  }
+
   // 移動系（出発地・到着地あり）→ 出発〜到着の区間イベント
   if (isTransitMode(entry.mode) && entry.placeFrom && entry.placeTo) {
     const startMs = new Date(entry.departAt ?? slot.arriveAt).getTime();
-    if (Number.isNaN(startMs)) return null;
+    if (Number.isNaN(startMs)) return [];
     const arriveMs = entry.arriveBy ? new Date(entry.arriveBy).getTime() : NaN;
     const endIso = !Number.isNaN(arriveMs) && arriveMs > startMs ? new Date(arriveMs).toISOString() : new Date(startMs + 30 * 60000).toISOString();
-    return {
-      ...base,
-      placeFrom: entry.placeFrom,
-      placeTo: entry.placeTo,
-      placeFromGeo: entry.placeFromGeo,
-      placeToGeo: entry.placeToGeo,
-      startAt: new Date(startMs).toISOString(),
-      endAt: endIso,
-    };
+    return [
+      {
+        ...base,
+        placeFrom: entry.placeFrom,
+        placeTo: entry.placeTo,
+        placeFromGeo: entry.placeFromGeo,
+        placeToGeo: entry.placeToGeo,
+        startAt: new Date(startMs).toISOString(),
+        endAt: endIso,
+      },
+    ];
   }
 
   // 宿泊 → チェックイン〜チェックアウト
   if (entry.mode === "stay") {
     const startMs = new Date(entry.arriveBy ?? slot.arriveAt).getTime();
-    if (Number.isNaN(startMs)) return null;
+    if (Number.isNaN(startMs)) return [];
     const outMs = entry.checkOut ? new Date(entry.checkOut).getTime() : NaN;
-    return {
+    return [
+      {
+        ...base,
+        placeTo: entryPlaceText(entry),
+        placeToGeo: entry.placeGeo,
+        startAt: new Date(startMs).toISOString(),
+        endAt: !Number.isNaN(outMs) && outMs > startMs ? new Date(outMs).toISOString() : undefined,
+      },
+    ];
+  }
+
+  // 観光・食事など → 地点イベント
+  // 時刻固定の予定は arriveBy を厳守。それ以外は組み上げ結果（slot）の時刻を反映する
+  //（AIやローカルが並べ替えた到着時刻が旅程・当日ビューに正しく出るようにするため）。
+  const startSource = entry.fixedTime && entry.arriveBy ? entry.arriveBy : slot.arriveAt ?? entry.arriveBy;
+  const startMs = new Date(startSource).getTime();
+  if (Number.isNaN(startMs)) return [];
+  const stay = slot.stayMin > 0 ? slot.stayMin : effectiveStayMin(entry);
+  return [
+    {
       ...base,
       placeTo: entryPlaceText(entry),
       placeToGeo: entry.placeGeo,
       startAt: new Date(startMs).toISOString(),
-      endAt: !Number.isNaN(outMs) && outMs > startMs ? new Date(outMs).toISOString() : undefined,
-    };
-  }
-
-  // 観光・食事など → 地点イベント
-  const startMs = new Date(entry.arriveBy ?? slot.arriveAt).getTime();
-  if (Number.isNaN(startMs)) return null;
-  const stay = slot.stayMin > 0 ? slot.stayMin : effectiveStayMin(entry);
-  return {
-    ...base,
-    placeTo: entryPlaceText(entry),
-    placeToGeo: entry.placeGeo,
-    startAt: new Date(startMs).toISOString(),
-    endAt: stay > 0 ? new Date(startMs + stay * 60000).toISOString() : undefined,
-  };
+      endAt: stay > 0 ? new Date(startMs + stay * 60000).toISOString() : undefined,
+    },
+  ];
 }
 
 /**
@@ -185,8 +298,7 @@ export function buildEventsFromSchedule(entries: PlanEntry[], slots: ScheduleSlo
   for (const slot of slots) {
     const entry = byId.get(slot.entryId);
     if (!entry) continue;
-    const ev = entryToEvent(entry, slot);
-    if (ev) events.push(ev);
+    events.push(...entryToEvents(entry, slot));
   }
   return events.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 }
@@ -238,6 +350,9 @@ export interface PlanEntryInput {
   departAt?: string;
   /** 宿泊: チェックアウト時刻(ISO) */
   checkOut?: string;
+  /** 営業・開館時間 "HH:MM" */
+  openFrom?: string;
+  openTo?: string;
 }
 
 export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | null {
@@ -259,6 +374,8 @@ export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | nul
     placeTo: input.placeTo?.trim() || undefined,
     departAt: input.departAt || undefined,
     checkOut: input.checkOut || undefined,
+    openFrom: input.openFrom || undefined,
+    openTo: input.openTo || undefined,
   };
 }
 
@@ -284,25 +401,50 @@ export function scheduleSignature(entries: PlanEntry[]): string {
   return entries
     .map(
       (e) =>
-        `${e.id}|${e.arriveBy ?? ""}|${e.departAt ?? ""}|${e.checkOut ?? ""}|${e.stayMin ?? ""}|${e.priority}|${e.mode}|${e.day ?? ""}|${e.fixedTime ? 1 : 0}|${e.placeFrom ?? ""}|${e.placeTo ?? ""}`
+        `${e.id}|${e.arriveBy ?? ""}|${e.departAt ?? ""}|${e.checkOut ?? ""}|${e.stayMin ?? ""}|${e.priority}|${e.mode}|${e.day ?? ""}|${e.fixedTime ? 1 : 0}|${e.placeFrom ?? ""}|${e.placeTo ?? ""}|${e.openFrom ?? ""}|${e.openTo ?? ""}`
     )
     .join(";");
+}
+
+/** 予算集計のカテゴリ。 */
+export type CostCategory = "transit" | "stay" | "dining" | "sightseeing";
+
+export const COST_CATEGORY_LABEL: Record<CostCategory, string> = {
+  transit: "交通",
+  stay: "宿泊",
+  dining: "食事",
+  sightseeing: "観光",
+};
+
+/** 表示順（交通→宿泊→食事→観光）。 */
+export const COST_CATEGORY_ORDER: CostCategory[] = ["transit", "stay", "dining", "sightseeing"];
+
+/** 種別を予算カテゴリへ対応づける。 */
+export function costCategoryOf(mode: TransportMode): CostCategory {
+  if (mode === "stay") return "stay";
+  if (mode === "dining") return "dining";
+  if (isTransitMode(mode)) return "transit";
+  return "sightseeing"; // activity / home など
 }
 
 export interface PlanTotals {
   entryCount: number;
   totalCost: number;
   costedCount: number;
+  /** カテゴリ別の費用合計（円）。0のカテゴリも含む。 */
+  byCategory: Record<CostCategory, number>;
 }
 
 export function computePlanTotals(entries: PlanEntry[]): PlanTotals {
   let totalCost = 0;
   let costedCount = 0;
+  const byCategory: Record<CostCategory, number> = { transit: 0, stay: 0, dining: 0, sightseeing: 0 };
   for (const e of entries) {
     if (typeof e.cost === "number" && e.cost > 0) {
       totalCost += e.cost;
       costedCount += 1;
+      byCategory[costCategoryOf(e.mode)] += e.cost;
     }
   }
-  return { entryCount: entries.length, totalCost, costedCount };
+  return { entryCount: entries.length, totalCost, costedCount, byCategory };
 }

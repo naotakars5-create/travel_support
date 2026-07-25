@@ -6,7 +6,8 @@ export type TransportMode =
   | "car"
   | "stay"
   | "dining"
-  | "activity";
+  | "activity"
+  | "home";
 
 export interface ParsedField {
   key: string;
@@ -73,6 +74,11 @@ export interface PlanEntry {
   source: string;
   /** 何日目か（1始まり）。複数日程で使う。未指定は1日目扱い。 */
   day?: number;
+
+  /** 営業・開館時間（開始, "HH:MM"）。AIや自動配置がこの時刻より前に置かないようにする。 */
+  openFrom?: string;
+  /** 営業・開館時間（終了, "HH:MM"）。閉店までに滞在が収まるように配置する。 */
+  openTo?: string;
 
   // --- 移動系（鉄道・バス・飛行機・車）専用 ---
   /** 出発地 */

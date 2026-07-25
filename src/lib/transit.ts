@@ -46,6 +46,7 @@ const DEFAULT_DURATION_BY_MODE: Record<TransportMode, number> = {
   stay: 5,
   dining: 5,
   activity: 5,
+  home: 0,
 };
 
 export const heuristicTransitEstimator: TransitEstimator = {

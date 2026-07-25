@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PlanEntry, Priority, SpotSuggestion } from "@/lib/types";
-import { PlanTotals, PRIORITY_META, effectiveStayMin } from "@/lib/plan";
+import { PlanTotals, PRIORITY_META, effectiveStayMin, COST_CATEGORY_LABEL, COST_CATEGORY_ORDER } from "@/lib/plan";
 import { Profile } from "@/lib/profile";
 import { BaseMode } from "@/lib/transit";
 import { MODE_LABEL } from "@/lib/modeMeta";
@@ -35,12 +36,13 @@ export function PlanScreen({
   onSetBaseMode,
   profile,
   onOpenProfile,
+  onOpenTrips,
   onOpenAdd,
   onCompose,
   onRemoveEntry,
   onEditEntry,
   onBumpPriority,
-  onAddSuggestion,
+  onAddSuggestions,
   onShare,
   onImportShared,
 }: {
@@ -60,18 +62,28 @@ export function PlanScreen({
   onSetBaseMode: (m: BaseMode) => void;
   profile: Profile;
   onOpenProfile: () => void;
+  onOpenTrips: () => void;
   onOpenAdd: () => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
   onBumpPriority: (id: string) => void;
-  onAddSuggestion: (s: SpotSuggestion) => void;
+  onAddSuggestions: (list: SpotSuggestion[]) => void;
   onShare: () => void;
   onImportShared: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  // 表示時刻＝目安到着（指定があれば）または組み上げ済みの到着予定
-  const timeOf = (e: PlanEntry): string | null => e.arriveBy ?? scheduleByEntry.get(e.id) ?? null;
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const togglePick = (title: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  // 表示時刻：固定予定は目安到着を厳守、それ以外は組み上げ結果（AI/自動）の時刻を優先
+  const timeOf = (e: PlanEntry): string | null =>
+    (e.fixedTime && e.arriveBy ? e.arriveBy : scheduleByEntry.get(e.id) ?? e.arriveBy) ?? null;
   const sorted = [...entries].sort((a, b) => {
     const ta = timeOf(a) ? new Date(timeOf(a)!).getTime() : Infinity;
     const tb = timeOf(b) ? new Date(timeOf(b)!).getTime() : Infinity;
@@ -99,6 +111,9 @@ export function PlanScreen({
           </View>
           {!readOnly && (
             <View className="mt-1 flex-row items-center gap-2">
+              <Pressable onPress={onOpenTrips} className="h-7 items-center justify-center rounded-[8px] border border-ink/25 px-3">
+                <Text className="font-gothic-500 text-[11px] text-ink">履歴</Text>
+              </Pressable>
               <Pressable onPress={onShare} className="h-7 items-center justify-center rounded-[8px] border border-ink/25 px-3">
                 <Text className="font-gothic-500 text-[11px] text-ink">共有</Text>
               </Pressable>
@@ -168,6 +183,33 @@ export function PlanScreen({
             <Pressable onPress={onImportShared} className="mt-2 self-start rounded-full bg-ink px-3 py-1.5">
               <Text className="font-gothic-500 text-[11px] text-kinari">自分のプランに保存して編集</Text>
             </Pressable>
+          </View>
+        )}
+        {totals.totalCost > 0 && (
+          <View className="mb-4 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
+            <View className="flex-row items-baseline justify-between">
+              <Text className="font-gothic-500 text-[10px] tracking-[.1em] text-muted">予算のめやす</Text>
+              <Text className="font-mincho-600 text-[16px] text-ink" style={TNUM}>
+                {formatYen(totals.totalCost)}
+              </Text>
+            </View>
+            <View className="mt-2 gap-1">
+              {COST_CATEGORY_ORDER.filter((c) => totals.byCategory[c] > 0).map((c) => {
+                const amount = totals.byCategory[c];
+                const pct = Math.round((amount / totals.totalCost) * 100);
+                return (
+                  <View key={c} className="flex-row items-center gap-2">
+                    <Text className="w-8 font-gothic-400 text-[11px] text-muted">{COST_CATEGORY_LABEL[c]}</Text>
+                    <View className="h-[6px] flex-1 overflow-hidden rounded-full bg-black/[.06]">
+                      <View className="h-full rounded-full bg-ink/60" style={{ width: `${Math.max(4, pct)}%` }} />
+                    </View>
+                    <Text className="w-16 text-right font-gothic-400 text-[11px] text-muted" style={TNUM}>
+                      {formatYen(amount)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
           </View>
         )}
         {sorted.length === 0 && (
@@ -281,22 +323,52 @@ export function PlanScreen({
 
         {suggestions.length > 0 && (
           <View className="mt-7">
-            <Text className="mb-2 font-gothic-500 text-[10px] tracking-[.15em] text-muted">AIのおすすめ · 近くで寄れる場所</Text>
-            <View className="rounded-[16px] border border-ink/10">
-              {suggestions.map((s, i) => (
-                <View key={s.title} className={`flex-row items-center justify-between gap-2 px-4 py-3 ${i > 0 ? "border-t border-ink/10" : ""}`}>
-                  <View className="flex-1">
-                    <Text className="font-mincho-400 text-[14px] text-ink">{s.title}</Text>
-                    {(s.area || s.note) && (
-                      <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{[s.area, s.note].filter(Boolean).join(" · ")}</Text>
-                    )}
-                  </View>
-                  <Pressable onPress={() => onAddSuggestion(s)} className="rounded-full border border-ink px-3 py-1">
-                    <Text className="font-gothic-500 text-[11px] text-ink">追加</Text>
-                  </Pressable>
-                </View>
-              ))}
+            <View className="mb-2 flex-row items-center justify-between">
+              <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">AIのおすすめ · 選んでまとめて追加</Text>
+              <Pressable
+                onPress={() =>
+                  setPicked((prev) => (prev.size === suggestions.length ? new Set() : new Set(suggestions.map((s) => s.title))))
+                }
+                hitSlop={6}
+                className="rounded-full border border-ink/25 px-2.5 py-1"
+              >
+                <Text className="font-gothic-400 text-[10px] text-ink">{picked.size === suggestions.length ? "選択を解除" : "すべて選択"}</Text>
+              </Pressable>
             </View>
+            <View className="rounded-[16px] border border-ink/10">
+              {suggestions.map((s, i) => {
+                const on = picked.has(s.title);
+                return (
+                  <Pressable
+                    key={s.title}
+                    onPress={() => togglePick(s.title)}
+                    className={`flex-row items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-ink/10" : ""}`}
+                  >
+                    <View className={`h-[20px] w-[20px] items-center justify-center rounded-[6px] border ${on ? "border-ink bg-ink" : "border-black/[.25]"}`}>
+                      {on && <View className="h-[8px] w-[8px] rounded-[2px] bg-kinari" />}
+                    </View>
+                    <View className="flex-1">
+                      <Text className="font-mincho-400 text-[14px] text-ink">{s.title}</Text>
+                      {(s.area || s.note) && (
+                        <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{[s.area, s.note].filter(Boolean).join(" · ")}</Text>
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable
+              disabled={picked.size === 0}
+              onPress={() => {
+                onAddSuggestions(suggestions.filter((s) => picked.has(s.title)));
+                setPicked(new Set());
+              }}
+              className={`mt-2 rounded-[12px] py-3 ${picked.size > 0 ? "bg-ink" : "bg-ink/30"}`}
+            >
+              <Text className="text-center font-gothic-500 text-[12px] text-kinari">
+                {picked.size > 0 ? `選択した${picked.size}件を追加` : "追加したいものを選択"}
+              </Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>

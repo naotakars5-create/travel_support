@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GeoPoint, isTransitMode, PackingItem, ParseApiResponse, PlanApiResponse, PlanEntry, ScheduleSlot, SpotSuggestion } from "@/lib/types";
 import { buildSeedEntries } from "@/lib/seedEntries";
 import { loadState, saveState } from "@/lib/storage";
+import { loadTrips, saveTrips, SavedTrip } from "@/lib/trips";
 import { buildRail, firstSeedGeo, lastSeedGeo, RailItem, sortedGroupEvents } from "@/lib/itinerary";
 import { getDayOfState, DayOfState } from "@/lib/dayof";
 import {
@@ -60,10 +61,21 @@ export function useAppState() {
   const [tripDayCount, setTripDayCount] = useState<number>(1);
   const [baseMode, setBaseMode] = useState<BaseMode>("car");
   const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
+  // 保存した旅の履歴（後から呼び出せる）
+  const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
 
   const initializedRef = useRef(false);
   // 「構造」が既にスケジュール済みかを追跡し、座標だけ埋まった時の不要な再ローカル化を防ぐ。
   const scheduleSigRef = useRef<string | null>(null);
+  // ローカル自動配置の基準（旅行初日の朝）を参照するための ref。
+  const tripDateRef = useRef(tripDate);
+  useEffect(() => {
+    tripDateRef.current = tripDate;
+  }, [tripDate]);
+  const localReferenceDate = () => {
+    const d = new Date(`${tripDateRef.current}T09:00:00`);
+    return Number.isNaN(d.getTime()) ? new Date() : d;
+  };
 
   // 初期化：AsyncStorageに保存済みなら復元、無ければシード行き先を生成
   useEffect(() => {
@@ -73,6 +85,9 @@ export function useAppState() {
       // プロフィール（名前・アイコン）は共有/通常どちらでも自分のものを読み込む
       const savedProfile = await loadProfile();
       if (savedProfile) setProfileState(savedProfile);
+
+      // 保存済みの旅の履歴を読み込む
+      setSavedTrips(await loadTrips());
 
       // 共有リンクで開かれた場合は、URLのプランを「閲覧のみ」で読み込む（保存済みは上書きしない）
       const shared = readSharedPlanFromUrl();
@@ -97,7 +112,7 @@ export function useAppState() {
       } else {
         const seeded = buildSeedEntries(new Date());
         setEntries(seeded);
-        setSlots(localSchedule(seeded, new Date()));
+        setSlots(localSchedule(seeded, localReferenceDate()));
         setPacking(buildDefaultPacking());
         scheduleSigRef.current = scheduleSignature(seeded);
       }
@@ -123,10 +138,8 @@ export function useAppState() {
     const sig = scheduleSignature(entries);
     if (scheduleSigRef.current === sig) return;
     scheduleSigRef.current = sig;
-    setSlots(localSchedule(entries, new Date()));
-    // 構造が変わったら以前のAI提案・メモは古くなるのでクリア
-    setSuggestions([]);
-    setPlanNotes(null);
+    setSlots(localSchedule(entries, localReferenceDate()));
+    // 注: おすすめ（suggestions）は追加操作で消さない。次にAIで組み直した時に更新する。
   }, [entries]);
 
   // 旅程イベントは entries + slots から都度導出する（座標も entry から引き継ぐ）。
@@ -269,7 +282,12 @@ export function useAppState() {
   // 組み上げた各行き先の到着予定時刻（entryId → ISO）。計画画面で「自動」の予定にも時刻を表示するため。
   const scheduleByEntry = useMemo(() => {
     const m = new Map<string, string>();
-    for (const ev of events) m.set(ev.id.replace(/^evt-/, ""), ev.startAt);
+    // イベントIDは evt-{entryId}（自宅は evt-{entryId}-depart / -return）。
+    // entryId へ戻し、最も早いイベント時刻を採用する。
+    for (const ev of events) {
+      const key = ev.id.replace(/^evt-/, "").replace(/-(depart|return)$/, "");
+      if (!m.has(key)) m.set(key, ev.startAt);
+    }
     return m;
   }, [events]);
 
@@ -291,13 +309,15 @@ export function useAppState() {
     [flashNewEvent]
   );
 
-  const addSuggestion = useCallback(
-    (s: SpotSuggestion) => {
-      const entry = suggestionToEntry(genId("entry"), s);
-      setEntries((prev) => [...(prev ?? []), entry]);
-      setSuggestions((prev) => prev.filter((x) => x.title !== s.title));
-      flashNewEvent(entry.id);
-      return entry;
+  /** おすすめスポットを複数まとめて行き先リストへ追加する（選択したものを一気に）。 */
+  const addSuggestions = useCallback(
+    (list: SpotSuggestion[]) => {
+      if (list.length === 0) return;
+      const titles = new Set(list.map((s) => s.title));
+      const newEntries = list.map((s) => suggestionToEntry(genId("entry"), s));
+      setEntries((prev) => [...(prev ?? []), ...newEntries]);
+      setSuggestions((prev) => prev.filter((x) => !titles.has(x.title)));
+      if (newEntries[0]) flashNewEvent(newEntries[0].id);
     },
     [flashNewEvent]
   );
@@ -439,6 +459,65 @@ export function useAppState() {
     void saveProfile(p);
   }, []);
 
+  /** 現在の旅程を名前を付けて履歴に保存する。 */
+  const saveCurrentTrip = useCallback(
+    (name: string) => {
+      const list = entries ?? [];
+      if (list.length === 0) return;
+      const trip: SavedTrip = {
+        id: genId("trip"),
+        name: name.trim() || `${tripDate} の旅`,
+        savedAt: new Date().toISOString(),
+        entries: list,
+        slots,
+        packing,
+        tripDate,
+        tripDayCount,
+        baseMode,
+      };
+      setSavedTrips((prev) => {
+        const next = [trip, ...prev];
+        void saveTrips(next);
+        return next;
+      });
+      setFlash({ visible: true, text: `「${trip.name}」を保存しました\n履歴からいつでも呼び出せます` });
+      setTimeout(() => setFlash({ visible: false, text: "" }), 1900);
+    },
+    [entries, slots, packing, tripDate, tripDayCount, baseMode]
+  );
+
+  /** 保存した旅を現在の旅程として読み込む（今の内容は上書きされる）。 */
+  const loadTrip = useCallback((id: string) => {
+    setSavedTrips((prev) => {
+      const trip = prev.find((t) => t.id === id);
+      if (!trip) return prev;
+      setReadOnly(false);
+      setEntries(trip.entries);
+      setSlots(trip.slots);
+      setPacking(trip.packing);
+      setCurrentNodeKey(null);
+      setTripDate(trip.tripDate);
+      setTripDayCount(trip.tripDayCount);
+      setBaseMode(trip.baseMode);
+      setSuggestions([]);
+      setPlanNotes(null);
+      scheduleSigRef.current = scheduleSignature(trip.entries);
+      setTab("plan");
+      setFlash({ visible: true, text: `「${trip.name}」を読み込みました` });
+      setTimeout(() => setFlash({ visible: false, text: "" }), 1700);
+      return prev;
+    });
+  }, []);
+
+  /** 保存した旅を履歴から削除する。 */
+  const deleteTrip = useCallback((id: string) => {
+    setSavedTrips((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      void saveTrips(next);
+      return next;
+    });
+  }, []);
+
   const recordArrival = useCallback((nodeKey: string, place: string) => {
     setCurrentNodeKey(nodeKey);
     setFlash({ visible: true, text: `${place} に到着\n到着を記録しました` });
@@ -485,6 +564,10 @@ export function useAppState() {
     setBaseMode,
     profile,
     setProfile,
+    savedTrips,
+    saveCurrentTrip,
+    loadTrip,
+    deleteTrip,
     suggestions,
     planNotes,
     composing,
@@ -493,7 +576,7 @@ export function useAppState() {
     shareCurrentPlan,
     importSharedToOwn,
     addEntry,
-    addSuggestion,
+    addSuggestions,
     updateEntry,
     editEntry,
     removeEntry,
