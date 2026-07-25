@@ -352,20 +352,45 @@ export function scheduleSignature(entries: PlanEntry[]): string {
     .join(";");
 }
 
+/** 予算集計のカテゴリ。 */
+export type CostCategory = "transit" | "stay" | "dining" | "sightseeing";
+
+export const COST_CATEGORY_LABEL: Record<CostCategory, string> = {
+  transit: "交通",
+  stay: "宿泊",
+  dining: "食事",
+  sightseeing: "観光",
+};
+
+/** 表示順（交通→宿泊→食事→観光）。 */
+export const COST_CATEGORY_ORDER: CostCategory[] = ["transit", "stay", "dining", "sightseeing"];
+
+/** 種別を予算カテゴリへ対応づける。 */
+export function costCategoryOf(mode: TransportMode): CostCategory {
+  if (mode === "stay") return "stay";
+  if (mode === "dining") return "dining";
+  if (isTransitMode(mode)) return "transit";
+  return "sightseeing"; // activity / home など
+}
+
 export interface PlanTotals {
   entryCount: number;
   totalCost: number;
   costedCount: number;
+  /** カテゴリ別の費用合計（円）。0のカテゴリも含む。 */
+  byCategory: Record<CostCategory, number>;
 }
 
 export function computePlanTotals(entries: PlanEntry[]): PlanTotals {
   let totalCost = 0;
   let costedCount = 0;
+  const byCategory: Record<CostCategory, number> = { transit: 0, stay: 0, dining: 0, sightseeing: 0 };
   for (const e of entries) {
     if (typeof e.cost === "number" && e.cost > 0) {
       totalCost += e.cost;
       costedCount += 1;
+      byCategory[costCategoryOf(e.mode)] += e.cost;
     }
   }
-  return { entryCount: entries.length, totalCost, costedCount };
+  return { entryCount: entries.length, totalCost, costedCount, byCategory };
 }

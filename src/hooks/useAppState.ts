@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GeoPoint, isTransitMode, PackingItem, ParseApiResponse, PlanApiResponse, PlanEntry, ScheduleSlot, SpotSuggestion } from "@/lib/types";
 import { buildSeedEntries } from "@/lib/seedEntries";
 import { loadState, saveState } from "@/lib/storage";
+import { loadTrips, saveTrips, SavedTrip } from "@/lib/trips";
 import { buildRail, firstSeedGeo, lastSeedGeo, RailItem, sortedGroupEvents } from "@/lib/itinerary";
 import { getDayOfState, DayOfState } from "@/lib/dayof";
 import {
@@ -60,6 +61,8 @@ export function useAppState() {
   const [tripDayCount, setTripDayCount] = useState<number>(1);
   const [baseMode, setBaseMode] = useState<BaseMode>("car");
   const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
+  // 保存した旅の履歴（後から呼び出せる）
+  const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
 
   const initializedRef = useRef(false);
   // 「構造」が既にスケジュール済みかを追跡し、座標だけ埋まった時の不要な再ローカル化を防ぐ。
@@ -82,6 +85,9 @@ export function useAppState() {
       // プロフィール（名前・アイコン）は共有/通常どちらでも自分のものを読み込む
       const savedProfile = await loadProfile();
       if (savedProfile) setProfileState(savedProfile);
+
+      // 保存済みの旅の履歴を読み込む
+      setSavedTrips(await loadTrips());
 
       // 共有リンクで開かれた場合は、URLのプランを「閲覧のみ」で読み込む（保存済みは上書きしない）
       const shared = readSharedPlanFromUrl();
@@ -448,6 +454,65 @@ export function useAppState() {
     void saveProfile(p);
   }, []);
 
+  /** 現在の旅程を名前を付けて履歴に保存する。 */
+  const saveCurrentTrip = useCallback(
+    (name: string) => {
+      const list = entries ?? [];
+      if (list.length === 0) return;
+      const trip: SavedTrip = {
+        id: genId("trip"),
+        name: name.trim() || `${tripDate} の旅`,
+        savedAt: new Date().toISOString(),
+        entries: list,
+        slots,
+        packing,
+        tripDate,
+        tripDayCount,
+        baseMode,
+      };
+      setSavedTrips((prev) => {
+        const next = [trip, ...prev];
+        void saveTrips(next);
+        return next;
+      });
+      setFlash({ visible: true, text: `「${trip.name}」を保存しました\n履歴からいつでも呼び出せます` });
+      setTimeout(() => setFlash({ visible: false, text: "" }), 1900);
+    },
+    [entries, slots, packing, tripDate, tripDayCount, baseMode]
+  );
+
+  /** 保存した旅を現在の旅程として読み込む（今の内容は上書きされる）。 */
+  const loadTrip = useCallback((id: string) => {
+    setSavedTrips((prev) => {
+      const trip = prev.find((t) => t.id === id);
+      if (!trip) return prev;
+      setReadOnly(false);
+      setEntries(trip.entries);
+      setSlots(trip.slots);
+      setPacking(trip.packing);
+      setCurrentNodeKey(null);
+      setTripDate(trip.tripDate);
+      setTripDayCount(trip.tripDayCount);
+      setBaseMode(trip.baseMode);
+      setSuggestions([]);
+      setPlanNotes(null);
+      scheduleSigRef.current = scheduleSignature(trip.entries);
+      setTab("plan");
+      setFlash({ visible: true, text: `「${trip.name}」を読み込みました` });
+      setTimeout(() => setFlash({ visible: false, text: "" }), 1700);
+      return prev;
+    });
+  }, []);
+
+  /** 保存した旅を履歴から削除する。 */
+  const deleteTrip = useCallback((id: string) => {
+    setSavedTrips((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      void saveTrips(next);
+      return next;
+    });
+  }, []);
+
   const recordArrival = useCallback((nodeKey: string, place: string) => {
     setCurrentNodeKey(nodeKey);
     setFlash({ visible: true, text: `${place} に到着\n到着を記録しました` });
@@ -494,6 +559,10 @@ export function useAppState() {
     setBaseMode,
     profile,
     setProfile,
+    savedTrips,
+    saveCurrentTrip,
+    loadTrip,
+    deleteTrip,
     suggestions,
     planNotes,
     composing,

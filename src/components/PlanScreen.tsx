@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PlanEntry, Priority, SpotSuggestion } from "@/lib/types";
-import { PlanTotals, PRIORITY_META, effectiveStayMin } from "@/lib/plan";
+import { PlanTotals, PRIORITY_META, effectiveStayMin, COST_CATEGORY_LABEL, COST_CATEGORY_ORDER } from "@/lib/plan";
 import { Profile } from "@/lib/profile";
 import { BaseMode } from "@/lib/transit";
 import { MODE_LABEL } from "@/lib/modeMeta";
@@ -36,6 +36,7 @@ export function PlanScreen({
   onSetBaseMode,
   profile,
   onOpenProfile,
+  onOpenTrips,
   onOpenAdd,
   onCompose,
   onRemoveEntry,
@@ -61,6 +62,7 @@ export function PlanScreen({
   onSetBaseMode: (m: BaseMode) => void;
   profile: Profile;
   onOpenProfile: () => void;
+  onOpenTrips: () => void;
   onOpenAdd: () => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
@@ -108,6 +110,9 @@ export function PlanScreen({
           </View>
           {!readOnly && (
             <View className="mt-1 flex-row items-center gap-2">
+              <Pressable onPress={onOpenTrips} className="h-7 items-center justify-center rounded-[8px] border border-ink/25 px-3">
+                <Text className="font-gothic-500 text-[11px] text-ink">履歴</Text>
+              </Pressable>
               <Pressable onPress={onShare} className="h-7 items-center justify-center rounded-[8px] border border-ink/25 px-3">
                 <Text className="font-gothic-500 text-[11px] text-ink">共有</Text>
               </Pressable>
@@ -177,6 +182,33 @@ export function PlanScreen({
             <Pressable onPress={onImportShared} className="mt-2 self-start rounded-full bg-ink px-3 py-1.5">
               <Text className="font-gothic-500 text-[11px] text-kinari">自分のプランに保存して編集</Text>
             </Pressable>
+          </View>
+        )}
+        {totals.totalCost > 0 && (
+          <View className="mb-4 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
+            <View className="flex-row items-baseline justify-between">
+              <Text className="font-gothic-500 text-[10px] tracking-[.1em] text-muted">予算のめやす</Text>
+              <Text className="font-mincho-600 text-[16px] text-ink" style={TNUM}>
+                {formatYen(totals.totalCost)}
+              </Text>
+            </View>
+            <View className="mt-2 gap-1">
+              {COST_CATEGORY_ORDER.filter((c) => totals.byCategory[c] > 0).map((c) => {
+                const amount = totals.byCategory[c];
+                const pct = Math.round((amount / totals.totalCost) * 100);
+                return (
+                  <View key={c} className="flex-row items-center gap-2">
+                    <Text className="w-8 font-gothic-400 text-[11px] text-muted">{COST_CATEGORY_LABEL[c]}</Text>
+                    <View className="h-[6px] flex-1 overflow-hidden rounded-full bg-black/[.06]">
+                      <View className="h-full rounded-full bg-ink/60" style={{ width: `${Math.max(4, pct)}%` }} />
+                    </View>
+                    <Text className="w-16 text-right font-gothic-400 text-[11px] text-muted" style={TNUM}>
+                      {formatYen(amount)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
           </View>
         )}
         {sorted.length === 0 && (

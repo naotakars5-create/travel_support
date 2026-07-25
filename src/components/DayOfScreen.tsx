@@ -202,6 +202,8 @@ function MoveHero({
 }) {
   const { mm, ss } = computeCountdown(state.targetDepartAt, now);
   const modeColor = MODE_COLOR[state.transitMode];
+  // 予定より遅れ（出発時刻を過ぎた分）。3分以上でお知らせ。
+  const lateMin = Math.round((now.getTime() - new Date(state.targetDepartAt).getTime()) / 60000);
   // GPSで目的地までの残り距離
   const remainingMeters = liveLocation && state.nextNode.geo ? haversineMeters(liveLocation, state.nextNode.geo) : null;
   const geoForSpots = liveLocation ?? state.currentNode?.geo ?? state.nextNode.geo ?? null;
@@ -220,6 +222,17 @@ function MoveHero({
         </Text>
       </View>
       <Text className="mt-2 font-gothic-400 text-[10px] tracking-[.15em] text-day-text3">分 秒</Text>
+
+      {lateMin >= 3 && (
+        <View className="mt-6 w-full rounded-[12px] border border-accent/50 bg-accent/[.08] px-4 py-3">
+          <Text className="font-gothic-500 text-[12px] text-accent" style={TNUM}>
+            予定より {formatDurationMin(lateMin)} 遅れています
+          </Text>
+          <Text className="mt-1 font-gothic-400 text-[11px] leading-[17px] text-day-text2">
+            このままだと後の予定も同じくらい後ろへずれます。急ぐか、任意の予定を1つ省くと取り戻せます。
+          </Text>
+        </View>
+      )}
 
       <View className="mt-8 w-full rounded-[16px] border border-day-text/10 bg-day-text/[.04] p-4">
         <Text className="font-mincho-600 text-[23px] text-day-text">{nodeName(state.nextNode)}</Text>
@@ -268,13 +281,18 @@ function FreeHero({
 
   return (
     <View className="items-center">
-      <Text className="font-gothic-400 text-[11px] tracking-[.08em] text-day-text2">空き時間</Text>
+      <Text className="font-gothic-400 text-[11px] tracking-[.08em] text-day-text2">空き時間 · 予定より早く回れています</Text>
       <Text className="mt-3 font-mincho-900 text-[62px] leading-[56px] text-day-text" style={TNUM}>
         {formatDurationMin(state.freeMin)}
       </Text>
       <Text className="mt-2 font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
         次の予約 {formatJstTime(new Date(state.nextNode.time))} {nodeName(state.nextNode)} まで
       </Text>
+      {state.freeMin >= 30 && (
+        <Text className="mt-2 text-center font-gothic-400 text-[11px] leading-[17px] text-day-text3">
+          この時間で近くのスポットへ寄り道できます。下のおすすめからどうぞ。
+        </Text>
+      )}
 
       <NearbySpots geo={geo} freeMinutes={state.freeMin} preferIndoor={preferIndoor} live={Boolean(liveLocation)} />
 

@@ -1,5 +1,6 @@
 import { PlanEntry } from "./types";
 import { PRIORITY_META } from "./plan";
+import { MODE_LABEL } from "./modeMeta";
 
 export const PLAN_SYSTEM_PROMPT = `あなたは日本の個人旅行者のための旅程プランナーです。
 ユーザーが「行きたい場所」を重要度・目安到着時間・滞在時間つきで挙げます。
@@ -12,6 +13,7 @@ export const PLAN_SYSTEM_PROMPT = `あなたは日本の個人旅行者のため
 4. 全部を回る時間が無い場合は、重要度が低い予定（optional→want の順）を後回し・除外してよい。ただし must は必ず残す。
 5. 地理的に近い場所は隣り合わせて、移動の往復を減らす。
 6. **常識的な行動時間帯（おおむね 9:00〜20:00）に配置すること。早朝・深夜には予定を入れない。** 収まらない場合は翌日に回すか、重要度の低いものを外す。ただし fixedTime=true の予定（予約・便）はその時刻を必ず守る。
+7. **種別「自宅」は旅の出発点・終着点。** 自宅の到着目安（出発時刻）より前、帰宅時刻より後には予定を置かない。旅程はすべて自宅の出発〜帰宅の時間内に収める。自宅そのものは schedule に必ず残し、出発時刻を動かさない。
 
 # 出力形式（最重要）
 - 出力は **JSONオブジェクト1つのみ**。前後に説明・挨拶・コードフェンス（\`\`\`）を一切付けない。
@@ -37,12 +39,23 @@ export const PLAN_SYSTEM_PROMPT = `あなたは日本の個人旅行者のため
 export function buildPlanUserMessage(params: { entries: PlanEntry[]; referenceDateIso: string }): string {
   const { entries, referenceDateIso } = params;
   const lines = entries.map((e) => {
+    // 自宅は「出発（departAt）」と「帰宅（arriveBy）」を明示する
+    if (e.mode === "home") {
+      return [
+        `- entryId: ${e.id}`,
+        `種別: 自宅（旅の起点・終点）`,
+        e.departAt ? `出発時刻: ${e.departAt}（固定・厳守）` : null,
+        e.arriveBy ? `帰宅時刻: ${e.arriveBy}（固定・厳守）` : null,
+      ]
+        .filter(Boolean)
+        .join(" / ");
+    }
     const parts = [
       `- entryId: ${e.id}`,
       `行き先: ${e.title}`,
       e.place ? `住所: ${e.place}` : null,
       `重要度: ${PRIORITY_META[e.priority].label}`,
-      `種別: ${e.mode}`,
+      `種別: ${MODE_LABEL[e.mode]}`,
       typeof e.stayMin === "number" ? `滞在: ${e.stayMin}分` : null,
       e.arriveBy ? `到着目安: ${e.arriveBy}${e.fixedTime ? "（固定・厳守）" : "（目安）"}` : "到着目安: なし（自由に配置してよい）",
     ].filter(Boolean);
