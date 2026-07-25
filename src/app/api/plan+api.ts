@@ -76,12 +76,13 @@ export async function POST(request: Request): Promise<Response> {
   const referenceDateIso = payload.referenceDate || new Date().toISOString();
   const dayCount = typeof payload.dayCount === "number" && payload.dayCount > 0 ? Math.floor(payload.dayCount) : 1;
 
-  if (entries.length === 0) {
+  if (entries.filter((e) => e.mode !== "rental").length === 0) {
     return Response.json({ kind: "error", message: "行き先がありません" } satisfies PlanApiResponse, { status: 400 });
   }
 
   const provider = getLlmProvider();
-  const validIds = new Set(entries.map((e) => e.id));
+  // レンタカーは「借りている期間」であって行き先ではないので、旅程には配置させない。
+  const validIds = new Set(entries.filter((e) => e.mode !== "rental").map((e) => e.id));
 
   try {
     const responseText = await provider.complete({

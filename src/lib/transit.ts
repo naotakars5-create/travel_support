@@ -1,8 +1,32 @@
 import { GeoPoint, ParsedEvent, TransportMode } from "./types";
 import { haversineMeters } from "./geo";
 
-/** 旅行全体の「基本の移動手段」。当日の出発カウントダウン等の計算に使う。 */
+/**
+ * 旅行全体の車の使い方。
+ * - "car": 旅行中ずっと車（マイカー等）
+ * - "walk": 基本は徒歩・電車。レンタカーを登録した期間だけ車になる
+ */
 export type BaseMode = "car" | "walk";
+
+/** レンタカーを借りている期間（この間の移動は車で計算する）。 */
+export interface CarWindow {
+  /** 借りる日時（ISO） */
+  fromIso: string;
+  /** 返す日時（ISO） */
+  toIso: string;
+}
+
+/** その時刻がレンタカー期間内か。 */
+export function isWithinCarWindow(iso: string | undefined, windows: CarWindow[]): boolean {
+  if (!iso || windows.length === 0) return false;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return false;
+  return windows.some((w) => {
+    const a = new Date(w.fromIso).getTime();
+    const b = new Date(w.toIso).getTime();
+    return !Number.isNaN(a) && !Number.isNaN(b) && t >= a && t <= b;
+  });
+}
 
 /** 1区間の実測移動時間（分）。車・徒歩（必要なら公共交通）を保持する。 */
 export interface EdgeTravel {
@@ -52,6 +76,7 @@ const DEFAULT_DURATION_BY_MODE: Record<TransportMode, number> = {
   dining: 5,
   activity: 5,
   home: 0,
+  rental: 0,
 };
 
 export const heuristicTransitEstimator: TransitEstimator = {
@@ -99,7 +124,12 @@ function pickPositive(measured: number | undefined, fallback: number | undefined
  * baseMode に応じて所要時間を選び、driving/walking の両方も添える。
  * キャッシュに無い区間はヒューリスティックにフォールバックする（取得中・API未設定・air区間など）。
  */
-export function createPrecomputedEstimator(cache: Record<string, EdgeTravel>, baseMode: BaseMode = "car"): TransitEstimator {
+export function createPrecomputedEstimator(
+  cache: Record<string, EdgeTravel>,
+  baseMode: BaseMode = "car",
+  /** レンタカーを借りている期間。この間の区間は車で計算する */
+  carWindows: CarWindow[] = []
+): TransitEstimator {
   return {
     estimate(from, to) {
       const t = cache[`${from.id}:${to.id}`];
@@ -124,10 +154,19 @@ export function createPrecomputedEstimator(cache: Record<string, EdgeTravel>, ba
         };
       }
 
+      // 「ずっと車（マイカー）」か、レンタカーを借りている時間帯なら車。
+      // それ以外は近ければ徒歩、離れていれば電車・バスとして見積もる。
+      const hasCar = baseMode === "car" || isWithinCarWindow(from.endAt ?? from.startAt, carWindows);
       if (driving != null || walking != null) {
-        const chosen = baseMode === "car" ? driving ?? walking : walking ?? driving;
-        const mode: TransportMode = baseMode === "car" ? "car" : "walk";
-        return { mode, durationMin: chosen ?? 0, driving, walking };
+        if (hasCar) {
+          return { mode: "car", durationMin: driving ?? walking ?? 0, driving, walking };
+        }
+        // 徒歩15分以内なら徒歩、それ以上は電車・バス扱い（日本の公共交通ルートはAPIで取得できないため概算）
+        if (walking != null && walking <= 15) {
+          return { mode: "walk", durationMin: walking, driving, walking };
+        }
+        const transitMin = pickPositive(t?.transit, undefined) ?? Math.round((driving ?? walking ?? 0) * 1.4);
+        return { mode: "rail", durationMin: transitMin, driving, walking };
       }
       return heuristicTransitEstimator.estimate(from, to);
     },

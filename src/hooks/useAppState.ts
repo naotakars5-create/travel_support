@@ -21,7 +21,7 @@ import {
 import { buildDefaultPacking } from "@/lib/packing";
 import { DEFAULT_PROFILE, loadProfile, Profile, saveProfile } from "@/lib/profile";
 import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM } from "@/lib/share";
-import { BaseMode, EdgeTravel, createPrecomputedEstimator, guessMode } from "@/lib/transit";
+import { BaseMode, CarWindow, EdgeTravel, createPrecomputedEstimator, guessMode } from "@/lib/transit";
 import { createSpotProvider, Spot } from "@/lib/spots";
 import { combineDateAndTime, dateForDay, dayOfIso, timeStrFromIso, todayDateStr } from "@/lib/date";
 import { apiUrl } from "@/lib/apiBase";
@@ -158,7 +158,8 @@ export function useAppState() {
   // AIが「時間内に収まらない」と外した予定（スロットが無い行き先）。旅程画面の下部に表示する。
   const unplacedEntries = useMemo(() => {
     const placed = new Set(slots.map((s) => s.entryId));
-    return (entries ?? []).filter((e) => !placed.has(e.id));
+    // レンタカーは期間の登録であって行き先ではないため「入らなかった予定」に出さない。
+    return (entries ?? []).filter((e) => e.mode !== "rental" && !placed.has(e.id));
   }, [entries, slots]);
 
   // 地点テキスト（place / title）を座標へジオコーディングし、entries へ書き戻す。
@@ -296,7 +297,19 @@ export function useAppState() {
     };
   }, [events]);
 
-  const transitEstimator = useMemo(() => createPrecomputedEstimator(transitCache, baseMode), [transitCache, baseMode]);
+  // レンタカーを借りている期間（種別 rental の 借りる=departAt 〜 返す=arriveBy）。
+  // この時間帯の移動は車、それ以外は徒歩/公共交通として計算される。
+  const carWindows = useMemo<CarWindow[]>(
+    () =>
+      (entries ?? [])
+        .filter((e) => e.mode === "rental" && e.departAt && e.arriveBy)
+        .map((e) => ({ fromIso: e.departAt!, toIso: e.arriveBy! })),
+    [entries]
+  );
+  const transitEstimator = useMemo(
+    () => createPrecomputedEstimator(transitCache, baseMode, carWindows),
+    [transitCache, baseMode, carWindows]
+  );
   const rail: RailItem[] = useMemo(() => buildRail(events, false, transitEstimator), [events, transitEstimator]);
   const dayOfState: DayOfState = useMemo(() => getDayOfState(rail, currentNodeKey), [rail, currentNodeKey]);
   const totals = useMemo(() => computePlanTotals(entries ?? []), [entries]);
@@ -307,7 +320,7 @@ export function useAppState() {
     const list = entries ?? [];
     const lodging = list.find((e) => e.mode === "stay" && e.placeGeo);
     if (lodging) return lodging.placeGeo ?? null;
-    const spot = list.find((e) => e.mode !== "home" && e.placeGeo);
+    const spot = list.find((e) => e.mode !== "home" && e.mode !== "rental" && e.placeGeo);
     return spot?.placeGeo ?? null;
   }, [entries]);
   const areaRefKey = areaRefGeo ? `${areaRefGeo.lat.toFixed(3)},${areaRefGeo.lng.toFixed(3)}` : null;
@@ -423,7 +436,7 @@ export function useAppState() {
       if (idx < 0) return prev;
       const day = prev[idx].day ?? 1;
       // 同じ日の隣（指定方向・宿泊は除外）を探して入れ替える
-      const sameDayReorderable = (e: PlanEntry) => (e.day ?? 1) === day && e.mode !== "stay" && e.mode !== "home";
+      const sameDayReorderable = (e: PlanEntry) => (e.day ?? 1) === day && e.mode !== "stay" && e.mode !== "home" && e.mode !== "rental";
       let swapIdx = -1;
       if (dir < 0) {
         for (let i = idx - 1; i >= 0; i--) {
@@ -475,7 +488,7 @@ export function useAppState() {
       const rest = prev.filter((_, i) => i !== idx);
       const sameDayPositions = rest
         .map((e, i) => ({ e, i }))
-        .filter((o) => (o.e.day ?? 1) === day && o.e.mode !== "stay" && o.e.mode !== "home")
+        .filter((o) => (o.e.day ?? 1) === day && o.e.mode !== "stay" && o.e.mode !== "home" && o.e.mode !== "rental")
         .map((o) => o.i);
       if (sameDayPositions.length === 0) return prev;
       const insertAt = dir < 0 ? sameDayPositions[0] : sameDayPositions[sameDayPositions.length - 1] + 1;
@@ -576,7 +589,8 @@ export function useAppState() {
 
         // AIが外した予定は捨てずに、空き時間へ入る限り詰め込む（びっちり埋める）。
         // それでも入らなかったものだけ「旅程に入らなかった予定」になる。
-        const leftovers = orderedByAi.filter((e) => !anchors.has(e.id) && !mustKeep(e));
+        // レンタカーは期間の登録なので、空き時間へ詰める対象にはしない。
+        const leftovers = orderedByAi.filter((e) => e.mode !== "rental" && !anchors.has(e.id) && !mustKeep(e));
         const home = list.find((e) => e.mode === "home");
         const extra = fillIntoGaps(leftovers, filledSlots, localReferenceDate(), tripDayCount, {
           notBefore: home?.departAt,

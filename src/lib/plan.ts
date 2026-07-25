@@ -17,6 +17,7 @@ const DEFAULT_STAY_MIN: Record<TransportMode, number> = {
   dining: 60,
   activity: 60,
   home: 0,
+  rental: 0,
 };
 
 /** 立ち寄り間の移動に確保する既定バッファ（分）。実測は Directions API 側で補正される。 */
@@ -132,6 +133,8 @@ export function sequentialSchedule(
     dayStart.setHours(DAY_START_HOUR, 0, 0, 0);
     let cursor = dayStart.getTime();
     for (const e of byDay.get(day)!) {
+      // レンタカーは「借りている期間」であって立ち寄り地点ではない。旅程には並べない。
+      if (e.mode === "rental") continue;
       // 宿泊は「固定の泊まる場所」。指定のチェックイン時刻に置き、他の予定のカーソルは動かさない。
       if (e.mode === "stay") {
         const anchor = entryAnchorTime(e);
@@ -272,6 +275,10 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot, ctx?: { reference: 
     fields: [] as ParsedField[],
     confidence: 1,
   };
+
+  // レンタカーは「借りている期間」であって地点ではないため、旅程には出さない
+  // （区間の移動手段を車として計算するためだけに使う）。
+  if (entry.mode === "rental") return [];
 
   // 出発地 → 「出発（初日）」と「帰着（最終日）」の2つの地点イベント。
   // 開始日を変更した場合などに古い日付へ取り残されないよう、
@@ -531,6 +538,7 @@ export const COST_CATEGORY_ORDER: CostCategory[] = ["transit", "stay", "dining",
 export function costCategoryOf(mode: TransportMode): CostCategory {
   if (mode === "stay") return "stay";
   if (mode === "dining") return "dining";
+  if (mode === "rental") return "transit"; // レンタル料金は交通費として扱う
   if (isTransitMode(mode)) return "transit";
   return "sightseeing"; // activity / home など
 }
@@ -554,5 +562,7 @@ export function computePlanTotals(entries: PlanEntry[]): PlanTotals {
       byCategory[costCategoryOf(e.mode)] += e.cost;
     }
   }
-  return { entryCount: entries.length, totalCost, costedCount, byCategory };
+  // レンタカーは「借りている期間」であって行き先ではないので件数に数えない。
+  const entryCount = entries.filter((e) => e.mode !== "rental").length;
+  return { entryCount, totalCost, costedCount, byCategory };
 }

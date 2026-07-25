@@ -20,6 +20,17 @@ export interface RailNode {
   stayMin?: number;
 }
 
+/**
+ * 区間の起点・終点。Googleマップの経路リンクに使う。
+ * 日本の電車・バスの乗換案内はDirections APIで取得できないため、本家マップへ渡して確認してもらう。
+ */
+export interface RailLeg {
+  fromPlace?: string;
+  toPlace?: string;
+  fromGeo?: GeoPoint;
+  toGeo?: GeoPoint;
+}
+
 export interface RailEdge {
   type: "edge";
   mode: TransportMode;
@@ -29,6 +40,8 @@ export interface RailEdge {
   walking?: number;
   /** ユーザーが移動手段を指定した区間（出発地→最初のスポット等）。指定手段のみ表示 */
   explicit?: boolean;
+  /** 経路リンク用の起点・終点 */
+  leg?: RailLeg;
 }
 
 export interface RailGap {
@@ -42,6 +55,8 @@ export interface RailGap {
   /** conflict 用：車・徒歩の実測/見積もり（分） */
   driving?: number;
   walking?: number;
+  /** conflict 用：経路リンクの起点・終点 */
+  leg?: RailLeg;
 }
 
 export type RailItem = RailNode | RailEdge | RailGap;
@@ -159,6 +174,12 @@ export function buildRail(
     const prevNodeIndex = nodeIndex - 1;
 
     const est = estimator.estimate(prevSeed.event, nextSeed.event);
+    const leg: RailLeg = {
+      fromPlace: prevSeed.place,
+      toPlace: nextSeed.place,
+      fromGeo: prevSeed.geo,
+      toGeo: nextSeed.geo,
+    };
 
     // 前の予定の終了が次の開始を超えている、または見積もり移動時間が空き時間を超える＝間に合わない
     if (intervalMin < 0 || est.durationMin > intervalMin) {
@@ -170,12 +191,13 @@ export function buildRail(
         requiredMin: est.durationMin,
         driving: est.driving,
         walking: est.walking,
+        leg,
       });
       return;
     }
 
     if (intervalMin < FREE_GAP_THRESHOLD_MIN) {
-      rail.push({ type: "edge", mode: est.mode, durationMin: est.durationMin, driving: est.driving, walking: est.walking, explicit: est.explicit });
+      rail.push({ type: "edge", mode: est.mode, durationMin: est.durationMin, driving: est.driving, walking: est.walking, explicit: est.explicit, leg });
       return;
     }
 
@@ -187,7 +209,7 @@ export function buildRail(
 
     const freeMin = intervalMin - est.durationMin;
     rail.push({ type: "gap", kind: "free", durationMin: freeMin, afterNodeIndex: prevNodeIndex });
-    rail.push({ type: "edge", mode: est.mode, durationMin: est.durationMin, driving: est.driving, walking: est.walking, explicit: est.explicit });
+    rail.push({ type: "edge", mode: est.mode, durationMin: est.durationMin, driving: est.driving, walking: est.walking, explicit: est.explicit, leg });
   });
 
   return rail;

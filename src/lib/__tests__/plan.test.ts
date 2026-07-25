@@ -172,9 +172,36 @@ describe("buildEventsFromSchedule: 出発地の日付合わせ", () => {
   });
 });
 
+describe("レンタカー（期間の登録）は旅程に並べない", () => {
+  it("is skipped by sequentialSchedule and does not shift the following stops", () => {
+    const entries = [
+      entry({ id: "a", stayMin: 60 }),
+      entry({
+        id: "car",
+        mode: "rental",
+        fixedTime: true,
+        departAt: new Date(REF.getTime() + 60 * 60000).toISOString(),
+        arriveBy: new Date(REF.getTime() + 600 * 60000).toISOString(),
+      }),
+      entry({ id: "b", stayMin: 30 }),
+    ];
+    const slots = sequentialSchedule(entries, REF);
+    expect(slots.map((s) => s.entryId)).toEqual(["a", "b"]);
+    // b は a の 60分滞在 + 20分バッファ後のまま（レンタカーはカーソルを動かさない）
+    expect(ms(slots[1].arriveAt) - ms(slots[0].arriveAt)).toBe(80 * 60000);
+  });
+
+  it("is not counted as a destination but its cost is transit", () => {
+    const totals = computePlanTotals([entry({ id: "a" }), entry({ id: "car", mode: "rental", cost: 12000 })]);
+    expect(totals.entryCount).toBe(1);
+    expect(totals.byCategory.transit).toBe(12000);
+  });
+});
+
 describe("computePlanTotals / costCategoryOf", () => {
   it("maps modes to categories", () => {
     expect(costCategoryOf("rail")).toBe("transit");
+    expect(costCategoryOf("rental")).toBe("transit");
     expect(costCategoryOf("stay")).toBe("stay");
     expect(costCategoryOf("dining")).toBe("dining");
     expect(costCategoryOf("activity")).toBe("sightseeing");

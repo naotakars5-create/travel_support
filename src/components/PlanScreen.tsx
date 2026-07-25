@@ -48,6 +48,7 @@ export function PlanScreen({
   onOpenAdd,
   onOpenAddLodging,
   onOpenAddStart,
+  onOpenAddRental,
   onCompose,
   onRemoveEntry,
   onEditEntry,
@@ -80,6 +81,7 @@ export function PlanScreen({
   onOpenAdd: () => void;
   onOpenAddLodging: () => void;
   onOpenAddStart: () => void;
+  onOpenAddRental: () => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
@@ -112,13 +114,14 @@ export function PlanScreen({
   // 表示時刻：固定予定は目安到着を厳守、それ以外は組み上げ結果（自動計算）の時刻を優先
   const timeOf = (e: PlanEntry): string | null =>
     (e.fixedTime && e.arriveBy ? e.arriveBy : scheduleByEntry.get(e.id) ?? e.arriveBy) ?? null;
-  // 宿泊・出発地は「固定枠」として別枠。並び替えの対象外。
+  // 宿泊・出発地・レンタカーは「固定枠」として別枠。並び替えの対象外。
   const lodging = entries.filter((e) => e.mode === "stay");
   const startPoint = entries.find((e) => e.mode === "home") ?? null;
-  // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番（宿泊・出発地は除外）
+  const rentals = entries.filter((e) => e.mode === "rental");
+  // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番（固定枠は除外）
   const indexOf = new Map(entries.map((e, i) => [e.id, i]));
   const ordered = entries
-    .filter((e) => e.mode !== "stay" && e.mode !== "home")
+    .filter((e) => e.mode !== "stay" && e.mode !== "home" && e.mode !== "rental")
     .sort((a, b) => (a.day ?? 1) - (b.day ?? 1) || (indexOf.get(a.id) ?? 0) - (indexOf.get(b.id) ?? 0));
   // 日ごとの通し番号（1,2,3…）
   const numberOf = new Map<string, number>();
@@ -198,23 +201,6 @@ export function PlanScreen({
                     );
                   })}
                 </View>
-              </View>
-            </View>
-            <View className="gap-1">
-              <Text className="font-gothic-400 text-[10px] text-muted">基本の移動手段</Text>
-              <View className="flex-row gap-2">
-                {(["car", "walk"] as BaseMode[]).map((m) => {
-                  const active = baseMode === m;
-                  return (
-                    <Pressable
-                      key={m}
-                      onPress={() => onSetBaseMode(m)}
-                      className={`rounded-full border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.12] bg-white/50"}`}
-                    >
-                      <Text className={`font-gothic-400 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>{m === "car" ? "車" : "徒歩・電車"}</Text>
-                    </Pressable>
-                  );
-                })}
               </View>
             </View>
           </View>
@@ -336,6 +322,70 @@ export function PlanScreen({
                     </Pressable>
                   </View>
                 ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* 車の移動（ずっと車 or レンタカーを借りている期間だけ車）。移動時間の見積もりに使う。 */}
+        {!readOnly && (
+          <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
+            <View className="flex-row items-center justify-between">
+              <Text className="font-gothic-500 text-[11px] text-ink">車の移動</Text>
+              {baseMode === "walk" && (
+                <Pressable onPress={onOpenAddRental} className="rounded-full border border-ink/25 px-3 py-1">
+                  <Text className="font-gothic-500 text-[10px] text-ink">＋ レンタカー</Text>
+                </Pressable>
+              )}
+            </View>
+            <View className="mt-1.5 flex-row gap-2">
+              {(["walk", "car"] as BaseMode[]).map((m) => {
+                const active = baseMode === m;
+                return (
+                  <Pressable
+                    key={m}
+                    onPress={() => onSetBaseMode(m)}
+                    className={`rounded-full border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.12] bg-white/50"}`}
+                  >
+                    <Text className={`font-gothic-400 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>
+                      {m === "car" ? "ずっと車（マイカー）" : "徒歩・電車が基本"}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {baseMode === "car" ? (
+              <Text className="mt-1.5 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+                旅行中ずっと車で移動する前提で、区間の所要時間を計算します。
+              </Text>
+            ) : rentals.length === 0 ? (
+              <Text className="mt-1.5 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+                近い区間は徒歩、離れた区間は電車・バスとして計算します。途中でレンタカーを借りるなら「＋レンタカー」で借りる〜返す時間を登録すると、その期間だけ車で計算します。
+              </Text>
+            ) : (
+              <View className="mt-2 gap-2">
+                {rentals.map((e) => (
+                  <View key={e.id} className="flex-row items-center gap-2">
+                    <Pressable onPress={() => onEditEntry(e.id)} className="flex-1">
+                      <Text className="font-mincho-600 text-[13px] text-ink">{e.title || "レンタカー"}</Text>
+                      <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                        {e.departAt ? `借 ${formatJstMonthDayJa(new Date(e.departAt))} ${formatJstTime(new Date(e.departAt))}` : ""}
+                        {e.arriveBy ? ` → 返 ${formatJstMonthDayJa(new Date(e.arriveBy))} ${formatJstTime(new Date(e.arriveBy))}` : ""}
+                      </Text>
+                      {e.place && (
+                        <Text numberOfLines={1} className="font-gothic-400 text-[10px] text-muted-light">
+                          {e.place}
+                        </Text>
+                      )}
+                    </Pressable>
+                    <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8}>
+                      <Text className="font-gothic-400 text-[15px] text-muted-light">×</Text>
+                    </Pressable>
+                  </View>
+                ))}
+                <Text className="font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+                  この期間の移動は車、期間外は徒歩・電車として計算します。
+                </Text>
               </View>
             )}
           </View>

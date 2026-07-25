@@ -10,6 +10,7 @@ export const MODE_LABEL: Record<TransportMode, string> = {
   dining: "食事",
   activity: "観光",
   home: "出発地",
+  rental: "レンタカー",
 };
 
 // 移動・種別の線色はすべて補助色（ink-muted）に統一。
@@ -24,6 +25,7 @@ export const MODE_COLOR: Record<TransportMode, string> = {
   dining: "#6E675C",
   activity: "#6E675C",
   home: "#6E675C",
+  rental: "#6E675C",
 };
 
 export const MODE_DASHED: Partial<Record<TransportMode, boolean>> = {
