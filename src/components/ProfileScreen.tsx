@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Profile } from "@/lib/profile";
+import { BellIcon } from "./icons";
 import { SlideUp } from "./animations";
 
 /** アイコン表示（写真があれば写真、無ければ絵文字）。 */
@@ -69,7 +70,7 @@ export function ProfileScreen({ profile, onEditProfile }: { profile: Profile; on
           onPress={() => setNotifOpen(true)}
           className="h-10 w-10 items-center justify-center rounded-full border border-black/[.08] bg-white/70"
         >
-          <Text className="text-[18px]">🔔</Text>
+          <BellIcon color="#2a2622" size={18} />
         </Pressable>
       </View>
       <View className="h-px w-full bg-black/[.08]" />

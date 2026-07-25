@@ -264,7 +264,7 @@ export function PlanScreen({
                 {lodging.map((e) => (
                   <View key={e.id} className="flex-row items-center gap-2">
                     <Pressable onPress={() => onEditEntry(e.id)} className="flex-1">
-                      <Text className="font-mincho-600 text-[13px] text-ink">🏨 {e.title}</Text>
+                      <Text className="font-mincho-600 text-[13px] text-ink">{e.title}</Text>
                       <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
                         {tripDayCount > 1 ? `${e.day ?? 1}日目 · ` : ""}
                         {e.arriveBy ? `IN ${formatJstTime(new Date(e.arriveBy))}` : ""}

@@ -209,7 +209,12 @@ export function localSchedule(entries: PlanEntry[], referenceDate: Date): Schedu
  * - それ以外は「前の予定の終了＋移動バッファ」で次々に時刻を割り当てる（営業時間内へ寄せる）。
  * 並び替えるたびにこれを呼べば、時刻が自動で再計算される。
  */
-export function sequentialSchedule(entries: PlanEntry[], referenceDate: Date): ScheduleSlot[] {
+export function sequentialSchedule(
+  entries: PlanEntry[],
+  referenceDate: Date,
+  /** entryId→到着時刻(ISO)。AIが割り当てた時刻をアンカーとして尊重するために使う。 */
+  anchors?: Map<string, string>
+): ScheduleSlot[] {
   if (entries.length === 0) return [];
 
   const byDay = new Map<number, PlanEntry[]>();
@@ -234,11 +239,12 @@ export function sequentialSchedule(entries: PlanEntry[], referenceDate: Date): S
         slots.push({ entryId: e.id, arriveAt: new Date(Number.isNaN(ms) ? cursor : ms).toISOString(), stayMin: entryDurationMin(e) });
         continue;
       }
-      const anchor = e.fixedTime ? entryAnchorTime(e) : null;
+      // 固定時刻 or AIが割り当てた時刻（anchors）があればそれを尊重、無ければ前詰めで自動計算。
+      const anchor = anchors?.get(e.id) ?? (e.fixedTime ? entryAnchorTime(e) : null);
       let start: number;
       if (anchor) {
         const anchorMs = new Date(anchor).getTime();
-        start = Number.isNaN(anchorMs) ? cursor : anchorMs; // 固定時刻は厳守
+        start = Number.isNaN(anchorMs) ? clampToOpenHours(cursor, e) : anchorMs;
       } else {
         start = clampToOpenHours(cursor, e); // 営業時間内へ寄せる
       }
