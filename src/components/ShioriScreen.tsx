@@ -51,9 +51,8 @@ function ShioriCard({ trip, index, onPress }: { trip: SavedTrip; index: number; 
           <View className="bg-black/25">{Header}</View>
         </ImageBackground>
       ) : (
-        <View style={{ flex: 1, backgroundColor: bg }} className="justify-between">
+        <View style={{ flex: 1, backgroundColor: bg }} className="justify-start">
           {Header}
-          <Text className="self-end p-3 text-[34px]">🧭</Text>
         </View>
       )}
     </Pressable>
@@ -88,7 +87,7 @@ export function ShioriScreen({
   return (
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
       <View className="flex-row items-center justify-between px-[26px] pb-3 pt-4">
-        <Text className="font-mincho-600 text-[26px] text-ink">旅のしおり ✈</Text>
+        <Text className="font-mincho-600 text-[26px] text-ink">旅のしおり</Text>
       </View>
       <View className="h-px w-full bg-black/[.08]" />
 

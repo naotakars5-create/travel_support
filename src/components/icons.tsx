@@ -33,6 +33,30 @@ export function RailNodeDot({ current, dark }: { current: boolean; dark?: boolea
   );
 }
 
+/** ミニマルなベル（お知らせ）アイコン。幾何形のみ・単色。 */
+export function BellIcon({ color = "#2a2622", size = 18 }: { color?: string; size?: number }) {
+  return (
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      {/* 本体（上が丸く下が開いた輪郭） */}
+      <View
+        style={{
+          width: size * 0.62,
+          height: size * 0.5,
+          borderTopLeftRadius: size * 0.31,
+          borderTopRightRadius: size * 0.31,
+          borderWidth: 1.6,
+          borderBottomWidth: 0,
+          borderColor: color,
+        }}
+      />
+      {/* 裾のライン */}
+      <View style={{ width: size * 0.78, height: 1.6, borderRadius: 1, backgroundColor: color, marginTop: -0.8 }} />
+      {/* 振り子 */}
+      <View style={{ width: size * 0.16, height: size * 0.16, borderRadius: size * 0.08, backgroundColor: color, marginTop: size * 0.06 }} />
+    </View>
+  );
+}
+
 export function SignalDots({ dark }: { dark?: boolean }) {
   const color = dark ? "#ece5d7" : "#2a2622";
   return (

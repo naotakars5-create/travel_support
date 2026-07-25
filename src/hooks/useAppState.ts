@@ -511,8 +511,12 @@ export function useAppState() {
           const day = dayOfIso(tripStart, slot.arriveAt);
           return day > 0 ? { ...e, day } : e;
         });
+        // AIが時刻を付けた予定はその時刻をアンカーに、付かなかった（未定の）予定も
+        // 並び順から自動で時刻を割り当てる。これで未定の予定も必ず旅程に入る。
+        const anchors = new Map(data.schedule.map((s) => [s.entryId, s.arriveAt]));
+        const filledSlots = sequentialSchedule(reordered, localReferenceDate(), anchors);
         setEntries(reordered);
-        setSlots(data.schedule);
+        setSlots(filledSlots);
         // AIの順路を採用したので、この構造は「スケジュール済み」として記録し、ローカル再計算で上書きしない。
         scheduleSigRef.current = scheduleSignature(reordered);
         setSuggestions(data.suggestions);
