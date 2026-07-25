@@ -64,6 +64,15 @@ export function useAppState() {
   const initializedRef = useRef(false);
   // 「構造」が既にスケジュール済みかを追跡し、座標だけ埋まった時の不要な再ローカル化を防ぐ。
   const scheduleSigRef = useRef<string | null>(null);
+  // ローカル自動配置の基準（旅行初日の朝）を参照するための ref。
+  const tripDateRef = useRef(tripDate);
+  useEffect(() => {
+    tripDateRef.current = tripDate;
+  }, [tripDate]);
+  const localReferenceDate = () => {
+    const d = new Date(`${tripDateRef.current}T09:00:00`);
+    return Number.isNaN(d.getTime()) ? new Date() : d;
+  };
 
   // 初期化：AsyncStorageに保存済みなら復元、無ければシード行き先を生成
   useEffect(() => {
@@ -97,7 +106,7 @@ export function useAppState() {
       } else {
         const seeded = buildSeedEntries(new Date());
         setEntries(seeded);
-        setSlots(localSchedule(seeded, new Date()));
+        setSlots(localSchedule(seeded, localReferenceDate()));
         setPacking(buildDefaultPacking());
         scheduleSigRef.current = scheduleSignature(seeded);
       }
@@ -123,10 +132,8 @@ export function useAppState() {
     const sig = scheduleSignature(entries);
     if (scheduleSigRef.current === sig) return;
     scheduleSigRef.current = sig;
-    setSlots(localSchedule(entries, new Date()));
-    // 構造が変わったら以前のAI提案・メモは古くなるのでクリア
-    setSuggestions([]);
-    setPlanNotes(null);
+    setSlots(localSchedule(entries, localReferenceDate()));
+    // 注: おすすめ（suggestions）は追加操作で消さない。次にAIで組み直した時に更新する。
   }, [entries]);
 
   // 旅程イベントは entries + slots から都度導出する（座標も entry から引き継ぐ）。
@@ -291,13 +298,15 @@ export function useAppState() {
     [flashNewEvent]
   );
 
-  const addSuggestion = useCallback(
-    (s: SpotSuggestion) => {
-      const entry = suggestionToEntry(genId("entry"), s);
-      setEntries((prev) => [...(prev ?? []), entry]);
-      setSuggestions((prev) => prev.filter((x) => x.title !== s.title));
-      flashNewEvent(entry.id);
-      return entry;
+  /** おすすめスポットを複数まとめて行き先リストへ追加する（選択したものを一気に）。 */
+  const addSuggestions = useCallback(
+    (list: SpotSuggestion[]) => {
+      if (list.length === 0) return;
+      const titles = new Set(list.map((s) => s.title));
+      const newEntries = list.map((s) => suggestionToEntry(genId("entry"), s));
+      setEntries((prev) => [...(prev ?? []), ...newEntries]);
+      setSuggestions((prev) => prev.filter((x) => !titles.has(x.title)));
+      if (newEntries[0]) flashNewEvent(newEntries[0].id);
     },
     [flashNewEvent]
   );
@@ -493,7 +502,7 @@ export function useAppState() {
     shareCurrentPlan,
     importSharedToOwn,
     addEntry,
-    addSuggestion,
+    addSuggestions,
     updateEntry,
     editEntry,
     removeEntry,

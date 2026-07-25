@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PlanEntry, Priority, SpotSuggestion } from "@/lib/types";
@@ -40,7 +41,7 @@ export function PlanScreen({
   onRemoveEntry,
   onEditEntry,
   onBumpPriority,
-  onAddSuggestion,
+  onAddSuggestions,
   onShare,
   onImportShared,
 }: {
@@ -65,11 +66,19 @@ export function PlanScreen({
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
   onBumpPriority: (id: string) => void;
-  onAddSuggestion: (s: SpotSuggestion) => void;
+  onAddSuggestions: (list: SpotSuggestion[]) => void;
   onShare: () => void;
   onImportShared: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const togglePick = (title: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
   // 表示時刻＝目安到着（指定があれば）または組み上げ済みの到着予定
   const timeOf = (e: PlanEntry): string | null => e.arriveBy ?? scheduleByEntry.get(e.id) ?? null;
   const sorted = [...entries].sort((a, b) => {
@@ -281,22 +290,41 @@ export function PlanScreen({
 
         {suggestions.length > 0 && (
           <View className="mt-7">
-            <Text className="mb-2 font-gothic-500 text-[10px] tracking-[.15em] text-muted">AIのおすすめ · 近くで寄れる場所</Text>
+            <Text className="mb-2 font-gothic-500 text-[10px] tracking-[.15em] text-muted">AIのおすすめ · 選んでまとめて追加</Text>
             <View className="rounded-[16px] border border-ink/10">
-              {suggestions.map((s, i) => (
-                <View key={s.title} className={`flex-row items-center justify-between gap-2 px-4 py-3 ${i > 0 ? "border-t border-ink/10" : ""}`}>
-                  <View className="flex-1">
-                    <Text className="font-mincho-400 text-[14px] text-ink">{s.title}</Text>
-                    {(s.area || s.note) && (
-                      <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{[s.area, s.note].filter(Boolean).join(" · ")}</Text>
-                    )}
-                  </View>
-                  <Pressable onPress={() => onAddSuggestion(s)} className="rounded-full border border-ink px-3 py-1">
-                    <Text className="font-gothic-500 text-[11px] text-ink">追加</Text>
+              {suggestions.map((s, i) => {
+                const on = picked.has(s.title);
+                return (
+                  <Pressable
+                    key={s.title}
+                    onPress={() => togglePick(s.title)}
+                    className={`flex-row items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-ink/10" : ""}`}
+                  >
+                    <View className={`h-[20px] w-[20px] items-center justify-center rounded-[6px] border ${on ? "border-ink bg-ink" : "border-black/[.25]"}`}>
+                      {on && <View className="h-[8px] w-[8px] rounded-[2px] bg-kinari" />}
+                    </View>
+                    <View className="flex-1">
+                      <Text className="font-mincho-400 text-[14px] text-ink">{s.title}</Text>
+                      {(s.area || s.note) && (
+                        <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{[s.area, s.note].filter(Boolean).join(" · ")}</Text>
+                      )}
+                    </View>
                   </Pressable>
-                </View>
-              ))}
+                );
+              })}
             </View>
+            <Pressable
+              disabled={picked.size === 0}
+              onPress={() => {
+                onAddSuggestions(suggestions.filter((s) => picked.has(s.title)));
+                setPicked(new Set());
+              }}
+              className={`mt-2 rounded-[12px] py-3 ${picked.size > 0 ? "bg-ink" : "bg-ink/30"}`}
+            >
+              <Text className="text-center font-gothic-500 text-[12px] text-kinari">
+                {picked.size > 0 ? `選択した${picked.size}件を追加` : "追加したいものを選択"}
+              </Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>

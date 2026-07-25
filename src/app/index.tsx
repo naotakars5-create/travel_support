@@ -51,7 +51,7 @@ export default function Home() {
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
           onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
-          onAddSuggestion={app.addSuggestion}
+          onAddSuggestions={app.addSuggestions}
           onShare={app.shareCurrentPlan}
           onImportShared={app.importSharedToOwn}
         />

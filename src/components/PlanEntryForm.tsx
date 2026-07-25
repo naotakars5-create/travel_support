@@ -10,6 +10,7 @@ const MODE_OPTIONS: { value: TransportMode; label: string }[] = [
   { value: "activity", label: "観光" },
   { value: "dining", label: "食事" },
   { value: "stay", label: "宿泊" },
+  { value: "home", label: "自宅" },
   { value: "rail", label: "鉄道" },
   { value: "bus", label: "バス" },
   { value: "car", label: "車" },
@@ -91,7 +92,8 @@ export function PlanEntryForm({
 
   const transit = isTransit(mode);
   const stay = mode === "stay";
-  const canSubmit = title.trim().length > 0;
+  const home = mode === "home";
+  const canSubmit = home ? true : title.trim().length > 0;
 
   const onTitleChange = (v: string) => {
     setTitle(v);
@@ -116,14 +118,21 @@ export function PlanEntryForm({
   const submit = () => {
     if (!canSubmit) return;
     const input: PlanEntryInput = {
-      title,
+      title: home ? title.trim() || "自宅" : title,
       mode,
       priority,
       day,
       cost: cost ? Number(cost.replace(/[^0-9]/g, "")) || undefined : undefined,
       detail: detail || undefined,
     };
-    if (transit) {
+    if (home) {
+      input.place = place || undefined;
+      input.priority = "must";
+      input.day = 1;
+      input.departAt = iso(1, departTime); // 初日に出発
+      input.arriveBy = iso(tripDayCount, arriveTime); // 最終日に帰宅
+      input.fixedTime = true;
+    } else if (transit) {
       input.placeFrom = placeFrom || undefined;
       input.placeTo = placeTo || undefined;
       input.departAt = iso(day, departTime);
@@ -161,16 +170,16 @@ export function PlanEntryForm({
     <View className="gap-3">
       <View className="gap-1">
         <Text className="font-gothic-400 text-[10px] text-muted">
-          {transit ? "名称 *（例: JL105便）" : "行き先 *（名前を入れると住所候補が出ます）"}
+          {home ? "名称（任意・例: 自宅）" : transit ? "名称 *（例: JL105便）" : "行き先 *（名前を入れると住所候補が出ます）"}
         </Text>
         <TextInput
           value={title}
           onChangeText={onTitleChange}
-          placeholder={transit ? "例: のぞみ / JL105" : "例: 中之島美術館"}
+          placeholder={home ? "自宅" : transit ? "例: のぞみ / JL105" : "例: 中之島美術館"}
           placeholderTextColor={MUTED}
           className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
         />
-        {predictions.length > 0 && !transit && (
+        {predictions.length > 0 && !transit && !home && (
           <View className="mt-1 overflow-hidden rounded-[10px] border border-black/[.1] bg-white/90">
             {predictions.map((p, i) => (
               <Pressable key={p.placeId} onPress={() => selectPrediction(p)} className={`px-3 py-2 ${i > 0 ? "border-t border-black/[.06]" : ""}`}>
@@ -191,7 +200,7 @@ export function PlanEntryForm({
         </View>
       </View>
 
-      {tripDayCount > 1 && (
+      {tripDayCount > 1 && !home && (
         <View className="gap-1.5">
           <Text className="font-gothic-400 text-[10px] text-muted">何日目</Text>
           <View className="flex-row flex-wrap gap-2">
@@ -203,7 +212,27 @@ export function PlanEntryForm({
       )}
 
       {/* 種別ごとの入力欄 */}
-      {transit ? (
+      {home ? (
+        <>
+          <View className="gap-1">
+            <Text className="font-gothic-400 text-[10px] text-muted">住所（任意・入れると地図/移動時間の精度UP）</Text>
+            <TextInput
+              value={place}
+              onChangeText={setPlace}
+              placeholder="例: 東京都新宿区…"
+              placeholderTextColor={MUTED}
+              className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
+            />
+          </View>
+          <View className="flex-row gap-3">
+            <TimeField label="出発時刻（初日）" value={departTime} onChange={setDepartTime} />
+            <TimeField label={tripDayCount > 1 ? `帰宅時刻（${tripDayCount}日目）` : "帰宅時刻"} value={arriveTime} onChange={setArriveTime} />
+          </View>
+          <Text className="font-gothic-400 text-[10px] text-muted">
+            出発は初日、帰宅は最終日として旅程の起点・終点に置きます。
+          </Text>
+        </>
+      ) : transit ? (
         <>
           <View className="flex-row gap-3">
             <View className="flex-1 gap-1">
@@ -296,8 +325,8 @@ export function PlanEntryForm({
         </>
       )}
 
-      {/* 重要度は宿泊/移動以外で表示（宿泊・移動は必ず組み込む想定） */}
-      {!transit && !stay && (
+      {/* 重要度は宿泊/移動/自宅以外で表示（宿泊・移動・自宅は必ず組み込む想定） */}
+      {!transit && !stay && !home && (
         <View className="gap-1.5">
           <Text className="font-gothic-400 text-[10px] text-muted">重要度</Text>
           <View className="flex-row gap-2">

@@ -6,7 +6,8 @@ export type TransportMode =
   | "car"
   | "stay"
   | "dining"
-  | "activity";
+  | "activity"
+  | "home";
 
 export interface ParsedField {
   key: string;

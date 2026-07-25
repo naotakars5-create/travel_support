@@ -9,6 +9,7 @@ export const MODE_LABEL: Record<TransportMode, string> = {
   stay: "宿泊",
   dining: "食事",
   activity: "観光",
+  home: "自宅",
 };
 
 export const MODE_COLOR: Record<TransportMode, string> = {
@@ -20,6 +21,7 @@ export const MODE_COLOR: Record<TransportMode, string> = {
   stay: "#4f7a5b",
   dining: "#4f7a5b",
   activity: "#4f7a5b",
+  home: "#7c5b4d",
 };
 
 export const MODE_DASHED: Partial<Record<TransportMode, boolean>> = {
