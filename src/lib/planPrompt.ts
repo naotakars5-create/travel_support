@@ -41,7 +41,12 @@ export const PLAN_SYSTEM_PROMPT = `あなたは日本の個人旅行者のため
 
 export function buildPlanUserMessage(params: { entries: PlanEntry[]; referenceDateIso: string; dayCount?: number }): string {
   const { entries, referenceDateIso, dayCount = 1 } = params;
-  const lines = entries.map((e) => {
+  // レンタカーは「借りている期間」であって行き先ではない。順路の参考情報としてだけ渡す。
+  const carLines = entries
+    .filter((e) => e.mode === "rental")
+    .map((e) => `- レンタカー「${e.title || "レンタカー"}」: ${e.departAt ?? "?"} 〜 ${e.arriveBy ?? "?"}（この期間は車で移動できます）`);
+
+  const lines = entries.filter((e) => e.mode !== "rental").map((e) => {
     // 出発地（自宅・集合場所）は「出発（departAt）」と「帰着（arriveBy）」を明示する
     if (e.mode === "home") {
       return [
@@ -94,6 +99,9 @@ export function buildPlanUserMessage(params: { entries: PlanEntry[]; referenceDa
     "----- 行きたい場所リスト -----",
     ...lines,
     "----- ここまで -----",
+    ...(carLines.length > 0
+      ? ["", "----- レンタカー（行き先ではありません。schedule には含めないでください） -----", ...carLines, "----- ここまで -----"]
+      : []),
     "",
     "指定のJSONスキーマのみを出力してください。",
   ].join("\n");

@@ -19,6 +19,7 @@ export default function Home() {
   const [addOpen, setAddOpen] = useState(false);
   const [addLodgingOpen, setAddLodgingOpen] = useState(false);
   const [addStartOpen, setAddStartOpen] = useState(false);
+  const [addRentalOpen, setAddRentalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const dark = app.tab === "today";
@@ -55,6 +56,7 @@ export default function Home() {
           onOpenAdd={() => setAddOpen(true)}
           onOpenAddLodging={() => setAddLodgingOpen(true)}
           onOpenAddStart={() => setAddStartOpen(true)}
+          onOpenAddRental={() => setAddRentalOpen(true)}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
@@ -153,6 +155,22 @@ export default function Home() {
           onAdd={(input) => {
             app.addEntry(input);
             setAddStartOpen(false);
+            app.setTab("plan");
+          }}
+          onImportMail={app.importFromMail}
+        />
+      )}
+
+      {addRentalOpen && (
+        <AddEntrySheet
+          tripDate={app.tripDate}
+          tripDayCount={app.tripDayCount}
+          fixedMode="rental"
+          title="レンタカーを登録"
+          onClose={() => setAddRentalOpen(false)}
+          onAdd={(input) => {
+            app.addEntry(input);
+            setAddRentalOpen(false);
             app.setTab("plan");
           }}
           onImportMail={app.importFromMail}

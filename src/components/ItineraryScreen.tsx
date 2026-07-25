@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Animated, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
+import { Animated, Linking, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RailItem, computeStats, formatDurationMin } from "@/lib/itinerary";
 import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
@@ -7,6 +7,7 @@ import { dayOfIso, formatJstHeadingJa, formatJstMonthDayJa, formatJstTime } from
 import { GeoPoint, PlanEntry } from "@/lib/types";
 import { PRIORITY_META } from "@/lib/plan";
 import { pickBenchIllustration } from "@/lib/illustrations";
+import { directionsUrl } from "@/lib/mapsLink";
 import { Illustration } from "./Illustration";
 import { RouteMap } from "./RouteMap";
 import { Blinker, PulseRing, useNodeInStyle } from "./animations";
@@ -41,6 +42,18 @@ function lineBorderStyle(style: LineStyle | null) {
 
 function LineFull({ style }: { style: LineStyle | null }) {
   return <View style={[{ position: "absolute", left: 12, top: 0, width: 1, height: "100%" } as const, lineBorderStyle(style)]} />;
+}
+
+/**
+ * 区間の経路をGoogleマップで開くリンク。
+ * 電車・バスの乗換や時刻表はAPIで取得できないため、本家マップで確認してもらう。
+ */
+function RouteLink({ url, label }: { url: string; label: string }) {
+  return (
+    <Pressable onPress={() => void Linking.openURL(url)} hitSlop={6} className="mt-0.5 self-start">
+      <Text className="font-gothic-400 text-[10px] text-muted underline">{label}</Text>
+    </Pressable>
+  );
 }
 
 /**
@@ -209,6 +222,7 @@ export function ItineraryScreen({
 
               if (item.type === "edge") {
                 const style = lineStyleFor(item);
+                const routeUrl = directionsUrl(item.leg, item.mode);
                 return (
                   <View key={`edge-${gi}-${i}`} className="min-h-[28px] flex-row">
                     <View className="w-12" />
@@ -234,6 +248,12 @@ export function ItineraryScreen({
                         <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
                           {MODE_LABEL[item.mode]} · {formatDurationMin(item.durationMin)}
                         </Text>
+                      )}
+                      {routeUrl && (
+                        <RouteLink
+                          url={routeUrl}
+                          label={item.mode === "rail" || item.mode === "bus" ? "乗換をGoogleマップで見る" : "経路をGoogleマップで見る"}
+                        />
                       )}
                     </View>
                   </View>
@@ -269,6 +289,10 @@ export function ItineraryScreen({
                             {item.durationMin >= 0 ? ` · 空き ${formatDurationMin(item.durationMin)}` : ""}
                           </Text>
                         )}
+                        {(() => {
+                          const url = directionsUrl(item.leg, "car");
+                          return url ? <RouteLink url={url} label="経路をGoogleマップで見る" /> : null;
+                        })()}
                       </View>
                     ) : isUnconfirmed ? (
                       <Pressable onPress={onNavigatePlan} className="self-start rounded-[10px] border border-ink px-3 py-1.5">
