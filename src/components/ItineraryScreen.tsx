@@ -108,7 +108,14 @@ export function ItineraryScreen({
           <Text className="font-gothic-400 text-[11px] text-muted">{heading}</Text>
           <Text className="font-gothic-500 text-[11px] text-ink" style={TNUM}>現在 {formatJstTime(now)}</Text>
         </View>
-        <Text className="mt-1 font-mincho-600 text-[26px] text-ink">本日の旅程</Text>
+        <View className="mt-1 flex-row items-center justify-between">
+          <Text className="font-mincho-600 text-[26px] text-ink">本日の旅程</Text>
+          {rail.length > 0 && (
+            <Pressable onPress={onNavigatePlan} className="rounded-full border border-ink/25 px-3 py-1">
+              <Text className="font-gothic-500 text-[11px] text-ink">計画を編集</Text>
+            </Pressable>
+          )}
+        </View>
         <Text className="mt-1 font-gothic-400 text-[11px] text-muted" style={TNUM}>
           {subLine}
         </Text>

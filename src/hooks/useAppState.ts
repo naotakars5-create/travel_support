@@ -11,9 +11,10 @@ import {
   entryPlaceText,
   eventToPlanEntry,
   inputToEntry,
-  localSchedule,
+  orderEntriesBySchedule,
   PlanEntryInput,
   scheduleSignature,
+  sequentialSchedule,
   suggestionToEntry,
 } from "@/lib/plan";
 import { buildDefaultPacking } from "@/lib/packing";
@@ -28,7 +29,7 @@ import { useLiveLocation } from "./useLiveLocation";
 /** この距離（メートル）以内に近づいたら、GPSで到着を自動記録する。 */
 const ARRIVAL_THRESHOLD_METERS = 120;
 
-export type Tab = "plan" | "itin" | "today" | "packing";
+export type Tab = "plan" | "itin" | "today" | "packing" | "shiori" | "profile";
 
 interface FlashState {
   visible: boolean;
@@ -101,18 +102,20 @@ export function useAppState() {
       }
       const persisted = await loadState();
       if (persisted) {
-        setEntries(persisted.entries);
+        // 保存済みの時刻順を「並び順」として引き継ぐ（手動並び替えの初期状態にする）
+        const ordered = orderEntriesBySchedule(persisted.entries, persisted.slots);
+        setEntries(ordered);
         setSlots(persisted.slots);
         setPacking(persisted.packing);
         setCurrentNodeKey(persisted.currentNodeKey);
         if (persisted.tripDate) setTripDate(persisted.tripDate);
         if (persisted.tripDayCount) setTripDayCount(persisted.tripDayCount);
         if (persisted.baseMode) setBaseMode(persisted.baseMode);
-        scheduleSigRef.current = scheduleSignature(persisted.entries);
+        scheduleSigRef.current = scheduleSignature(ordered);
       } else {
         const seeded = buildSeedEntries(new Date());
         setEntries(seeded);
-        setSlots(localSchedule(seeded, localReferenceDate()));
+        setSlots(sequentialSchedule(seeded, localReferenceDate()));
         setPacking(buildDefaultPacking());
         scheduleSigRef.current = scheduleSignature(seeded);
       }
@@ -138,7 +141,7 @@ export function useAppState() {
     const sig = scheduleSignature(entries);
     if (scheduleSigRef.current === sig) return;
     scheduleSigRef.current = sig;
-    setSlots(localSchedule(entries, localReferenceDate()));
+    setSlots(sequentialSchedule(entries, localReferenceDate()));
     // 注: おすすめ（suggestions）は追加操作で消さない。次にAIで組み直した時に更新する。
   }, [entries]);
 
@@ -340,6 +343,65 @@ export function useAppState() {
     setEntries((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
   }, []);
 
+  /**
+   * 行き先の並び順を1つ上／下へ動かす（同じ日の中で入れ替え）。
+   * dir < 0 で上（前）へ、dir > 0 で下（後ろ）へ。時刻は並び順から自動再計算される。
+   */
+  const moveEntry = useCallback((id: string, dir: -1 | 1) => {
+    setEntries((prev) => {
+      if (!prev) return prev;
+      const idx = prev.findIndex((e) => e.id === id);
+      if (idx < 0) return prev;
+      const day = prev[idx].day ?? 1;
+      // 同じ日の隣（指定方向）を探して入れ替える
+      let swapIdx = -1;
+      if (dir < 0) {
+        for (let i = idx - 1; i >= 0; i--) {
+          if ((prev[i].day ?? 1) === day) {
+            swapIdx = i;
+            break;
+          }
+        }
+      } else {
+        for (let i = idx + 1; i < prev.length; i++) {
+          if ((prev[i].day ?? 1) === day) {
+            swapIdx = i;
+            break;
+          }
+        }
+      }
+      if (swapIdx < 0) return prev;
+      const next = [...prev];
+      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      return next;
+    });
+  }, []);
+
+  /** 行き先を別の日（何日目）へ移動する。到着/出発/チェックアウトの日付も同じ日数だけずらす。 */
+  const setEntryDay = useCallback((id: string, day: number) => {
+    setEntries((prev) =>
+      prev
+        ? prev.map((e) => {
+            if (e.id !== id) return e;
+            const deltaDays = day - (e.day ?? 1);
+            const shift = (iso?: string) => {
+              if (!iso) return iso;
+              const t = new Date(iso).getTime();
+              if (Number.isNaN(t)) return iso;
+              return new Date(t + deltaDays * 86400000).toISOString();
+            };
+            return {
+              ...e,
+              day,
+              arriveBy: shift(e.arriveBy),
+              departAt: shift(e.departAt),
+              checkOut: shift(e.checkOut),
+            };
+          })
+        : prev
+    );
+  }, []);
+
   /** 追加済みの行き先を、フォーム入力の内容で上書き更新する（再編集）。 */
   const editEntry = useCallback(
     (id: string, input: PlanEntryInput) => {
@@ -392,9 +454,12 @@ export function useAppState() {
       });
       const data = (await res.json()) as PlanApiResponse;
       if (data.kind === "plan") {
+        // AIの順路を「並び順」に反映（以後の手動並び替えがAI結果から続けられる）
+        const reordered = orderEntriesBySchedule(list, data.schedule);
+        setEntries(reordered);
         setSlots(data.schedule);
         // AIの順路を採用したので、この構造は「スケジュール済み」として記録し、ローカル再計算で上書きしない。
-        scheduleSigRef.current = scheduleSignature(list);
+        scheduleSigRef.current = scheduleSignature(reordered);
         setSuggestions(data.suggestions);
         setPlanNotes(data.notes ?? null);
         // 反映が分かるように：旅程タブへ切り替え＋通知
@@ -459,14 +524,15 @@ export function useAppState() {
     void saveProfile(p);
   }, []);
 
-  /** 現在の旅程を名前を付けて履歴に保存する。 */
+  /** 現在の旅程を名前（＋表紙写真）を付けてしおり／履歴に保存する。 */
   const saveCurrentTrip = useCallback(
-    (name: string) => {
+    (name: string, coverPhoto?: string) => {
       const list = entries ?? [];
       if (list.length === 0) return;
       const trip: SavedTrip = {
         id: genId("trip"),
         name: name.trim() || `${tripDate} の旅`,
+        coverPhoto,
         savedAt: new Date().toISOString(),
         entries: list,
         slots,
@@ -480,11 +546,20 @@ export function useAppState() {
         void saveTrips(next);
         return next;
       });
-      setFlash({ visible: true, text: `「${trip.name}」を保存しました\n履歴からいつでも呼び出せます` });
+      setFlash({ visible: true, text: `「${trip.name}」をしおりに保存しました` });
       setTimeout(() => setFlash({ visible: false, text: "" }), 1900);
     },
     [entries, slots, packing, tripDate, tripDayCount, baseMode]
   );
+
+  /** しおりの表紙写真を更新する。 */
+  const setTripCover = useCallback((id: string, coverPhoto?: string) => {
+    setSavedTrips((prev) => {
+      const next = prev.map((t) => (t.id === id ? { ...t, coverPhoto } : t));
+      void saveTrips(next);
+      return next;
+    });
+  }, []);
 
   /** 保存した旅を現在の旅程として読み込む（今の内容は上書きされる）。 */
   const loadTrip = useCallback((id: string) => {
@@ -566,6 +641,7 @@ export function useAppState() {
     setProfile,
     savedTrips,
     saveCurrentTrip,
+    setTripCover,
     loadTrip,
     deleteTrip,
     suggestions,
@@ -580,6 +656,8 @@ export function useAppState() {
     updateEntry,
     editEntry,
     removeEntry,
+    setEntryDay,
+    moveEntry,
     importFromMail,
     composeWithAi,
     togglePacking,

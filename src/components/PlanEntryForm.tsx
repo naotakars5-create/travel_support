@@ -3,7 +3,7 @@ import { Pressable, Text, TextInput, View } from "react-native";
 import { Priority, TransportMode } from "@/lib/types";
 import { PlanEntryInput } from "@/lib/plan";
 import { combineDateAndTime, dateForDay, timeStrFromIso } from "@/lib/date";
-import { fetchPlacePredictions, PlacePrediction } from "@/lib/places";
+import { fetchPlacePredictions, fetchPlaceDetails, PlacePrediction } from "@/lib/places";
 import { TimeField } from "./PlainFields";
 
 const MODE_OPTIONS: { value: TransportMode; label: string }[] = [
@@ -29,6 +29,21 @@ const MUTED = "#8a8378";
 
 const TRANSIT_MODES: TransportMode[] = ["air", "rail", "bus", "car"];
 const isTransit = (m: TransportMode) => TRANSIT_MODES.includes(m);
+
+/** 自動取得した営業時間の表示（読み取り専用）。取得中は「取得中…」。 */
+function OpenHoursNote({ loading, openFrom, openTo }: { loading: boolean; openFrom?: string; openTo?: string }) {
+  if (loading) {
+    return <Text className="font-gothic-400 text-[10px] text-muted-light">営業時間を取得中…</Text>;
+  }
+  if (openFrom || openTo) {
+    return (
+      <Text className="font-gothic-400 text-[10px] text-mode-rail">
+        営業時間 {openFrom ?? "?"}〜{openTo ?? "?"}（自動取得・AIがこの時間内に組みます）
+      </Text>
+    );
+  }
+  return null;
+}
 
 function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
   return (
@@ -90,6 +105,10 @@ export function PlanEntryForm({
   const [cost, setCost] = useState(typeof initial?.cost === "number" ? String(initial.cost) : "");
   const [detail, setDetail] = useState(initial?.detail ?? "");
   const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
+  // 営業時間は Place Details から自動取得する（手入力欄は廃止）。
+  const [openFrom, setOpenFrom] = useState<string | undefined>(initial?.openFrom);
+  const [openTo, setOpenTo] = useState<string | undefined>(initial?.openTo);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const transit = isTransit(mode);
@@ -113,6 +132,24 @@ export function PlanEntryForm({
     setTitle(p.mainText);
     setPlace(p.secondaryText || p.description);
     setPredictions([]);
+    // place_id から番地までの住所と営業時間を自動取得して補完する。
+    setLoadingDetails(true);
+    void (async () => {
+      const details = await fetchPlaceDetails(p.placeId);
+      if (details) {
+        if (details.address) setPlace(details.address); // 番地まで含む完全な住所
+        setOpenFrom(details.openFrom);
+        setOpenTo(details.openTo);
+      }
+      setLoadingDetails(false);
+    })();
+  };
+
+  const onPlaceChange = (v: string) => {
+    setPlace(v);
+    // 住所を手で変えたら、自動取得した営業時間はいったんクリア（別の場所になり得るため）。
+    setOpenFrom(undefined);
+    setOpenTo(undefined);
   };
 
   const iso = (d: number, t: string) => (t ? combineDateAndTime(dateForDay(tripDate, d), t)?.toISOString() : undefined);
@@ -145,11 +182,15 @@ export function PlanEntryForm({
       input.arriveBy = iso(day, arriveTime); // チェックイン
       input.checkOut = iso(day + 1, checkOutTime); // 翌日チェックアウト
       input.fixedTime = true;
+      input.openFrom = openFrom;
+      input.openTo = openTo;
     } else {
       input.place = place || undefined;
       input.stayMin = stayMin ?? undefined;
       input.arriveBy = iso(day, arriveTime);
       input.fixedTime = arriveTime ? fixedTime : false;
+      input.openFrom = openFrom;
+      input.openTo = openTo;
     }
     onSubmit(input);
     if (!resetAfterSubmit) return;
@@ -166,6 +207,8 @@ export function PlanEntryForm({
     setCost("");
     setDetail("");
     setPredictions([]);
+    setOpenFrom(undefined);
+    setOpenTo(undefined);
   };
 
   return (
@@ -266,14 +309,15 @@ export function PlanEntryForm({
       ) : stay ? (
         <>
           <View className="gap-1">
-            <Text className="font-gothic-400 text-[10px] text-muted">場所・住所（宿泊先）</Text>
+            <Text className="font-gothic-400 text-[10px] text-muted">場所・住所（宿泊先。候補から選ぶと番地まで自動入力）</Text>
             <TextInput
               value={place}
-              onChangeText={setPlace}
+              onChangeText={onPlaceChange}
               placeholder="例: ホテル日航大阪"
               placeholderTextColor={MUTED}
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
             />
+            <OpenHoursNote loading={loadingDetails} openFrom={openFrom} openTo={openTo} />
           </View>
           <View className="flex-row gap-3">
             <TimeField label="チェックイン" value={arriveTime} onChange={setArriveTime} />
@@ -283,14 +327,15 @@ export function PlanEntryForm({
       ) : (
         <>
           <View className="gap-1">
-            <Text className="font-gothic-400 text-[10px] text-muted">住所（任意・入れると地図/移動時間の精度UP）</Text>
+            <Text className="font-gothic-400 text-[10px] text-muted">住所（候補から選ぶと番地まで自動入力）</Text>
             <TextInput
               value={place}
-              onChangeText={setPlace}
+              onChangeText={onPlaceChange}
               placeholder="例: 大阪府大阪市北区中之島4-3-1"
               placeholderTextColor={MUTED}
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
             />
+            <OpenHoursNote loading={loadingDetails} openFrom={openFrom} openTo={openTo} />
           </View>
           <View className="gap-1.5">
             <Text className="font-gothic-400 text-[10px] text-muted">滞在時間の目安</Text>

@@ -7,6 +7,8 @@ const ITEMS: { id: Tab; label: string }[] = [
   { id: "itin", label: "旅程" },
   { id: "today", label: "当日" },
   { id: "packing", label: "持ち物" },
+  { id: "shiori", label: "しおり" },
+  { id: "profile", label: "マイページ" },
 ];
 
 export function BottomNav({ tab, onChange, dark }: { tab: Tab; onChange: (t: Tab) => void; dark?: boolean }) {

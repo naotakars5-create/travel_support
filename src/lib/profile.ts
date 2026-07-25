@@ -5,6 +5,8 @@ export interface Profile {
   name: string;
   /** アイコン（絵文字1つ） */
   avatar: string;
+  /** 自分で設定した写真（data URL）。あれば絵文字より優先して表示する。 */
+  photo?: string;
 }
 
 const PROFILE_KEY = "tabinavi.profile.v1";
@@ -20,7 +22,11 @@ export async function loadProfile(): Promise<Profile | null> {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (typeof parsed?.name !== "string" || typeof parsed?.avatar !== "string") return null;
-    return parsed as Profile;
+    return {
+      name: parsed.name,
+      avatar: parsed.avatar,
+      photo: typeof parsed.photo === "string" ? parsed.photo : undefined,
+    };
   } catch {
     return null;
   }
