@@ -53,6 +53,8 @@ export interface PlanEntryFormInitial {
   placeTo?: string;
   departAt?: string;
   checkOut?: string;
+  openFrom?: string;
+  openTo?: string;
 }
 
 /** 行き先を入力するフォーム。種別で入力欄が変わり、複数日程では「何日目」を選べる。 */
@@ -84,6 +86,8 @@ export function PlanEntryForm({
   const [arriveTime, setArriveTime] = useState<string>(timeStrFromIso(initial?.arriveBy));
   const [departTime, setDepartTime] = useState<string>(timeStrFromIso(initial?.departAt));
   const [checkOutTime, setCheckOutTime] = useState<string>(timeStrFromIso(initial?.checkOut));
+  const [openFrom, setOpenFrom] = useState<string>(initial?.openFrom ?? "");
+  const [openTo, setOpenTo] = useState<string>(initial?.openTo ?? "");
   const [fixedTime, setFixedTime] = useState(initial?.fixedTime ?? false);
   const [cost, setCost] = useState(typeof initial?.cost === "number" ? String(initial.cost) : "");
   const [detail, setDetail] = useState(initial?.detail ?? "");
@@ -148,6 +152,8 @@ export function PlanEntryForm({
       input.stayMin = stayMin ?? undefined;
       input.arriveBy = iso(day, arriveTime);
       input.fixedTime = arriveTime ? fixedTime : false;
+      input.openFrom = openFrom || undefined;
+      input.openTo = openTo || undefined;
     }
     onSubmit(input);
     if (!resetAfterSubmit) return;
@@ -160,6 +166,8 @@ export function PlanEntryForm({
     setArriveTime("");
     setDepartTime("");
     setCheckOutTime("");
+    setOpenFrom("");
+    setOpenTo("");
     setFixedTime(false);
     setCost("");
     setDetail("");
@@ -297,6 +305,13 @@ export function PlanEntryForm({
                 <Chip key={m} active={stayMin === m} label={`${m}分`} onPress={() => setStayMin(m)} />
               ))}
               <Chip active={stayMin === null} label="指定なし" onPress={() => setStayMin(null)} />
+            </View>
+          </View>
+          <View className="gap-1">
+            <Text className="font-gothic-400 text-[10px] text-muted">営業・開館時間（任意・AIがこの時間内に組みます）</Text>
+            <View className="flex-row gap-3">
+              <TimeField label="開店" value={openFrom} onChange={setOpenFrom} />
+              <TimeField label="閉店" value={openTo} onChange={setOpenTo} />
             </View>
           </View>
           <View className="flex-row items-end gap-3">

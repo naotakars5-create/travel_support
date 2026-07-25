@@ -14,6 +14,7 @@ export const PLAN_SYSTEM_PROMPT = `あなたは日本の個人旅行者のため
 5. 地理的に近い場所は隣り合わせて、移動の往復を減らす。
 6. **常識的な行動時間帯（おおむね 9:00〜20:00）に配置すること。早朝・深夜には予定を入れない。** 収まらない場合は翌日に回すか、重要度の低いものを外す。ただし fixedTime=true の予定（予約・便）はその時刻を必ず守る。
 7. **種別「自宅」は旅の出発点・終着点。** 自宅の到着目安（出発時刻）より前、帰宅時刻より後には予定を置かない。旅程はすべて自宅の出発〜帰宅の時間内に収める。自宅そのものは schedule に必ず残し、出発時刻を動かさない。
+8. **営業時間が指定された行き先（営業時間: 開店〜閉店）は、その時間内に到着し滞在が閉店までに収まるように配置する。** 開店前や閉店後には割り当てない。どうしても収まらない場合は翌日に回すか、重要度の低いものを外す。
 
 # 出力形式（最重要）
 - 出力は **JSONオブジェクト1つのみ**。前後に説明・挨拶・コードフェンス（\`\`\`）を一切付けない。
@@ -57,6 +58,7 @@ export function buildPlanUserMessage(params: { entries: PlanEntry[]; referenceDa
       `重要度: ${PRIORITY_META[e.priority].label}`,
       `種別: ${MODE_LABEL[e.mode]}`,
       typeof e.stayMin === "number" ? `滞在: ${e.stayMin}分` : null,
+      e.openFrom || e.openTo ? `営業時間: ${e.openFrom ?? "?"}〜${e.openTo ?? "?"}` : null,
       e.arriveBy ? `到着目安: ${e.arriveBy}${e.fixedTime ? "（固定・厳守）" : "（目安）"}` : "到着目安: なし（自由に配置してよい）",
     ].filter(Boolean);
     return parts.join(" / ");

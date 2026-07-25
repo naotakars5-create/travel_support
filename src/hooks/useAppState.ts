@@ -282,7 +282,12 @@ export function useAppState() {
   // 組み上げた各行き先の到着予定時刻（entryId → ISO）。計画画面で「自動」の予定にも時刻を表示するため。
   const scheduleByEntry = useMemo(() => {
     const m = new Map<string, string>();
-    for (const ev of events) m.set(ev.id.replace(/^evt-/, ""), ev.startAt);
+    // イベントIDは evt-{entryId}（自宅は evt-{entryId}-depart / -return）。
+    // entryId へ戻し、最も早いイベント時刻を採用する。
+    for (const ev of events) {
+      const key = ev.id.replace(/^evt-/, "").replace(/-(depart|return)$/, "");
+      if (!m.has(key)) m.set(key, ev.startAt);
+    }
     return m;
   }, [events]);
 

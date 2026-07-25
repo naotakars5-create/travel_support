@@ -81,8 +81,9 @@ export function PlanScreen({
       else next.add(title);
       return next;
     });
-  // 表示時刻＝目安到着（指定があれば）または組み上げ済みの到着予定
-  const timeOf = (e: PlanEntry): string | null => e.arriveBy ?? scheduleByEntry.get(e.id) ?? null;
+  // 表示時刻：固定予定は目安到着を厳守、それ以外は組み上げ結果（AI/自動）の時刻を優先
+  const timeOf = (e: PlanEntry): string | null =>
+    (e.fixedTime && e.arriveBy ? e.arriveBy : scheduleByEntry.get(e.id) ?? e.arriveBy) ?? null;
   const sorted = [...entries].sort((a, b) => {
     const ta = timeOf(a) ? new Date(timeOf(a)!).getTime() : Infinity;
     const tb = timeOf(b) ? new Date(timeOf(b)!).getTime() : Infinity;
@@ -322,7 +323,18 @@ export function PlanScreen({
 
         {suggestions.length > 0 && (
           <View className="mt-7">
-            <Text className="mb-2 font-gothic-500 text-[10px] tracking-[.15em] text-muted">AIのおすすめ · 選んでまとめて追加</Text>
+            <View className="mb-2 flex-row items-center justify-between">
+              <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">AIのおすすめ · 選んでまとめて追加</Text>
+              <Pressable
+                onPress={() =>
+                  setPicked((prev) => (prev.size === suggestions.length ? new Set() : new Set(suggestions.map((s) => s.title))))
+                }
+                hitSlop={6}
+                className="rounded-full border border-ink/25 px-2.5 py-1"
+              >
+                <Text className="font-gothic-400 text-[10px] text-ink">{picked.size === suggestions.length ? "選択を解除" : "すべて選択"}</Text>
+              </Pressable>
+            </View>
             <View className="rounded-[16px] border border-ink/10">
               {suggestions.map((s, i) => {
                 const on = picked.has(s.title);

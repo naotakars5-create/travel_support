@@ -46,6 +46,51 @@ function notBeforeMorning(ms: number): number {
   return ms;
 }
 
+/** "HH:MM" を {h, min} に。不正なら null。 */
+function parseHm(s: string | undefined): { h: number; min: number } | null {
+  if (!s) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return { h, min };
+}
+
+/**
+ * 開始時刻を施設の営業時間内へ寄せる。
+ * - 開店前なら開店時刻へ繰り下げ
+ * - 閉店までに滞在が収まらないなら翌日の開店（無ければ朝）へ
+ * 営業時間の指定が無ければそのまま返す。
+ */
+function clampToOpenHours(ms: number, entry: PlanEntry): number {
+  const from = parseHm(entry.openFrom);
+  const to = parseHm(entry.openTo);
+  if (!from && !to) return ms;
+  const d = new Date(ms);
+  const minutesOfDay = d.getHours() * 60 + d.getMinutes();
+  if (from) {
+    const fromMin = from.h * 60 + from.min;
+    if (minutesOfDay < fromMin) {
+      d.setHours(from.h, from.min, 0, 0);
+      return d.getTime();
+    }
+  }
+  if (to) {
+    const toMin = to.h * 60 + to.min;
+    const startMin = d.getHours() * 60 + d.getMinutes();
+    if (startMin + entryDurationMin(entry) > toMin) {
+      // 閉店までに収まらない → 翌日の開店（無ければ朝）へ
+      const nd = new Date(ms);
+      nd.setDate(nd.getDate() + 1);
+      if (from) nd.setHours(from.h, from.min, 0, 0);
+      else nd.setHours(DAY_START_HOUR, 0, 0, 0);
+      return nd.getTime();
+    }
+  }
+  return ms;
+}
+
 export function effectiveStayMin(entry: PlanEntry): number {
   if (typeof entry.stayMin === "number" && entry.stayMin > 0) return entry.stayMin;
   return DEFAULT_STAY_MIN[entry.mode] ?? 45;
@@ -112,8 +157,9 @@ export function localSchedule(entries: PlanEntry[], referenceDate: Date): Schedu
     let cursor = notBeforeMorning(referenceDate.getTime());
     for (const e of loose) {
       if (new Date(cursor).getHours() >= DAY_END_HOUR) cursor = nextMorning(cursor); // 遅すぎたら翌朝へ
-      placed.push({ entry: e, start: cursor });
-      cursor += (entryDurationMin(e) + TRAVEL_BUFFER_MIN) * 60000;
+      const start = clampToOpenHours(cursor, e); // 営業時間内へ寄せる
+      placed.push({ entry: e, start });
+      cursor = start + (entryDurationMin(e) + TRAVEL_BUFFER_MIN) * 60000;
     }
   } else {
     // loose を「空いている一番早い隙間」に差し込む（＝一番最後にしない）
@@ -135,7 +181,7 @@ export function localSchedule(entries: PlanEntry[], referenceDate: Date): Schedu
         insertAt = endOf(last) + bufferMs;
         if (new Date(insertAt).getHours() >= DAY_END_HOUR) insertAt = nextMorning(insertAt); // 遅すぎたら翌朝へ
       }
-      placed.push({ entry: e, start: insertAt });
+      placed.push({ entry: e, start: clampToOpenHours(insertAt, e) }); // 営業時間内へ寄せる
     }
   }
 
@@ -225,7 +271,10 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
   }
 
   // 観光・食事など → 地点イベント
-  const startMs = new Date(entry.arriveBy ?? slot.arriveAt).getTime();
+  // 時刻固定の予定は arriveBy を厳守。それ以外は組み上げ結果（slot）の時刻を反映する
+  //（AIやローカルが並べ替えた到着時刻が旅程・当日ビューに正しく出るようにするため）。
+  const startSource = entry.fixedTime && entry.arriveBy ? entry.arriveBy : slot.arriveAt ?? entry.arriveBy;
+  const startMs = new Date(startSource).getTime();
   if (Number.isNaN(startMs)) return [];
   const stay = slot.stayMin > 0 ? slot.stayMin : effectiveStayMin(entry);
   return [
@@ -301,6 +350,9 @@ export interface PlanEntryInput {
   departAt?: string;
   /** 宿泊: チェックアウト時刻(ISO) */
   checkOut?: string;
+  /** 営業・開館時間 "HH:MM" */
+  openFrom?: string;
+  openTo?: string;
 }
 
 export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | null {
@@ -322,6 +374,8 @@ export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | nul
     placeTo: input.placeTo?.trim() || undefined,
     departAt: input.departAt || undefined,
     checkOut: input.checkOut || undefined,
+    openFrom: input.openFrom || undefined,
+    openTo: input.openTo || undefined,
   };
 }
 
@@ -347,7 +401,7 @@ export function scheduleSignature(entries: PlanEntry[]): string {
   return entries
     .map(
       (e) =>
-        `${e.id}|${e.arriveBy ?? ""}|${e.departAt ?? ""}|${e.checkOut ?? ""}|${e.stayMin ?? ""}|${e.priority}|${e.mode}|${e.day ?? ""}|${e.fixedTime ? 1 : 0}|${e.placeFrom ?? ""}|${e.placeTo ?? ""}`
+        `${e.id}|${e.arriveBy ?? ""}|${e.departAt ?? ""}|${e.checkOut ?? ""}|${e.stayMin ?? ""}|${e.priority}|${e.mode}|${e.day ?? ""}|${e.fixedTime ? 1 : 0}|${e.placeFrom ?? ""}|${e.placeTo ?? ""}|${e.openFrom ?? ""}|${e.openTo ?? ""}`
     )
     .join(";");
 }
