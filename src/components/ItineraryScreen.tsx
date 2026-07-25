@@ -1,8 +1,9 @@
+import { useMemo } from "react";
 import { Animated, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RailItem, computeStats, formatDurationMin, railNodes } from "@/lib/itinerary";
 import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
-import { formatJstHeadingJa, formatJstTime } from "@/lib/date";
+import { dayOfIso, formatJstHeadingJa, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { GeoPoint } from "@/lib/types";
 import { RailNodeDot } from "./icons";
 import { RouteMap } from "./RouteMap";
@@ -57,6 +58,7 @@ export function ItineraryScreen({
   justAddedEventId,
   liveLocation,
   now,
+  tripDate,
   onNavigatePlan,
 }: {
   rail: RailItem[];
@@ -64,6 +66,7 @@ export function ItineraryScreen({
   justAddedEventId: string | null;
   liveLocation: GeoPoint | null;
   now: Date;
+  tripDate: string;
   onNavigatePlan: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -75,6 +78,19 @@ export function ItineraryScreen({
   const mapPoints: GeoPoint[] = railNodes(rail)
     .map((n) => n.geo)
     .filter((g): g is GeoPoint => Boolean(g));
+
+  // 日付が変わるノードのキー → 日番号（「N日目」見出しを出す位置）
+  const dayHeaders = useMemo(() => {
+    const map = new Map<string, number>();
+    let prevDate: string | null = null;
+    for (const item of rail) {
+      if (item.type !== "node") continue;
+      const dk = new Date(item.time).toDateString();
+      if (prevDate !== null && dk !== prevDate) map.set(item.key, dayOfIso(tripDate, item.time));
+      prevDate = dk;
+    }
+    return map;
+  }, [rail, tripDate]);
 
   const subLine = `予定${stats.reservationCount}件 · 空き${stats.gapCount}件 · 総移動${formatDurationMin(stats.totalTransitMin)}`;
 
@@ -106,16 +122,28 @@ export function ItineraryScreen({
           const next = rail[i + 1];
 
           if (item.type === "node") {
+            const dayNum = dayHeaders.get(item.key);
+            const showDayHeader = dayNum !== undefined;
             return (
-              <NodeRow
-                key={item.key}
-                item={item}
-                prevStyle={lineStyleFor(prev)}
-                nextStyle={lineStyleFor(next)}
-                isCurrent={item.key === currentNodeKey}
-                isPast={item.nodeIndex < currentIndex && item.key !== currentNodeKey}
-                justAdded={item.event.id === justAddedEventId}
-              />
+              <View key={item.key}>
+                {showDayHeader && (
+                  <View className="mb-2 mt-3 flex-row items-center gap-2">
+                    <View className="h-px flex-1 bg-black/[.1]" />
+                    <Text className="font-gothic-500 text-[11px] text-ink">
+                      {dayNum}日目 · {formatJstMonthDayJa(new Date(item.time))}
+                    </Text>
+                    <View className="h-px flex-1 bg-black/[.1]" />
+                  </View>
+                )}
+                <NodeRow
+                  item={item}
+                  prevStyle={lineStyleFor(showDayHeader ? undefined : prev)}
+                  nextStyle={lineStyleFor(next)}
+                  isCurrent={item.key === currentNodeKey}
+                  isPast={item.nodeIndex < currentIndex && item.key !== currentNodeKey}
+                  justAdded={item.event.id === justAddedEventId}
+                />
+              </View>
             );
           }
 
@@ -167,6 +195,10 @@ export function ItineraryScreen({
                   <Pressable onPress={onNavigatePlan} className="self-start rounded-[10px] border border-ink px-3 py-1.5">
                     <Text className="font-gothic-400 text-[11px] text-ink">未確定 · 計画で行き先を追加</Text>
                   </Pressable>
+                ) : item.durationMin >= 360 ? (
+                  <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
+                    <Text className="font-gothic-400 text-[11px] text-muted">翌日まで（宿泊など）</Text>
+                  </View>
                 ) : (
                   <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
                     <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>

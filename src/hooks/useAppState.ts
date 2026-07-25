@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GeoPoint, PackingItem, ParseApiResponse, PlanApiResponse, PlanEntry, ScheduleSlot, SpotSuggestion } from "@/lib/types";
+import { GeoPoint, isTransitMode, PackingItem, ParseApiResponse, PlanApiResponse, PlanEntry, ScheduleSlot, SpotSuggestion } from "@/lib/types";
 import { buildSeedEntries } from "@/lib/seedEntries";
 import { loadState, saveState } from "@/lib/storage";
 import { buildRail, firstSeedGeo, lastSeedGeo, RailItem, sortedGroupEvents } from "@/lib/itinerary";
@@ -57,6 +57,7 @@ export function useAppState() {
   const [readOnly, setReadOnly] = useState(false);
   // 旅行日（YYYY-MM-DD）と基本の移動手段
   const [tripDate, setTripDate] = useState<string>(() => todayDateStr());
+  const [tripDayCount, setTripDayCount] = useState<number>(1);
   const [baseMode, setBaseMode] = useState<BaseMode>("car");
   const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
 
@@ -90,6 +91,7 @@ export function useAppState() {
         setPacking(persisted.packing);
         setCurrentNodeKey(persisted.currentNodeKey);
         if (persisted.tripDate) setTripDate(persisted.tripDate);
+        if (persisted.tripDayCount) setTripDayCount(persisted.tripDayCount);
         if (persisted.baseMode) setBaseMode(persisted.baseMode);
         scheduleSigRef.current = scheduleSignature(persisted.entries);
       } else {
@@ -105,8 +107,8 @@ export function useAppState() {
   // 永続化（共有リンクの閲覧中は保存しない＝受け取った人の自分のプランを壊さない）
   useEffect(() => {
     if (!entries || readOnly) return;
-    void saveState({ version: 2, entries, slots, currentNodeKey, packing, tripDate, baseMode, savedAt: new Date().toISOString() });
-  }, [entries, slots, currentNodeKey, packing, tripDate, baseMode, readOnly]);
+    void saveState({ version: 2, entries, slots, currentNodeKey, packing, tripDate, tripDayCount, baseMode, savedAt: new Date().toISOString() });
+  }, [entries, slots, currentNodeKey, packing, tripDate, tripDayCount, baseMode, readOnly]);
 
   // 現在時刻の更新（当日画面のカウントダウン用）
   useEffect(() => {
@@ -136,32 +138,53 @@ export function useAppState() {
     let cancelled = false;
     async function run() {
       const list = entries ?? [];
-      const targets = list.filter((e) => !e.placeGeo);
+      // ジオコーディング対象を (entryId, フィールド, テキスト) で洗い出す。
+      // 移動系は出発地/到着地の両方、それ以外は place（住所/名前）。
+      type Field = "place" | "from" | "to";
+      const targets: { id: string; field: Field; text: string }[] = [];
+      for (const e of list) {
+        if (isTransitMode(e.mode) && (e.placeFrom || e.placeTo)) {
+          if (e.placeFrom && !e.placeFromGeo) targets.push({ id: e.id, field: "from", text: e.placeFrom });
+          if (e.placeTo && !e.placeToGeo) targets.push({ id: e.id, field: "to", text: e.placeTo });
+        } else if (!e.placeGeo) {
+          targets.push({ id: e.id, field: "place", text: entryPlaceText(e) });
+        }
+      }
       if (targets.length === 0) return;
-      const unique = new Map<string, string>();
-      targets.forEach((e) => unique.set(e.id, entryPlaceText(e)));
 
-      const entriesGeo = await Promise.all(
-        Array.from(unique.entries()).map(async ([id, text]) => {
+      const results = await Promise.all(
+        targets.map(async (t) => {
           try {
             const res = await fetch(apiUrl("/api/geocode"), {
               method: "POST",
               headers: { "content-type": "application/json" },
-              body: JSON.stringify({ query: text }),
+              body: JSON.stringify({ query: t.text }),
             });
             const data = await res.json();
-            return [id, (data.point as GeoPoint | null) ?? null] as const;
+            return { ...t, point: (data.point as GeoPoint | null) ?? null };
           } catch {
-            return [id, null] as const;
+            return { ...t, point: null };
           }
         })
       );
       if (cancelled) return;
-      const geoById = new Map(entriesGeo);
-      if (![...geoById.values()].some(Boolean)) return;
+      const hits = results.filter((r) => r.point);
+      if (hits.length === 0) return;
 
       setEntries((prev) =>
-        prev ? prev.map((e) => (!e.placeGeo && geoById.get(e.id) ? { ...e, placeGeo: geoById.get(e.id)! } : e)) : prev
+        prev
+          ? prev.map((e) => {
+              const mine = hits.filter((h) => h.id === e.id);
+              if (mine.length === 0) return e;
+              const next = { ...e };
+              for (const h of mine) {
+                if (h.field === "place" && !next.placeGeo) next.placeGeo = h.point!;
+                if (h.field === "from" && !next.placeFromGeo) next.placeFromGeo = h.point!;
+                if (h.field === "to" && !next.placeToGeo) next.placeToGeo = h.point!;
+              }
+              return next;
+            })
+          : prev
       );
     }
     void run();
@@ -456,6 +479,8 @@ export function useAppState() {
     scheduleByEntry,
     tripDate,
     setTripDate,
+    tripDayCount,
+    setTripDayCount,
     baseMode,
     setBaseMode,
     profile,
