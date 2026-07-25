@@ -12,11 +12,14 @@ export async function GET(request: Request): Promise<Response> {
   const width = clampInt(url.searchParams.get("w"), 640, 100, 640);
   const height = clampInt(url.searchParams.get("h"), 320, 100, 640);
 
-  const points: GeoPoint[] = ptsParam
+  // pts=lat,lng[,label];... （label は行き先の通し番号・任意）
+  const parsed = ptsParam
     .split(";")
-    .map((pair) => pair.split(","))
-    .map(([lat, lng]) => ({ lat: Number(lat), lng: Number(lng) }))
+    .map((triple) => triple.split(","))
+    .map(([lat, lng, label]) => ({ lat: Number(lat), lng: Number(lng), label: label || undefined }))
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  const points: GeoPoint[] = parsed.map((p) => ({ lat: p.lat, lng: p.lng }));
+  const labels = parsed.map((p) => p.label);
 
   // 現在地（任意）: me=lat,lng
   const meParam = url.searchParams.get("me");
@@ -33,7 +36,7 @@ export async function GET(request: Request): Promise<Response> {
     return new Response("no key", { status: 404 });
   }
 
-  const mapUrl = staticRouteMapUrl(points, width, height, me);
+  const mapUrl = staticRouteMapUrl(points, width, height, me, labels);
   if (!mapUrl) return new Response("no map", { status: 400 });
 
   try {

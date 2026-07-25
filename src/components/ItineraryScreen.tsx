@@ -75,9 +75,16 @@ export function ItineraryScreen({
   const currentNode = rail.find((i) => i.type === "node" && i.key === currentNodeKey);
   const currentIndex = currentNode && currentNode.type === "node" ? currentNode.nodeIndex : -1;
 
-  const mapPoints: GeoPoint[] = railNodes(rail)
-    .map((n) => n.geo)
-    .filter((g): g is GeoPoint => Boolean(g));
+  // 各地点（ノード）に行く順の通し番号を振る。地図のマーカー番号と旅程の番号を一致させる。
+  const nodes = railNodes(rail);
+  const nodeNumber = useMemo(() => {
+    const m = new Map<string, number>();
+    nodes.forEach((n, i) => m.set(n.key, i + 1));
+    return m;
+  }, [nodes]);
+  const mappableNodes = nodes.filter((n) => n.geo);
+  const mapPoints: GeoPoint[] = mappableNodes.map((n) => n.geo as GeoPoint);
+  const mapLabels: (string | undefined)[] = mappableNodes.map((n) => String(nodeNumber.get(n.key)));
 
   // 日付が変わるノードのキー → 日番号（「N日目」見出しを出す位置）
   const dayHeaders = useMemo(() => {
@@ -109,7 +116,7 @@ export function ItineraryScreen({
       <View className="h-px w-full bg-black/[.08]" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 80 }}>
-        {(mapPoints.length > 0 || liveLocation) && <RouteMap points={mapPoints} me={liveLocation} />}
+        {(mapPoints.length > 0 || liveLocation) && <RouteMap points={mapPoints} me={liveLocation} labels={mapLabels} />}
         {rail.length === 0 && (
           <Pressable onPress={onNavigatePlan} className="mt-10 self-center rounded-[12px] border border-ink/25 px-5 py-3">
             <Text className="text-center font-gothic-400 text-[12px] text-muted">
@@ -137,6 +144,7 @@ export function ItineraryScreen({
                 )}
                 <NodeRow
                   item={item}
+                  stopNumber={nodeNumber.get(item.key)}
                   prevStyle={lineStyleFor(showDayHeader ? undefined : prev)}
                   nextStyle={lineStyleFor(next)}
                   isCurrent={item.key === currentNodeKey}
@@ -217,6 +225,7 @@ export function ItineraryScreen({
 
 function NodeRow({
   item,
+  stopNumber,
   prevStyle,
   nextStyle,
   isCurrent,
@@ -224,6 +233,7 @@ function NodeRow({
   justAdded,
 }: {
   item: Extract<RailItem, { type: "node" }>;
+  stopNumber?: number;
   prevStyle: LineStyle | null;
   nextStyle: LineStyle | null;
   isCurrent: boolean;
@@ -245,6 +255,13 @@ function NodeRow({
       </View>
       <View className="flex-1 pb-4 pl-1">
         <View className="flex-row flex-wrap items-center gap-2">
+          {stopNumber !== undefined && (
+            <View className={`h-[18px] w-[18px] items-center justify-center rounded-full ${isPast ? "bg-muted-light" : "bg-ink"}`}>
+              <Text className="font-gothic-500 text-[10px] text-kinari" style={TNUM}>
+                {stopNumber}
+              </Text>
+            </View>
+          )}
           <Text className={`font-mincho-600 text-[15px] ${isPast ? "text-muted-light" : "text-ink"}`}>{item.event.title || item.place}</Text>
           {isCurrent && (
             <View className="rounded-full border border-ink px-2 py-[1px]">

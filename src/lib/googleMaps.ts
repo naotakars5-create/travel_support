@@ -198,7 +198,13 @@ export async function placeAutocomplete(input: string): Promise<PlacePrediction[
  * 旅程の全地点を結ぶ経路を描いた静的地図（Static Maps API）の画像URLを組み立てる。
  * APIキーはサーバー側にのみ埋め込む（クライアントへは露出させない）。
  */
-export function staticRouteMapUrl(points: GeoPoint[], width: number, height: number, me?: GeoPoint | null): string | null {
+export function staticRouteMapUrl(
+  points: GeoPoint[],
+  width: number,
+  height: number,
+  me?: GeoPoint | null,
+  labels?: (string | undefined)[]
+): string | null {
   if (points.length === 0 && !me) return null;
   const url = new URL("https://maps.googleapis.com/maps/api/staticmap");
   url.searchParams.set("size", `${width}x${height}`);
@@ -211,7 +217,9 @@ export function staticRouteMapUrl(points: GeoPoint[], width: number, height: num
     url.searchParams.append("path", `color:0xc2492dcc|weight:4|${path}`);
   }
   points.forEach((p, i) => {
-    const label = points.length <= 9 ? String(i + 1) : "";
+    // ラベル指定があればそれを（行き先の通し番号）、無ければ連番。Static Maps のラベルは英数字1文字のみ。
+    const raw = labels?.[i] ?? String(i + 1);
+    const label = /^[0-9A-Za-z]$/.test(raw) ? raw : "";
     url.searchParams.append("markers", `color:0x2a2622|label:${label}|${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
   });
   // 現在地は青いマーカーで表示（ラベルなし）

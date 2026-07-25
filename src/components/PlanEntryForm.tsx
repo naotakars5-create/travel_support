@@ -86,8 +86,6 @@ export function PlanEntryForm({
   const [arriveTime, setArriveTime] = useState<string>(timeStrFromIso(initial?.arriveBy));
   const [departTime, setDepartTime] = useState<string>(timeStrFromIso(initial?.departAt));
   const [checkOutTime, setCheckOutTime] = useState<string>(timeStrFromIso(initial?.checkOut));
-  const [openFrom, setOpenFrom] = useState<string>(initial?.openFrom ?? "");
-  const [openTo, setOpenTo] = useState<string>(initial?.openTo ?? "");
   const [fixedTime, setFixedTime] = useState(initial?.fixedTime ?? false);
   const [cost, setCost] = useState(typeof initial?.cost === "number" ? String(initial.cost) : "");
   const [detail, setDetail] = useState(initial?.detail ?? "");
@@ -152,8 +150,6 @@ export function PlanEntryForm({
       input.stayMin = stayMin ?? undefined;
       input.arriveBy = iso(day, arriveTime);
       input.fixedTime = arriveTime ? fixedTime : false;
-      input.openFrom = openFrom || undefined;
-      input.openTo = openTo || undefined;
     }
     onSubmit(input);
     if (!resetAfterSubmit) return;
@@ -166,8 +162,6 @@ export function PlanEntryForm({
     setArriveTime("");
     setDepartTime("");
     setCheckOutTime("");
-    setOpenFrom("");
-    setOpenTo("");
     setFixedTime(false);
     setCost("");
     setDetail("");
@@ -307,27 +301,20 @@ export function PlanEntryForm({
               <Chip active={stayMin === null} label="指定なし" onPress={() => setStayMin(null)} />
             </View>
           </View>
-          <View className="gap-1">
-            <Text className="font-gothic-400 text-[10px] text-muted">営業・開館時間（任意・AIがこの時間内に組みます）</Text>
-            <View className="flex-row gap-3">
-              <TimeField label="開店" value={openFrom} onChange={setOpenFrom} />
-              <TimeField label="閉店" value={openTo} onChange={setOpenTo} />
-            </View>
-          </View>
-          <View className="flex-row items-end gap-3">
+          <View className="flex-row">
             <TimeField label="到着時刻（任意）" value={arriveTime} onChange={setArriveTime} />
-            <View className="flex-1 gap-1">
-              <Text className="font-gothic-400 text-[10px] text-muted">費用（円・任意）</Text>
-              <TextInput
-                value={cost}
-                onChangeText={setCost}
-                keyboardType="number-pad"
-                placeholder="例: 1200"
-                placeholderTextColor={MUTED}
-                className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 font-mincho-400 text-[14px] text-ink"
-                style={{ height: 42, fontVariant: ["tabular-nums"] }}
-              />
-            </View>
+          </View>
+          <View className="gap-1">
+            <Text className="font-gothic-400 text-[10px] text-muted">費用（円・任意）</Text>
+            <TextInput
+              value={cost}
+              onChangeText={setCost}
+              keyboardType="number-pad"
+              placeholder="例: 1200"
+              placeholderTextColor={MUTED}
+              className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 font-mincho-400 text-[14px] text-ink"
+              style={{ height: 42, fontVariant: ["tabular-nums"] }}
+            />
           </View>
           {arriveTime !== "" && (
             <Pressable onPress={() => setFixedTime((v) => !v)} className="flex-row items-center gap-2">

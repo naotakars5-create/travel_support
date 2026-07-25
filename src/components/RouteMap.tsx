@@ -15,9 +15,9 @@ function googleMapsRouteUrl(points: GeoPoint[], me?: GeoPoint | null): string {
  * タップすると Google マップが開き、ピンチ/ズーム・移動できる。
  * 座標がまだ無い / APIキー未設定 / 読み込み失敗時は、そっと非表示にする（フォールバック）。
  */
-export function RouteMap({ points, me }: { points: GeoPoint[]; me?: GeoPoint | null }) {
+export function RouteMap({ points, me, labels }: { points: GeoPoint[]; me?: GeoPoint | null; labels?: (string | undefined)[] }) {
   const [failed, setFailed] = useState(false);
-  const uri = routeMapImageUrl(points, me);
+  const uri = routeMapImageUrl(points, me, labels);
 
   if (!uri || failed) return null;
 
