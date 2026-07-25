@@ -8,9 +8,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "tabinavi",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "icon": "./assets/expo.icon"
-    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#f3efe6",
@@ -31,7 +28,7 @@
         {
           "backgroundColor": "#f3efe6",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 160
         }
       ],
       [
