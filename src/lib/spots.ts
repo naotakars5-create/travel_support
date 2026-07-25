@@ -8,6 +8,9 @@ export interface Spot {
   address?: string;
   /** 種別のかんたんな概要（例: 美術館・博物館）。取得できた場合 */
   category?: string;
+  /** 座標（タップで地図に飛ぶために使う） */
+  lat?: number;
+  lng?: number;
 }
 
 /**
@@ -48,8 +51,8 @@ export const googlePlacesSpotProvider: SpotProvider = {
     if (!res.ok) throw new Error(`nearby-spots API error ${res.status}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    const spots: { name: string; note: string; walkMin: number; address?: string; category?: string }[] = data.spots ?? [];
-    return spots.map((s) => ({ name: s.name, note: s.note, walkMin: s.walkMin, address: s.address, category: s.category }));
+    const spots: { name: string; note: string; walkMin: number; address?: string; category?: string; lat?: number; lng?: number }[] = data.spots ?? [];
+    return spots.map((s) => ({ name: s.name, note: s.note, walkMin: s.walkMin, address: s.address, category: s.category, lat: s.lat, lng: s.lng }));
   },
 };
 

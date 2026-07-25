@@ -156,7 +156,8 @@ export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number,
         category: categoryFromTypes(r.types),
       };
     })
-    .sort((a, b) => a.walkMin - b.walkMin);
+    .sort((a, b) => a.walkMin - b.walkMin)
+    .slice(0, 15);
 }
 
 export interface PlacePrediction {

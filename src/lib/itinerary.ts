@@ -16,6 +16,8 @@ export interface RailNode {
   confidence: number;
   /** この地点の座標（ジオコーディング済みの場合） */
   geo?: GeoPoint;
+  /** 想定滞在時間（分）。滞在系の地点で終了時刻がある場合 */
+  stayMin?: number;
 }
 
 export interface RailEdge {
@@ -41,6 +43,8 @@ interface NodeSeed {
   event: ParsedEvent;
   key: string;
   time: string;
+  /** この地点を出発する時刻（滞在後）。次区間の空き時間計算に使う。 */
+  endTime?: string;
   place: string;
   sub?: string;
   geo?: GeoPoint;
@@ -83,6 +87,7 @@ function eventToNodeSeeds(event: ParsedEvent): NodeSeed[] {
       event,
       key: `${event.id}:point`,
       time: event.startAt,
+      endTime: event.endAt && event.endAt !== event.startAt ? event.endAt : undefined,
       place: event.placeTo ?? event.placeFrom ?? event.title,
       sub: event.detail,
       geo: event.placeToGeo ?? event.placeFromGeo,
@@ -123,6 +128,7 @@ export function buildRail(
         sub: seed.sub,
         confidence: seed.event.confidence,
         geo: seed.geo,
+        stayMin: seed.endTime ? minutesBetween(seed.time, seed.endTime) : undefined,
       });
       nodeIndex += 1;
 
@@ -141,7 +147,8 @@ export function buildRail(
 
     const prevSeed = group.seeds[group.seeds.length - 1];
     const nextSeed = nextGroup.seeds[0];
-    const intervalMin = minutesBetween(prevSeed.time, nextSeed.time);
+    // 空き時間は「前の地点を出発（滞在後）してから次の到着まで」で計算する。
+    const intervalMin = minutesBetween(prevSeed.endTime ?? prevSeed.time, nextSeed.time);
     const prevNodeIndex = nodeIndex - 1;
 
     const est = estimator.estimate(prevSeed.event, nextSeed.event);

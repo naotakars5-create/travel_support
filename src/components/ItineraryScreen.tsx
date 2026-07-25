@@ -56,12 +56,14 @@ export function ItineraryScreen({
   currentNodeKey,
   justAddedEventId,
   liveLocation,
+  now,
   onNavigatePlan,
 }: {
   rail: RailItem[];
   currentNodeKey: string | null;
   justAddedEventId: string | null;
   liveLocation: GeoPoint | null;
+  now: Date;
   onNavigatePlan: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -79,7 +81,10 @@ export function ItineraryScreen({
   return (
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
       <View className="px-[26px] pb-3 pt-4">
-        <Text className="font-gothic-400 text-[11px] text-muted">{heading}</Text>
+        <View className="flex-row items-baseline justify-between">
+          <Text className="font-gothic-400 text-[11px] text-muted">{heading}</Text>
+          <Text className="font-gothic-500 text-[11px] text-ink" style={TNUM}>現在 {formatJstTime(now)}</Text>
+        </View>
         <Text className="mt-1 font-mincho-600 text-[26px] text-ink">本日の旅程</Text>
         <Text className="mt-1 font-gothic-400 text-[11px] text-muted" style={TNUM}>
           {subLine}
@@ -223,6 +228,11 @@ function NodeRow({
         {item.place && item.place !== item.event.title && (
           <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted-light">{item.place}</Text>
         )}
+        {item.stayMin ? (
+          <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
+            滞在 {formatDurationMin(item.stayMin)}
+          </Text>
+        ) : null}
         {item.sub && <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted">{item.sub}</Text>}
       </View>
     </Animated.View>
