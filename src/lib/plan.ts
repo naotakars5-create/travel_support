@@ -202,6 +202,57 @@ export function localSchedule(entries: PlanEntry[], referenceDate: Date): Schedu
   }));
 }
 
+/**
+ * 「行き先リストの並び順」をそのまま行程の順序として、時刻を前から順に自動計算する。
+ * - 日ごとにグループ化し、各日は朝（DAY_START_HOUR）から前詰め。
+ * - 固定時刻の予定（fixedTime）はその時刻を厳守し、以降のカーソルを進める。
+ * - それ以外は「前の予定の終了＋移動バッファ」で次々に時刻を割り当てる（営業時間内へ寄せる）。
+ * 並び替えるたびにこれを呼べば、時刻が自動で再計算される。
+ */
+export function sequentialSchedule(entries: PlanEntry[], referenceDate: Date): ScheduleSlot[] {
+  if (entries.length === 0) return [];
+
+  const byDay = new Map<number, PlanEntry[]>();
+  for (const e of entries) {
+    const d = e.day && e.day > 0 ? e.day : 1;
+    const arr = byDay.get(d);
+    if (arr) arr.push(e);
+    else byDay.set(d, [e]);
+  }
+
+  const slots: ScheduleSlot[] = [];
+  const days = [...byDay.keys()].sort((a, b) => a - b);
+  for (const day of days) {
+    const dayStart = new Date(referenceDate.getTime() + (day - 1) * 86400000);
+    dayStart.setHours(DAY_START_HOUR, 0, 0, 0);
+    let cursor = dayStart.getTime();
+    for (const e of byDay.get(day)!) {
+      const anchor = e.fixedTime ? entryAnchorTime(e) : null;
+      let start: number;
+      if (anchor) {
+        const anchorMs = new Date(anchor).getTime();
+        start = Number.isNaN(anchorMs) ? cursor : anchorMs; // 固定時刻は厳守
+      } else {
+        start = clampToOpenHours(cursor, e); // 営業時間内へ寄せる
+      }
+      slots.push({ entryId: e.id, arriveAt: new Date(start).toISOString(), stayMin: entryDurationMin(e) });
+      cursor = Math.max(cursor, start) + (entryDurationMin(e) + TRAVEL_BUFFER_MIN) * 60000;
+    }
+  }
+  return slots;
+}
+
+/** entries を、与えたスケジュール（slot の arriveAt 昇順）に合わせて並べ替える。手動並び替えの土台に使う。 */
+export function orderEntriesBySchedule(entries: PlanEntry[], slots: ScheduleSlot[]): PlanEntry[] {
+  const order = new Map<string, number>();
+  slots.forEach((s, i) => order.set(s.entryId, i));
+  return [...entries].sort((a, b) => {
+    const oa = order.has(a.id) ? order.get(a.id)! : Number.MAX_SAFE_INTEGER;
+    const ob = order.has(b.id) ? order.get(b.id)! : Number.MAX_SAFE_INTEGER;
+    return oa - ob;
+  });
+}
+
 /** 1件の PlanEntry を、種別に応じた ParsedEvent（複数になる場合あり）へ変換する。 */
 function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
   const base = {

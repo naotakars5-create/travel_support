@@ -2,12 +2,12 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PlanEntry, Priority, SpotSuggestion } from "@/lib/types";
-import { PlanTotals, PRIORITY_META, effectiveStayMin, COST_CATEGORY_LABEL, COST_CATEGORY_ORDER } from "@/lib/plan";
+import { PlanTotals, PRIORITY_META, effectiveStayMin, entryDurationMin, COST_CATEGORY_LABEL, COST_CATEGORY_ORDER } from "@/lib/plan";
 import { Profile } from "@/lib/profile";
 import { BaseMode } from "@/lib/transit";
 import { MODE_LABEL } from "@/lib/modeMeta";
 import { formatDurationMin } from "@/lib/itinerary";
-import { formatJstTime } from "@/lib/date";
+import { dateForDay, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { formatYen } from "@/lib/format";
 import { DateOnlyField } from "./PlainFields";
 
@@ -42,6 +42,7 @@ export function PlanScreen({
   onEditEntry,
   onBumpPriority,
   onSetEntryDay,
+  onMoveEntry,
   onAddSuggestions,
   onShare,
   onImportShared,
@@ -68,6 +69,7 @@ export function PlanScreen({
   onEditEntry: (id: string) => void;
   onBumpPriority: (id: string) => void;
   onSetEntryDay: (id: string, day: number) => void;
+  onMoveEntry: (id: string, dir: -1 | 1) => void;
   onAddSuggestions: (list: SpotSuggestion[]) => void;
   onShare: () => void;
   onImportShared: () => void;
@@ -81,16 +83,42 @@ export function PlanScreen({
       else next.add(title);
       return next;
     });
-  // 表示時刻：固定予定は目安到着を厳守、それ以外は組み上げ結果（AI/自動）の時刻を優先
+  const [selectedDay, setSelectedDay] = useState<number | "all">("all");
+  // 表示時刻：固定予定は目安到着を厳守、それ以外は組み上げ結果（自動計算）の時刻を優先
   const timeOf = (e: PlanEntry): string | null =>
     (e.fixedTime && e.arriveBy ? e.arriveBy : scheduleByEntry.get(e.id) ?? e.arriveBy) ?? null;
-  const sorted = [...entries].sort((a, b) => {
-    const ta = timeOf(a) ? new Date(timeOf(a)!).getTime() : Infinity;
-    const tb = timeOf(b) ? new Date(timeOf(b)!).getTime() : Infinity;
-    return ta - tb;
-  });
-  // AIが組んだ結果、今の旅程に入りきらなかった予定（スケジュールに含まれていないもの）
-  const dropped = scheduleByEntry.size > 0 ? entries.filter((e) => !scheduleByEntry.has(e.id)) : [];
+  // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番
+  const indexOf = new Map(entries.map((e, i) => [e.id, i]));
+  const ordered = [...entries].sort(
+    (a, b) => (a.day ?? 1) - (b.day ?? 1) || (indexOf.get(a.id) ?? 0) - (indexOf.get(b.id) ?? 0)
+  );
+  // 日ごとの通し番号（1,2,3…）
+  const numberOf = new Map<string, number>();
+  const dayCounter = new Map<number, number>();
+  for (const e of ordered) {
+    const d = e.day ?? 1;
+    const n = (dayCounter.get(d) ?? 0) + 1;
+    dayCounter.set(d, n);
+    numberOf.set(e.id, n);
+  }
+  // 日数が減った等で選択日が範囲外なら「全日」にフォールバック
+  const activeDay: number | "all" =
+    typeof selectedDay === "number" && selectedDay >= 1 && selectedDay <= tripDayCount ? selectedDay : "all";
+  const visible = activeDay === "all" ? ordered : ordered.filter((e) => (e.day ?? 1) === activeDay);
+  // 同じ日の中で最初/最後か（上下ボタンの無効化に使う）
+  const isFirstInDay = (e: PlanEntry) => numberOf.get(e.id) === 1;
+  const isLastInDay = (e: PlanEntry) => numberOf.get(e.id) === dayCounter.get(e.day ?? 1);
+  // 時刻レンジ（開始〜終了）の表示
+  const timeRange = (e: PlanEntry): string | null => {
+    const startIso = timeOf(e);
+    if (!startIso) return null;
+    const start = new Date(startIso);
+    const dur = entryDurationMin(e);
+    const startStr = formatJstTime(start);
+    if (dur <= 0) return `${startStr}〜`;
+    return `${startStr}〜${formatJstTime(new Date(start.getTime() + dur * 60000))}`;
+  };
+  const dropped: PlanEntry[] = [];
 
   return (
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
@@ -209,34 +237,61 @@ export function PlanScreen({
             </View>
           </View>
         )}
-        {sorted.length === 0 && (
+        {/* Day タブ（複数日程のとき）。並び替えは各日の中で行う。 */}
+        {tripDayCount > 1 && entries.length > 0 && (
+          <View className="mb-3 flex-row flex-wrap gap-2">
+            <Pressable
+              onPress={() => setSelectedDay("all")}
+              className={`rounded-[10px] border px-3 py-1.5 ${activeDay === "all" ? "border-ink bg-ink" : "border-black/[.15] bg-white/50"}`}
+            >
+              <Text className={`font-gothic-500 text-[11px] ${activeDay === "all" ? "text-kinari" : "text-ink"}`}>全日</Text>
+            </Pressable>
+            {Array.from({ length: tripDayCount }, (_, i) => i + 1).map((d) => {
+              const active = activeDay === d;
+              const dateStr = formatJstMonthDayJa(new Date(`${dateForDay(tripDate, d)}T00:00`));
+              return (
+                <Pressable
+                  key={d}
+                  onPress={() => setSelectedDay(d)}
+                  className={`rounded-[10px] border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.15] bg-white/50"}`}
+                >
+                  <Text className={`font-gothic-500 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>Day{d}</Text>
+                  <Text className={`font-gothic-400 text-[9px] ${active ? "text-kinari/80" : "text-muted"}`}>{dateStr}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+
+        {entries.length === 0 && (
           <Text className="mt-10 text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
-            右上の＋から行きたい場所を追加してください。{"\n"}追加していくと、AIが一日の順路に組み上げます。
+            右上の＋から行きたい場所を追加してください。{"\n"}順番に並べて、上下ボタンで入れ替えると時刻を自動計算します。
           </Text>
         )}
 
-        {sorted.map((e) => {
+        {visible.map((e) => {
           const ps = PRIORITY_STYLE[e.priority];
+          const num = numberOf.get(e.id);
+          const range = timeRange(e);
           return (
             <View key={e.id} className="border-b border-black/[.06] py-3.5">
-              <View className="flex-row gap-3">
-              <Pressable disabled={readOnly} onPress={() => onEditEntry(e.id)} className="flex-1 flex-row gap-3">
-                <View className="w-[46px] pt-0.5">
-                  {timeOf(e) ? (
-                    <Text className="font-mincho-600 text-[14px] text-ink" style={TNUM}>
-                      {formatJstTime(new Date(timeOf(e)!))}
-                    </Text>
-                  ) : (
-                    <Text className="font-gothic-400 text-[10px] text-muted-light">—</Text>
-                  )}
-                  {e.fixedTime ? (
-                    <Text className="mt-0.5 font-gothic-400 text-[9px] text-accent">固定</Text>
-                  ) : (
-                    !e.arriveBy && timeOf(e) && <Text className="mt-0.5 font-gothic-400 text-[9px] text-muted-light">予定</Text>
-                  )}
+              <View className="flex-row gap-2">
+                {/* 番号 */}
+                <View className="w-[22px] items-center pt-0.5">
+                  <View className="h-[20px] w-[20px] items-center justify-center rounded-full bg-ink">
+                    <Text className="font-gothic-500 text-[10px] text-kinari" style={TNUM}>{num}</Text>
+                  </View>
                 </View>
-                <View className="flex-1">
+                <Pressable disabled={readOnly} onPress={() => onEditEntry(e.id)} className="flex-1">
                   <View className="flex-row items-center gap-1.5">
+                    {range ? (
+                      <Text className="font-mincho-600 text-[13px] text-ink" style={TNUM}>{range}</Text>
+                    ) : (
+                      <Text className="font-gothic-400 text-[10px] text-muted-light">時刻未定</Text>
+                    )}
+                    {e.fixedTime && <Text className="font-gothic-400 text-[9px] text-accent">固定</Text>}
+                  </View>
+                  <View className="mt-0.5 flex-row items-center gap-1.5">
                     <Text className="font-mincho-600 text-[15px] text-ink">{e.title}</Text>
                     {!readOnly && <Text className="font-gothic-400 text-[10px] text-muted-light">編集 ›</Text>}
                   </View>
@@ -264,17 +319,37 @@ export function PlanScreen({
                       </Text>
                     )}
                   </View>
-                </View>
-              </Pressable>
-              {!readOnly && (
-                <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8} className="pt-0.5">
-                  <Text className="font-gothic-400 text-[16px] text-muted-light">×</Text>
                 </Pressable>
-              )}
+                {/* 並び替え（上下）＋削除 */}
+                {!readOnly && (
+                  <View className="items-center justify-center gap-1">
+                    <Pressable
+                      disabled={isFirstInDay(e)}
+                      onPress={() => onMoveEntry(e.id, -1)}
+                      hitSlop={6}
+                      className={`h-6 w-6 items-center justify-center rounded-[6px] border ${isFirstInDay(e) ? "border-black/[.08]" : "border-ink/30"}`}
+                    >
+                      <Text className={`text-[12px] ${isFirstInDay(e) ? "text-muted-light" : "text-ink"}`}>▲</Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={isLastInDay(e)}
+                      onPress={() => onMoveEntry(e.id, 1)}
+                      hitSlop={6}
+                      className={`h-6 w-6 items-center justify-center rounded-[6px] border ${isLastInDay(e) ? "border-black/[.08]" : "border-ink/30"}`}
+                    >
+                      <Text className={`text-[12px] ${isLastInDay(e) ? "text-muted-light" : "text-ink"}`}>▼</Text>
+                    </Pressable>
+                  </View>
+                )}
+                {!readOnly && (
+                  <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8} className="pt-0.5">
+                    <Text className="font-gothic-400 text-[16px] text-muted-light">×</Text>
+                  </Pressable>
+                )}
               </View>
               {/* 複数日程では、行き先を何日目に置くか切り替えられる */}
               {!readOnly && tripDayCount > 1 && (
-                <View className="mt-2 flex-row flex-wrap items-center gap-1.5 pl-[58px]">
+                <View className="mt-2 flex-row flex-wrap items-center gap-1.5 pl-[30px]">
                   <Text className="font-gothic-400 text-[9px] text-muted-light">日:</Text>
                   {Array.from({ length: tripDayCount }, (_, i) => i + 1).map((d) => {
                     const active = (e.day ?? 1) === d;
@@ -305,7 +380,7 @@ export function PlanScreen({
               <Text className="font-gothic-500 text-[12px] text-kinari">{composing ? "AIが旅程を組んでいます…" : "AIで旅程を組む"}</Text>
             </Pressable>
             <Text className="mt-2 text-center font-gothic-400 text-[10px] text-muted-light">
-              到着時刻・重要度・移動時間をもとに最適な順路に並べ替えます
+              AIがおすすめ順に並べ替えます。▲▼で手動並び替えすると時刻が自動で再計算されます。
             </Text>
             {composeError && <Text className="mt-2 text-center font-gothic-400 text-[11px] text-accent">{composeError}</Text>}
             {planNotes && (

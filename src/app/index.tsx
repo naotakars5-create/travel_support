@@ -54,6 +54,7 @@ export default function Home() {
           onEditEntry={(id) => setEditId(id)}
           onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
           onSetEntryDay={app.setEntryDay}
+          onMoveEntry={app.moveEntry}
           onAddSuggestions={app.addSuggestions}
           onShare={app.shareCurrentPlan}
           onImportShared={app.importSharedToOwn}
