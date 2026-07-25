@@ -6,11 +6,10 @@ import { combineDateAndTime, dateForDay, timeStrFromIso } from "@/lib/date";
 import { fetchPlacePredictions, fetchPlaceDetails, PlacePrediction } from "@/lib/places";
 import { TimeField } from "./PlainFields";
 
-// 宿泊は「宿泊先」として別枠で固定入力するため、通常の追加からは除外。
+// 宿泊・出発地は計画画面の「固定枠」から専用入力するため、通常の追加からは除外。
 const MODE_OPTIONS: { value: TransportMode; label: string }[] = [
   { value: "activity", label: "観光" },
   { value: "dining", label: "食事" },
-  { value: "home", label: "出発地" },
   { value: "rail", label: "鉄道" },
   { value: "bus", label: "バス" },
   { value: "car", label: "車" },

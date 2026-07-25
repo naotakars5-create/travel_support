@@ -408,7 +408,7 @@ export function useAppState() {
       if (idx < 0) return prev;
       const day = prev[idx].day ?? 1;
       // 同じ日の隣（指定方向・宿泊は除外）を探して入れ替える
-      const sameDayReorderable = (e: PlanEntry) => (e.day ?? 1) === day && e.mode !== "stay";
+      const sameDayReorderable = (e: PlanEntry) => (e.day ?? 1) === day && e.mode !== "stay" && e.mode !== "home";
       let swapIdx = -1;
       if (dir < 0) {
         for (let i = idx - 1; i >= 0; i--) {
@@ -443,7 +443,7 @@ export function useAppState() {
       const rest = prev.filter((_, i) => i !== idx);
       const sameDayPositions = rest
         .map((e, i) => ({ e, i }))
-        .filter((o) => (o.e.day ?? 1) === day && o.e.mode !== "stay")
+        .filter((o) => (o.e.day ?? 1) === day && o.e.mode !== "stay" && o.e.mode !== "home")
         .map((o) => o.i);
       if (sameDayPositions.length === 0) return prev;
       const insertAt = dir < 0 ? sameDayPositions[0] : sameDayPositions[sameDayPositions.length - 1] + 1;
@@ -541,8 +541,9 @@ export function useAppState() {
         const reordered = orderEntriesBySchedule(list, data.schedule).map((e) => {
           const slot = slotById.get(e.id);
           if (!slot) return e;
-          const day = dayOfIso(tripStart, slot.arriveAt);
-          return day > 0 ? { ...e, day } : e;
+          // 日数の範囲内へクランプ（万一AIの日付がずれても「存在しない日」へ書き戻さない）
+          const day = Math.min(Math.max(1, dayOfIso(tripStart, slot.arriveAt)), tripDayCount);
+          return { ...e, day };
         });
         // AIが時刻を付けた予定はその時刻をアンカーに採用。AIが「時間内に収まらない」と
         // 判断して外した予定（低優先度）は旅程に入れず、旅程画面下部の

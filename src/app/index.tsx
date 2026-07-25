@@ -18,6 +18,7 @@ export default function Home() {
   const app = useAppState();
   const [addOpen, setAddOpen] = useState(false);
   const [addLodgingOpen, setAddLodgingOpen] = useState(false);
+  const [addStartOpen, setAddStartOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const dark = app.tab === "today";
@@ -53,6 +54,7 @@ export default function Home() {
           profile={app.profile}
           onOpenAdd={() => setAddOpen(true)}
           onOpenAddLodging={() => setAddLodgingOpen(true)}
+          onOpenAddStart={() => setAddStartOpen(true)}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
@@ -134,6 +136,22 @@ export default function Home() {
           onAdd={(input) => {
             app.addEntry(input);
             setAddLodgingOpen(false);
+            app.setTab("plan");
+          }}
+          onImportMail={app.importFromMail}
+        />
+      )}
+
+      {addStartOpen && (
+        <AddEntrySheet
+          tripDate={app.tripDate}
+          tripDayCount={app.tripDayCount}
+          fixedMode="home"
+          title="出発地を設定"
+          onClose={() => setAddStartOpen(false)}
+          onAdd={(input) => {
+            app.addEntry(input);
+            setAddStartOpen(false);
             app.setTab("plan");
           }}
           onImportMail={app.importFromMail}

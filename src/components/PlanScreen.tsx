@@ -44,6 +44,7 @@ export function PlanScreen({
   profile,
   onOpenAdd,
   onOpenAddLodging,
+  onOpenAddStart,
   onCompose,
   onRemoveEntry,
   onEditEntry,
@@ -74,6 +75,7 @@ export function PlanScreen({
   profile: Profile;
   onOpenAdd: () => void;
   onOpenAddLodging: () => void;
+  onOpenAddStart: () => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
@@ -93,24 +95,25 @@ export function PlanScreen({
       else next.add(title);
       return next;
     });
-  const [pickedArea, setPickedArea] = useState<Set<string>>(new Set());
-  const togglePickArea = (title: string) =>
-    setPickedArea((prev) => {
-      const next = new Set(prev);
-      if (next.has(title)) next.delete(title);
-      else next.add(title);
-      return next;
-    });
+  // AIのおすすめと周辺スポットを1つの「この辺のおすすめ」に統合（タイトルで重複排除・登録済みは除外）
+  const existingTitles = new Set(entries.map((e) => e.title));
+  const combinedSuggestions: SpotSuggestion[] = [];
+  for (const s of [...suggestions, ...areaSuggestions]) {
+    if (existingTitles.has(s.title)) continue;
+    if (combinedSuggestions.some((m) => m.title === s.title)) continue;
+    combinedSuggestions.push(s);
+  }
   const [selectedDay, setSelectedDay] = useState<number | "all">("all");
   // 表示時刻：固定予定は目安到着を厳守、それ以外は組み上げ結果（自動計算）の時刻を優先
   const timeOf = (e: PlanEntry): string | null =>
     (e.fixedTime && e.arriveBy ? e.arriveBy : scheduleByEntry.get(e.id) ?? e.arriveBy) ?? null;
-  // 宿泊は「宿泊先（固定）」として別枠。並び替えの対象外。
+  // 宿泊・出発地は「固定枠」として別枠。並び替えの対象外。
   const lodging = entries.filter((e) => e.mode === "stay");
-  // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番（宿泊は除外）
+  const startPoint = entries.find((e) => e.mode === "home") ?? null;
+  // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番（宿泊・出発地は除外）
   const indexOf = new Map(entries.map((e, i) => [e.id, i]));
   const ordered = entries
-    .filter((e) => e.mode !== "stay")
+    .filter((e) => e.mode !== "stay" && e.mode !== "home")
     .sort((a, b) => (a.day ?? 1) - (b.day ?? 1) || (indexOf.get(a.id) ?? 0) - (indexOf.get(b.id) ?? 0));
   // 日ごとの通し番号（1,2,3…）
   const numberOf = new Map<string, number>();
@@ -249,6 +252,43 @@ export function PlanScreen({
             </View>
           </View>
         )}
+        {/* 出発地（固定・旅の起点/終点。ここから1件目のスポットへの移動も計算） */}
+        {!readOnly && (
+          <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
+            <View className="flex-row items-center justify-between">
+              <Text className="font-gothic-500 text-[11px] text-ink">出発地（固定）</Text>
+              {!startPoint && (
+                <Pressable onPress={onOpenAddStart} className="rounded-full border border-ink/25 px-3 py-1">
+                  <Text className="font-gothic-500 text-[10px] text-ink">＋ 出発地</Text>
+                </Pressable>
+              )}
+            </View>
+            {!startPoint ? (
+              <Text className="mt-1 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+                自宅・集合場所（例: 東京駅）を設定すると、旅の起点・終点になり、最初のスポットまでの移動時間も計算します。
+              </Text>
+            ) : (
+              <View className="mt-2 flex-row items-center gap-2">
+                <Pressable onPress={() => onEditEntry(startPoint.id)} className="flex-1">
+                  <Text className="font-mincho-600 text-[13px] text-ink">{startPoint.title || "自宅"}</Text>
+                  <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                    {startPoint.departAt ? `出発 ${formatJstTime(new Date(startPoint.departAt))}（初日）` : ""}
+                    {startPoint.arriveBy ? ` → 帰着 ${formatJstTime(new Date(startPoint.arriveBy))}${tripDayCount > 1 ? `（${tripDayCount}日目）` : ""}` : ""}
+                  </Text>
+                  {startPoint.place && (
+                    <Text numberOfLines={1} className="font-gothic-400 text-[10px] text-muted-light">
+                      {startPoint.place}
+                    </Text>
+                  )}
+                </Pressable>
+                <Pressable onPress={() => onRemoveEntry(startPoint.id)} hitSlop={8}>
+                  <Text className="font-gothic-400 text-[15px] text-muted-light">×</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* 宿泊先（固定・並び替え対象外） */}
         {!readOnly && (
           <View className="mb-4 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
@@ -465,8 +505,8 @@ export function PlanScreen({
           </View>
         )}
 
-        {/* 周辺おすすめの状態表示（取得中／候補未選択） */}
-        {!readOnly && entries.length > 0 && areaSuggestions.length === 0 && (
+        {/* この辺のおすすめ（AIのおすすめ＋周辺スポットを統合・選んでまとめて追加） */}
+        {!readOnly && entries.length > 0 && combinedSuggestions.length === 0 && (
           <View className="mt-6">
             <Text className="mb-1 font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ</Text>
             {areaSuggestionsLoading ? (
@@ -484,79 +524,26 @@ export function PlanScreen({
           </View>
         )}
 
-        {/* この辺のおすすめ（宿泊先などの周辺スポット・最初から表示） */}
-        {!readOnly && areaSuggestions.length > 0 && (
+        {!readOnly && combinedSuggestions.length > 0 && (
           <View className="mt-7">
             <View className="mb-2 flex-row items-center justify-between">
-              <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ · 選んで追加</Text>
+              <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ · 選んでまとめて追加</Text>
               <Pressable
                 onPress={() =>
-                  setPickedArea((prev) =>
-                    prev.size === areaSuggestions.length ? new Set() : new Set(areaSuggestions.map((s) => s.title))
+                  setPicked((prev) =>
+                    prev.size === combinedSuggestions.length ? new Set() : new Set(combinedSuggestions.map((s) => s.title))
                   )
                 }
                 hitSlop={6}
                 className="rounded-full border border-ink/25 px-2.5 py-1"
               >
                 <Text className="font-gothic-400 text-[10px] text-ink">
-                  {pickedArea.size === areaSuggestions.length ? "選択を解除" : "すべて選択"}
+                  {picked.size === combinedSuggestions.length ? "選択を解除" : "すべて選択"}
                 </Text>
               </Pressable>
             </View>
-            <Text className="mb-2 font-gothic-400 text-[10px] text-muted-light">登録した宿泊先・行き先の周辺から提案しています。</Text>
             <View className="rounded-[16px] border border-ink/10">
-              {areaSuggestions.map((s, i) => {
-                const on = pickedArea.has(s.title);
-                return (
-                  <Pressable
-                    key={s.title}
-                    onPress={() => togglePickArea(s.title)}
-                    className={`flex-row items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-ink/10" : ""}`}
-                  >
-                    <View className={`h-[20px] w-[20px] items-center justify-center rounded-[6px] border ${on ? "border-ink bg-ink" : "border-black/[.25]"}`}>
-                      {on && <View className="h-[8px] w-[8px] rounded-[2px] bg-kinari" />}
-                    </View>
-                    <View className="flex-1">
-                      <Text className="font-mincho-400 text-[14px] text-ink">{s.title}</Text>
-                      {(s.area || s.note) && (
-                        <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{[s.area, s.note].filter(Boolean).join(" · ")}</Text>
-                      )}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Pressable
-              disabled={pickedArea.size === 0}
-              onPress={() => {
-                onAddSuggestions(areaSuggestions.filter((s) => pickedArea.has(s.title)));
-                setPickedArea(new Set());
-              }}
-              className={`mt-2 rounded-[12px] py-3 ${pickedArea.size > 0 ? "bg-ink" : "bg-ink/30"}`}
-            >
-              <Text className="text-center font-gothic-500 text-[12px] text-kinari">
-                {pickedArea.size > 0 ? `選択した${pickedArea.size}件を追加` : "追加したいものを選択"}
-              </Text>
-            </Pressable>
-          </View>
-        )}
-
-        {suggestions.length > 0 && (
-          <View className="mt-7">
-            <View className="mb-2 flex-row items-center justify-between">
-              <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">AIのおすすめ · 選んでまとめて追加</Text>
-              <Pressable
-                onPress={() =>
-                  setPicked((prev) => (prev.size === suggestions.length ? new Set() : new Set(suggestions.map((s) => s.title))))
-                }
-                hitSlop={6}
-                className="rounded-full border border-ink/25 px-2.5 py-1"
-              >
-                <Text className="font-gothic-400 text-[10px] text-ink">{picked.size === suggestions.length ? "選択を解除" : "すべて選択"}</Text>
-              </Pressable>
-            </View>
-            <View className="rounded-[16px] border border-ink/10">
-              {suggestions.map((s, i) => {
+              {combinedSuggestions.map((s, i) => {
                 const on = picked.has(s.title);
                 return (
                   <Pressable
@@ -580,7 +567,7 @@ export function PlanScreen({
             <Pressable
               disabled={picked.size === 0}
               onPress={() => {
-                onAddSuggestions(suggestions.filter((s) => picked.has(s.title)));
+                onAddSuggestions(combinedSuggestions.filter((s) => picked.has(s.title)));
                 setPicked(new Set());
               }}
               className={`mt-2 rounded-[12px] py-3 ${picked.size > 0 ? "bg-ink" : "bg-ink/30"}`}
