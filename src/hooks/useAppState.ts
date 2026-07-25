@@ -149,6 +149,12 @@ export function useAppState() {
   // 旅程イベントは entries + slots から都度導出する（座標も entry から引き継ぐ）。
   const events = useMemo(() => buildEventsFromSchedule(entries ?? [], slots), [entries, slots]);
 
+  // AIが「時間内に収まらない」と外した予定（スロットが無い行き先）。旅程画面の下部に表示する。
+  const unplacedEntries = useMemo(() => {
+    const placed = new Set(slots.map((s) => s.entryId));
+    return (entries ?? []).filter((e) => !placed.has(e.id));
+  }, [entries, slots]);
+
   // 地点テキスト（place / title）を座標へジオコーディングし、entries へ書き戻す。
   useEffect(() => {
     if (!entries) return;
@@ -538,10 +544,14 @@ export function useAppState() {
           const day = dayOfIso(tripStart, slot.arriveAt);
           return day > 0 ? { ...e, day } : e;
         });
-        // AIが時刻を付けた予定はその時刻をアンカーに、付かなかった（未定の）予定も
-        // 並び順から自動で時刻を割り当てる。これで未定の予定も必ず旅程に入る。
+        // AIが時刻を付けた予定はその時刻をアンカーに採用。AIが「時間内に収まらない」と
+        // 判断して外した予定（低優先度）は旅程に入れず、旅程画面下部の
+        // 「旅程に入らなかった予定」に表示する。ただし宿泊・出発地・時刻固定は必ず残す。
         const anchors = new Map(data.schedule.map((s) => [s.entryId, s.arriveAt]));
-        const filledSlots = sequentialSchedule(reordered, localReferenceDate(), anchors);
+        const mustKeep = (e: PlanEntry) => e.mode === "stay" || e.mode === "home" || Boolean(e.fixedTime);
+        const included = reordered.filter((e) => anchors.has(e.id) || mustKeep(e));
+        const filledSlots = sequentialSchedule(included, localReferenceDate(), anchors);
+        const droppedCount = reordered.length - included.length;
         setEntries(reordered);
         setSlots(filledSlots);
         // AIの順路を採用したので、この構造は「スケジュール済み」として記録し、ローカル再計算で上書きしない。
@@ -550,8 +560,14 @@ export function useAppState() {
         setPlanNotes(data.notes ?? null);
         // 反映が分かるように：旅程タブへ切り替え＋通知
         setTab("itin");
-        setFlash({ visible: true, text: "AIが旅程を組みました\n旅程を確認してください" });
-        setTimeout(() => setFlash({ visible: false, text: "" }), 1800);
+        setFlash({
+          visible: true,
+          text:
+            droppedCount > 0
+              ? `AIが旅程を組みました\n入りきらない予定が${droppedCount}件あります（旅程の下部）`
+              : "AIが旅程を組みました\n旅程を確認してください",
+        });
+        setTimeout(() => setFlash({ visible: false, text: "" }), droppedCount > 0 ? 2600 : 1800);
       } else {
         setComposeError(data.message);
       }
@@ -775,6 +791,7 @@ export function useAppState() {
     justAddedEventId,
     now,
     rail,
+    unplacedEntries,
     dayOfState,
     currentNodeKey,
     totals,

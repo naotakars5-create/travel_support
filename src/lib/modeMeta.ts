@@ -9,7 +9,7 @@ export const MODE_LABEL: Record<TransportMode, string> = {
   stay: "宿泊",
   dining: "食事",
   activity: "観光",
-  home: "自宅",
+  home: "出発地",
 };
 
 export const MODE_COLOR: Record<TransportMode, string> = {

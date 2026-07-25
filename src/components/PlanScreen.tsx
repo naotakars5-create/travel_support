@@ -317,7 +317,7 @@ export function PlanScreen({
 
         {entries.length === 0 && (
           <Text className="mt-10 text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
-            右上の＋から行きたい場所を追加してください。{"\n"}順番に並べて、上下ボタンで入れ替えると時刻を自動計算します。
+            右上の＋から行きたい場所をどんどん追加してください。{"\n"}時間は入れなくてOK。予約など決まっている時刻だけ入力すれば、{"\n"}AIが効率のよい順路と時間を自動で組みます。
           </Text>
         )}
 
@@ -453,7 +453,7 @@ export function PlanScreen({
               <Text className="font-gothic-500 text-[12px] text-kinari">{composing ? "AIが旅程を組んでいます…" : "AIで旅程を組む"}</Text>
             </Pressable>
             <Text className="mt-2 text-center font-gothic-400 text-[10px] text-muted-light">
-              AIがおすすめ順に並べ替えます。▲▼で手動並び替えすると時刻が自動で再計算されます。
+              時間未定のままでOK。重要度と移動効率をもとに複数日へ自動配置します。入りきらない予定は旅程の下部へ。
             </Text>
             {composeError && <Text className="mt-2 text-center font-gothic-400 text-[11px] text-accent">{composeError}</Text>}
             {planNotes && (

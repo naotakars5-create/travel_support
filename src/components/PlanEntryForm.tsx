@@ -10,7 +10,7 @@ import { TimeField } from "./PlainFields";
 const MODE_OPTIONS: { value: TransportMode; label: string }[] = [
   { value: "activity", label: "観光" },
   { value: "dining", label: "食事" },
-  { value: "home", label: "自宅" },
+  { value: "home", label: "出発地" },
   { value: "rail", label: "鉄道" },
   { value: "bus", label: "バス" },
   { value: "car", label: "車" },
@@ -226,7 +226,7 @@ export function PlanEntryForm({
     <View className="gap-3">
       <View className="gap-1">
         <Text className="font-gothic-400 text-[10px] text-muted">
-          {home ? "名称（任意・例: 自宅）" : transit ? "名称 *（例: JL105便）" : "行き先 *（名前を入れると住所候補が出ます）"}
+          {home ? "スタート地点の名称（任意・例: 自宅 / 東京駅集合）" : transit ? "名称 *（例: JL105便）" : "行き先 *（名前を入れると住所候補が出ます）"}
         </Text>
         <TextInput
           value={title}
@@ -284,10 +284,10 @@ export function PlanEntryForm({
           </View>
           <View className="flex-row gap-3">
             <TimeField label="出発時刻（初日）" value={departTime} onChange={setDepartTime} />
-            <TimeField label={tripDayCount > 1 ? `帰宅時刻（${tripDayCount}日目）` : "帰宅時刻"} value={arriveTime} onChange={setArriveTime} />
+            <TimeField label={tripDayCount > 1 ? `帰着時刻（${tripDayCount}日目）` : "帰着時刻"} value={arriveTime} onChange={setArriveTime} />
           </View>
           <Text className="font-gothic-400 text-[10px] text-muted">
-            出発は初日、帰宅は最終日として旅程の起点・終点に置きます。
+            旅の起点・終点になります（自宅・集合場所など）。最初の行き先への移動もここから計算します。
           </Text>
         </>
       ) : transit ? (
@@ -388,7 +388,7 @@ export function PlanEntryForm({
       {/* 重要度は宿泊/移動/自宅以外で表示（宿泊・移動・自宅は必ず組み込む想定） */}
       {!transit && !stay && !home && (
         <View className="gap-1.5">
-          <Text className="font-gothic-400 text-[10px] text-muted">重要度（AIのおすすめ順の参考。手動並び替えには影響しません）</Text>
+          <Text className="font-gothic-400 text-[10px] text-muted">重要度（時間が足りない時、AIが優先度の低い予定から外します）</Text>
           <View className="flex-row gap-2">
             {PRIORITY_OPTIONS.map((o) => (
               <Chip key={o.value} active={o.value === priority} label={o.label} onPress={() => setPriority(o.value)} />

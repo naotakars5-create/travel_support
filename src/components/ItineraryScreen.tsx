@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { Animated, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { RailItem, computeStats, formatDurationMin, railNodes } from "@/lib/itinerary";
+import { RailItem, computeStats, formatDurationMin } from "@/lib/itinerary";
 import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
 import { dayOfIso, formatJstHeadingJa, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
-import { GeoPoint } from "@/lib/types";
+import { GeoPoint, PlanEntry } from "@/lib/types";
+import { PRIORITY_META } from "@/lib/plan";
 import { RouteMap } from "./RouteMap";
 import { Blinker, PulseRing, useNodeInStyle } from "./animations";
 
@@ -51,22 +52,38 @@ function LineFull({ style }: { style: LineStyle | null }) {
   return <View style={[{ position: "absolute", left: 12, top: 0, width: 1, height: "100%" } as const, lineBorderStyle(style)]} />;
 }
 
+/** 1日分の旅程（日番号・日付・その日の rail 要素・地点番号）。 */
+interface DayGroup {
+  day: number;
+  dateLabel: string;
+  items: RailItem[];
+  /** その日の中での地点番号（1始まり・日ごとにリセット） */
+  numberOf: Map<string, number>;
+  mapPoints: GeoPoint[];
+  mapLabels: (string | undefined)[];
+}
+
 export function ItineraryScreen({
   rail,
+  unplaced,
   currentNodeKey,
   justAddedEventId,
   liveLocation,
   now,
   tripDate,
   onNavigatePlan,
+  onBumpPriority,
 }: {
   rail: RailItem[];
+  /** AIが時間内に収まらないと判断して外した予定 */
+  unplaced: PlanEntry[];
   currentNodeKey: string | null;
   justAddedEventId: string | null;
   liveLocation: GeoPoint | null;
   now: Date;
   tripDate: string;
   onNavigatePlan: () => void;
+  onBumpPriority: (id: string) => void;
 }) {
   const insets = useSafeAreaInsets();
   const stats = computeStats(rail);
@@ -74,28 +91,40 @@ export function ItineraryScreen({
   const currentNode = rail.find((i) => i.type === "node" && i.key === currentNodeKey);
   const currentIndex = currentNode && currentNode.type === "node" ? currentNode.nodeIndex : -1;
 
-  // 各地点（ノード）に行く順の通し番号を振る。地図のマーカー番号と旅程の番号を一致させる。
-  const nodes = railNodes(rail);
-  const nodeNumber = useMemo(() => {
-    const m = new Map<string, number>();
-    nodes.forEach((n, i) => m.set(n.key, i + 1));
-    return m;
-  }, [nodes]);
-  const mappableNodes = nodes.filter((n) => n.geo);
-  const mapPoints: GeoPoint[] = mappableNodes.map((n) => n.geo as GeoPoint);
-  const mapLabels: (string | undefined)[] = mappableNodes.map((n) => String(nodeNumber.get(n.key)));
-
-  // 日付が変わるノードのキー → 日番号（「N日目」見出しを出す位置）
-  const dayHeaders = useMemo(() => {
-    const map = new Map<string, number>();
+  // rail を「日」ごとのグループに分割し、日内で地点番号（1,2,3…）と地図の点列を作る。
+  // 番号は日ごとにリセットされ、その日の地図マーカーと一致する。
+  const dayGroups = useMemo<DayGroup[]>(() => {
+    const groups: DayGroup[] = [];
+    let current: DayGroup | null = null;
     let prevDate: string | null = null;
     for (const item of rail) {
-      if (item.type !== "node") continue;
-      const dk = new Date(item.time).toDateString();
-      if (prevDate !== null && dk !== prevDate) map.set(item.key, dayOfIso(tripDate, item.time));
-      prevDate = dk;
+      if (item.type === "node") {
+        const dk = new Date(item.time).toDateString();
+        if (prevDate === null || dk !== prevDate) {
+          current = {
+            day: dayOfIso(tripDate, item.time),
+            dateLabel: formatJstMonthDayJa(new Date(item.time)),
+            items: [],
+            numberOf: new Map(),
+            mapPoints: [],
+            mapLabels: [],
+          };
+          groups.push(current);
+          prevDate = dk;
+        }
+      }
+      if (!current) continue; // 先頭にnode以外は来ない想定の保険
+      current.items.push(item);
+      if (item.type === "node") {
+        const num = current.numberOf.size + 1;
+        current.numberOf.set(item.key, num);
+        if (item.geo) {
+          current.mapPoints.push(item.geo);
+          current.mapLabels.push(String(num));
+        }
+      }
     }
-    return map;
+    return groups;
   }, [rail, tripDate]);
 
   const subLine = `予定${stats.reservationCount}件 · 空き${stats.gapCount}件 · 総移動${formatDurationMin(stats.totalTransitMin)}`;
@@ -122,7 +151,6 @@ export function ItineraryScreen({
       <View className="h-px w-full bg-black/[.08]" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 80 }}>
-        {(mapPoints.length > 0 || liveLocation) && <RouteMap points={mapPoints} me={liveLocation} labels={mapLabels} />}
         {rail.length === 0 && (
           <Pressable onPress={onNavigatePlan} className="mt-10 self-center rounded-[12px] border border-ink/25 px-5 py-3">
             <Text className="text-center font-gothic-400 text-[12px] text-muted">
@@ -130,100 +158,143 @@ export function ItineraryScreen({
             </Text>
           </Pressable>
         )}
-        {rail.map((item, i) => {
-          const prev = rail[i - 1];
-          const next = rail[i + 1];
 
-          if (item.type === "node") {
-            const dayNum = dayHeaders.get(item.key);
-            const showDayHeader = dayNum !== undefined;
-            return (
-              <View key={item.key}>
-                {showDayHeader && (
-                  <View className="mb-2 mt-3 flex-row items-center gap-2">
-                    <View className="h-px flex-1 bg-black/[.1]" />
-                    <Text className="font-gothic-500 text-[11px] text-ink">
-                      {dayNum}日目 · {formatJstMonthDayJa(new Date(item.time))}
-                    </Text>
-                    <View className="h-px flex-1 bg-black/[.1]" />
-                  </View>
-                )}
-                <NodeRow
-                  item={item}
-                  stopNumber={nodeNumber.get(item.key)}
-                  prevStyle={lineStyleFor(showDayHeader ? undefined : prev)}
-                  nextStyle={lineStyleFor(next)}
-                  isCurrent={item.key === currentNodeKey}
-                  isPast={item.nodeIndex < currentIndex && item.key !== currentNodeKey}
-                  justAdded={item.event.id === justAddedEventId}
-                />
+        {dayGroups.map((g, gi) => (
+          <View key={`day-${g.day}-${gi}`}>
+            {/* 日の見出し（複数日程では塗りのバンドで目立たせる） */}
+            {dayGroups.length > 1 && (
+              <View className={`mb-3 flex-row items-baseline justify-between rounded-[10px] bg-ink px-4 py-2.5 ${gi > 0 ? "mt-5" : "mt-1"}`}>
+                <Text className="font-gothic-700 text-[14px] text-kinari">{g.day}日目</Text>
+                <Text className="font-gothic-400 text-[11px] text-kinari/80">{g.dateLabel}</Text>
               </View>
-            );
-          }
+            )}
+            {/* その日の全行程マップ（番号はその日の1,2,3…と一致） */}
+            {(g.mapPoints.length > 0 || (gi === 0 && liveLocation)) && (
+              <RouteMap points={g.mapPoints} me={liveLocation} labels={g.mapLabels} />
+            )}
+            {g.items.map((item, i) => {
+              const prev = g.items[i - 1];
+              const next = g.items[i + 1];
 
-          if (item.type === "edge") {
-            const style = lineStyleFor(item);
-            return (
-              <View key={`edge-${i}`} className="min-h-[40px] flex-row">
-                <View className="w-12" />
-                <View className="w-[26px]">
-                  <LineFull style={style} />
+              if (item.type === "node") {
+                return (
+                  <NodeRow
+                    key={item.key}
+                    item={item}
+                    stopNumber={g.numberOf.get(item.key)}
+                    prevStyle={lineStyleFor(prev)}
+                    nextStyle={lineStyleFor(next)}
+                    isCurrent={item.key === currentNodeKey}
+                    isPast={item.nodeIndex < currentIndex && item.key !== currentNodeKey}
+                    justAdded={item.event.id === justAddedEventId}
+                  />
+                );
+              }
+
+              if (item.type === "edge") {
+                const style = lineStyleFor(item);
+                return (
+                  <View key={`edge-${gi}-${i}`} className="min-h-[40px] flex-row">
+                    <View className="w-12" />
+                    <View className="w-[26px]">
+                      <LineFull style={style} />
+                    </View>
+                    <View className="flex-1 justify-center pb-2 pl-1">
+                      {item.driving != null || item.walking != null ? (
+                        <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
+                          {[
+                            item.driving != null ? `車 ${formatDurationMin(item.driving)}` : null,
+                            item.walking != null ? `徒歩 ${formatDurationMin(item.walking)}` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" ／ ")}
+                        </Text>
+                      ) : (
+                        <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
+                          {MODE_LABEL[item.mode]} · {formatDurationMin(item.durationMin)}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              }
+
+              const style = lineStyleFor(item);
+              const isConflict = item.kind === "conflict";
+              const isUnconfirmed = item.kind === "unconfirmed";
+              return (
+                <View key={`gap-${gi}-${i}`} className="min-h-[56px] flex-row">
+                  <View className="w-12" />
+                  <View className="w-[26px]">
+                    <LineFull style={style} />
+                  </View>
+                  <View className="flex-1 justify-center py-2 pl-1">
+                    {isConflict ? (
+                      <View className="self-start rounded-[10px] border border-accent/60 bg-accent/[.06] px-3 py-1.5">
+                        <Text className="font-gothic-500 text-[11px] text-accent">
+                          {item.durationMin < 0 ? "予定が重なっています" : "移動時間が足りない可能性があります"}
+                        </Text>
+                        {(item.driving != null || item.walking != null || item.requiredMin != null) && (
+                          <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                            実際の移動{" "}
+                            {item.driving != null || item.walking != null
+                              ? [
+                                  item.driving != null ? `車 ${formatDurationMin(item.driving)}` : null,
+                                  item.walking != null ? `徒歩 ${formatDurationMin(item.walking)}` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ／ ")
+                              : `約 ${formatDurationMin(item.requiredMin ?? 0)}`}
+                            {item.durationMin >= 0 ? ` · 空き ${formatDurationMin(item.durationMin)}` : ""}
+                          </Text>
+                        )}
+                      </View>
+                    ) : isUnconfirmed ? (
+                      <Pressable onPress={onNavigatePlan} className="self-start rounded-[10px] border border-ink px-3 py-1.5">
+                        <Text className="font-gothic-400 text-[11px] text-ink">未確定 · 計画で行き先を追加</Text>
+                      </Pressable>
+                    ) : item.durationMin >= 360 ? (
+                      <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
+                        <Text className="font-gothic-400 text-[11px] text-muted">翌日まで（宿泊）</Text>
+                      </View>
+                    ) : (
+                      <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
+                        <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>
+                          空き時間 · {formatDurationMin(item.durationMin)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
-                <View className="flex-1 justify-center pb-2 pl-1">
-                  {item.driving != null || item.walking != null ? (
-                    <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
-                      {[
-                        item.driving != null ? `車 ${formatDurationMin(item.driving)}` : null,
-                        item.walking != null ? `徒歩 ${formatDurationMin(item.walking)}` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" ／ ")}
-                    </Text>
-                  ) : (
-                    <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
-                      {MODE_LABEL[item.mode]} · {formatDurationMin(item.durationMin)}
-                    </Text>
+              );
+            })}
+          </View>
+        ))}
+
+        {/* AIが時間内に収まらないと判断して外した予定 */}
+        {unplaced.length > 0 && (
+          <View className="mt-7">
+            <Text className="mb-2 font-gothic-500 text-[10px] tracking-[.15em] text-accent">旅程に入らなかった予定</Text>
+            <View className="rounded-[16px] border border-accent/40">
+              {unplaced.map((e, i) => (
+                <View key={e.id} className={`flex-row items-center justify-between px-4 py-3 ${i > 0 ? "border-t border-black/[.06]" : ""}`}>
+                  <View className="flex-1 pr-2">
+                    <Text className="font-mincho-600 text-[14px] text-ink">{e.title}</Text>
+                    <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{PRIORITY_META[e.priority].label}</Text>
+                  </View>
+                  {e.priority !== "must" && (
+                    <Pressable onPress={() => onBumpPriority(e.id)} className="rounded-full border border-accent px-3 py-1.5">
+                      <Text className="font-gothic-500 text-[11px] text-accent">必ず行くにする</Text>
+                    </Pressable>
                   )}
                 </View>
-              </View>
-            );
-          }
-
-          const style = lineStyleFor(item);
-          const isConflict = item.kind === "conflict";
-          const isUnconfirmed = item.kind === "unconfirmed";
-          return (
-            <View key={`gap-${i}`} className="min-h-[56px] flex-row">
-              <View className="w-12" />
-              <View className="w-[26px]">
-                <LineFull style={style} />
-              </View>
-              <View className="flex-1 justify-center py-2 pl-1">
-                {isConflict ? (
-                  <View className="self-start rounded-[10px] border border-ink px-3 py-1.5">
-                    <Text className="font-gothic-400 text-[11px] text-ink">
-                      {item.durationMin < 0 ? "予定が重なっています" : "移動時間が足りない可能性があります"}
-                    </Text>
-                  </View>
-                ) : isUnconfirmed ? (
-                  <Pressable onPress={onNavigatePlan} className="self-start rounded-[10px] border border-ink px-3 py-1.5">
-                    <Text className="font-gothic-400 text-[11px] text-ink">未確定 · 計画で行き先を追加</Text>
-                  </Pressable>
-                ) : item.durationMin >= 360 ? (
-                  <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
-                    <Text className="font-gothic-400 text-[11px] text-muted">翌日まで（宿泊など）</Text>
-                  </View>
-                ) : (
-                  <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
-                    <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>
-                      空き時間 · {formatDurationMin(item.durationMin)}
-                    </Text>
-                  </View>
-                )}
-              </View>
+              ))}
             </View>
-          );
-        })}
+            <Text className="mt-1.5 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+              時間が足りず入らなかった予定です。「必ず行くにする」→もう一度「AIで旅程を組む」と優先して組み込みます。
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
