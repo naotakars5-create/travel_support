@@ -21,6 +21,7 @@ import { buildDefaultPacking } from "@/lib/packing";
 import { DEFAULT_PROFILE, loadProfile, Profile, saveProfile } from "@/lib/profile";
 import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM } from "@/lib/share";
 import { BaseMode, EdgeTravel, createPrecomputedEstimator, guessMode } from "@/lib/transit";
+import { createSpotProvider, Spot } from "@/lib/spots";
 import { dayOfIso, todayDateStr } from "@/lib/date";
 import { apiUrl } from "@/lib/apiBase";
 import { haversineMeters } from "@/lib/geo";
@@ -281,6 +282,44 @@ export function useAppState() {
   const rail: RailItem[] = useMemo(() => buildRail(events, false, transitEstimator), [events, transitEstimator]);
   const dayOfState: DayOfState = useMemo(() => getDayOfState(rail, currentNodeKey), [rail, currentNodeKey]);
   const totals = useMemo(() => computePlanTotals(entries ?? []), [entries]);
+
+  // 計画中の「この辺のおすすめ」：宿泊先（無ければ最初に座標が付いた行き先）の周辺スポットを提案する。
+  const areaRefGeo = useMemo(() => {
+    const list = entries ?? [];
+    const lodging = list.find((e) => e.mode === "stay" && e.placeGeo);
+    return (lodging ?? list.find((e) => e.placeGeo))?.placeGeo ?? null;
+  }, [entries]);
+  const areaRefKey = areaRefGeo ? `${areaRefGeo.lat.toFixed(3)},${areaRefGeo.lng.toFixed(3)}` : null;
+  const [rawAreaSpots, setRawAreaSpots] = useState<Spot[]>([]);
+  /* eslint-disable react-hooks/set-state-in-effect -- 外部API（周辺スポット）取得と基点消失時のクリアのため意図的 */
+  useEffect(() => {
+    if (!areaRefGeo || readOnly) {
+      setRawAreaSpots([]);
+      return;
+    }
+    let cancelled = false;
+    createSpotProvider(true)
+      .nearby(areaRefGeo.lat, areaRefGeo.lng, 120, false)
+      .then((s) => {
+        if (!cancelled) setRawAreaSpots(s);
+      })
+      .catch(() => {
+        if (!cancelled) setRawAreaSpots([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // 基点の座標が概ね変わった時だけ再取得（areaRefKey で丸め）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaRefKey, readOnly]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+  const areaSuggestions = useMemo<SpotSuggestion[]>(() => {
+    const existing = new Set((entries ?? []).map((e) => e.title));
+    return rawAreaSpots
+      .filter((s) => !existing.has(s.name))
+      .slice(0, 6)
+      .map((s) => ({ title: s.name, area: s.address, note: s.category ?? s.note, mode: "activity" as const, stayMin: 60 }));
+  }, [rawAreaSpots, entries]);
 
   // 組み上げた各行き先の到着予定時刻（entryId → ISO）。計画画面で「自動」の予定にも時刻を表示するため。
   const scheduleByEntry = useMemo(() => {
@@ -690,6 +729,7 @@ export function useAppState() {
     loadTrip,
     deleteTrip,
     suggestions,
+    areaSuggestions,
     planNotes,
     composing,
     composeError,
