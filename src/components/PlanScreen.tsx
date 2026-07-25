@@ -144,7 +144,7 @@ export function PlanScreen({
 
   return (
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
-      <View className="px-[26px] pb-3 pt-4">
+      <View className="px-[26px] pb-2 pt-3">
         <View className="flex-row items-start justify-between">
           <View className="flex-1">
             <Text className="font-gothic-400 text-[10px] tracking-[.2em] text-muted">
@@ -458,7 +458,7 @@ export function PlanScreen({
               </View>
               {/* 複数日程では、行き先を何日目に置くか切り替えられる */}
               {!readOnly && tripDayCount > 1 && (
-                <View className="mt-2 flex-row flex-wrap items-center gap-1.5 pl-[30px]">
+                <View className="mt-1.5 flex-row flex-wrap items-center gap-1.5 pl-[30px]">
                   <Text className="font-gothic-400 text-[9px] text-muted-light">日:</Text>
                   {Array.from({ length: tripDayCount }, (_, i) => i + 1).map((d) => {
                     const active = (e.day ?? 1) === d;

@@ -10,6 +10,7 @@ import {
   computePlanTotals,
   entryPlaceText,
   eventToPlanEntry,
+  fillIntoGaps,
   inputToEntry,
   orderEntriesBySchedule,
   PlanEntryInput,
@@ -541,26 +542,37 @@ export function useAppState() {
       });
       const data = (await res.json()) as PlanApiResponse;
       if (data.kind === "plan") {
-        // AIの順路を「並び順」に反映し、割り当てられた日付から「何日目」を更新する
-        // （2日目・3日目にもちゃんと配分されるように）
-        const slotById = new Map(data.schedule.map((s) => [s.entryId, s]));
-        const reordered = orderEntriesBySchedule(list, data.schedule).map((e) => {
+        // AIが時刻を付けた予定はその時刻をアンカーに採用。宿泊・出発地・時刻固定は必ず残す。
+        const anchors = new Map(data.schedule.map((s) => [s.entryId, s.arriveAt]));
+        const mustKeep = (e: PlanEntry) => e.mode === "stay" || e.mode === "home" || Boolean(e.fixedTime);
+        const orderedByAi = orderEntriesBySchedule(list, data.schedule);
+        const included = orderedByAi.filter((e) => anchors.has(e.id) || mustKeep(e));
+        const filledSlots = sequentialSchedule(included, localReferenceDate(), anchors);
+
+        // AIが外した予定は捨てずに、空き時間へ入る限り詰め込む（びっちり埋める）。
+        // それでも入らなかったものだけ「旅程に入らなかった予定」になる。
+        const leftovers = orderedByAi.filter((e) => !anchors.has(e.id) && !mustKeep(e));
+        const home = list.find((e) => e.mode === "home");
+        const extra = fillIntoGaps(leftovers, filledSlots, localReferenceDate(), tripDayCount, {
+          notBefore: home?.departAt,
+          notAfter: home?.arriveBy,
+        });
+        const allSlots = [...filledSlots, ...extra].sort(
+          (a, b) => new Date(a.arriveAt).getTime() - new Date(b.arriveAt).getTime()
+        );
+
+        // 最終スケジュールの時刻から「並び順」と「何日目」を更新する
+        const slotById = new Map(allSlots.map((s) => [s.entryId, s]));
+        const reordered = orderEntriesBySchedule(list, allSlots).map((e) => {
           const slot = slotById.get(e.id);
           if (!slot) return e;
           // 日数の範囲内へクランプ（万一AIの日付がずれても「存在しない日」へ書き戻さない）
           const day = Math.min(Math.max(1, dayOfIso(tripStart, slot.arriveAt)), tripDayCount);
           return { ...e, day };
         });
-        // AIが時刻を付けた予定はその時刻をアンカーに採用。AIが「時間内に収まらない」と
-        // 判断して外した予定（低優先度）は旅程に入れず、旅程画面下部の
-        // 「旅程に入らなかった予定」に表示する。ただし宿泊・出発地・時刻固定は必ず残す。
-        const anchors = new Map(data.schedule.map((s) => [s.entryId, s.arriveAt]));
-        const mustKeep = (e: PlanEntry) => e.mode === "stay" || e.mode === "home" || Boolean(e.fixedTime);
-        const included = reordered.filter((e) => anchors.has(e.id) || mustKeep(e));
-        const filledSlots = sequentialSchedule(included, localReferenceDate(), anchors);
-        const droppedCount = reordered.length - included.length;
+        const droppedCount = leftovers.length - extra.length;
         setEntries(reordered);
-        setSlots(filledSlots);
+        setSlots(allSlots);
         // AIの順路を採用したので、この構造は「スケジュール済み」として記録し、ローカル再計算で上書きしない。
         scheduleSigRef.current = scheduleSignature(reordered);
         setSuggestions(data.suggestions);
