@@ -1,4 +1,4 @@
-import { sequentialSchedule, computePlanTotals, costCategoryOf } from "../plan";
+import { sequentialSchedule, computePlanTotals, costCategoryOf, fillIntoGaps } from "../plan";
 import { PlanEntry } from "../types";
 
 const REF = new Date("2026-07-25T09:00:00.000Z"); // 各日の起点（テストは差分で検証しTZ非依存）
@@ -91,6 +91,51 @@ describe("sequentialSchedule", () => {
     const entries = [entry({ id: "a" }), entry({ id: "b" }), entry({ id: "c" })];
     const slots = sequentialSchedule(entries, REF);
     expect(slots.map((s) => s.entryId).sort()).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("fillIntoGaps", () => {
+  const refLocal = (() => {
+    // ローカルタイムの「その日の9:00」を基準にする（sequentialSchedule と同じ前提）
+    const d = new Date(2026, 6, 25, 9, 0, 0, 0);
+    return d;
+  })();
+
+  it("places a dropped entry into a big free gap", () => {
+    // 9:00-10:00 と 15:00-16:00 の間（10:00-15:00）が空いている
+    const mk = (h: number) => new Date(2026, 6, 25, h, 0, 0, 0).toISOString();
+    const slots = [
+      { entryId: "a", arriveAt: mk(9), stayMin: 60 },
+      { entryId: "b", arriveAt: mk(15), stayMin: 60 },
+    ];
+    const extra = fillIntoGaps([entry({ id: "x", stayMin: 60 })], slots, refLocal, 1);
+    expect(extra).toHaveLength(1);
+    const t = new Date(extra[0].arriveAt).getTime();
+    expect(t).toBeGreaterThanOrEqual(new Date(mk(10)).getTime());
+    expect(t + 60 * 60000).toBeLessThanOrEqual(new Date(mk(15)).getTime());
+  });
+
+  it("leaves the entry unplaced when no gap fits", () => {
+    // 9:00-20:00 をほぼ占有
+    const slots = [{ entryId: "a", arriveAt: new Date(2026, 6, 25, 9, 0).toISOString(), stayMin: 11 * 60 }];
+    const extra = fillIntoGaps([entry({ id: "x", stayMin: 120 })], slots, refLocal, 1);
+    expect(extra).toHaveLength(0);
+  });
+
+  it("does not place after the return-home limit", () => {
+    const slots = [{ entryId: "a", arriveAt: new Date(2026, 6, 25, 9, 0).toISOString(), stayMin: 60 }];
+    const notAfter = new Date(2026, 6, 25, 12, 0).toISOString(); // 12:00 帰着
+    const extra = fillIntoGaps([entry({ id: "x", stayMin: 60 })], slots, refLocal, 1, { notAfter });
+    for (const s of extra) {
+      expect(new Date(s.arriveAt).getTime() + 60 * 60000).toBeLessThanOrEqual(new Date(notAfter).getTime());
+    }
+  });
+
+  it("uses day 2 when day 1 is full", () => {
+    const slots = [{ entryId: "a", arriveAt: new Date(2026, 6, 25, 9, 0).toISOString(), stayMin: 11 * 60 }];
+    const extra = fillIntoGaps([entry({ id: "x", stayMin: 120 })], slots, refLocal, 2);
+    expect(extra).toHaveLength(1);
+    expect(new Date(extra[0].arriveAt).getDate()).toBe(26);
   });
 });
 

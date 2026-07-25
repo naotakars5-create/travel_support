@@ -53,8 +53,8 @@ function NearbySpots({
     void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
   };
   return (
-    <View className="mt-7 w-full">
-      <Text className="mb-2 font-gothic-400 text-[10px] tracking-[.15em] text-day-text3">
+    <View className="mt-4 w-full">
+      <Text className="mb-1.5 font-gothic-400 text-[10px] tracking-[.15em] text-day-text3">
         {preferIndoor ? "近くの屋内スポット（雨のため）" : "近くの観光スポット"}
         {live ? "（現在地から）" : ""} · タップで地図
       </Text>
@@ -63,7 +63,7 @@ function NearbySpots({
           <Pressable
             key={s.name}
             onPress={() => openSpot(s)}
-            className={`flex-row items-start justify-between px-4 py-3 ${i > 0 ? "border-t border-day-text/10" : ""}`}
+            className={`flex-row items-start justify-between px-4 py-2 ${i > 0 ? "border-t border-day-text/10" : ""}`}
           >
             <View className="flex-1 pr-2">
               <Text className="font-mincho-400 text-[14px] text-day-text">{s.name}</Text>

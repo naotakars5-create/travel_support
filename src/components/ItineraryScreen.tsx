@@ -139,7 +139,7 @@ export function ItineraryScreen({
 
   return (
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
-      <View className="px-[26px] pb-3 pt-4">
+      <View className="px-[26px] pb-2 pt-3">
         <View className="flex-row items-baseline justify-between">
           <Text className="font-gothic-400 text-[11px] text-muted">{heading}</Text>
           <Text className="font-gothic-500 text-[11px] text-ink" style={TNUM}>現在 {formatJstTime(now)}</Text>
@@ -171,7 +171,7 @@ export function ItineraryScreen({
           <View key={`day-${g.day}-${gi}`}>
             {/* 日の見出し（複数日程では塗りのバンドで目立たせる） */}
             {dayGroups.length > 1 && (
-              <View className={`mb-3 flex-row items-baseline justify-between rounded-[10px] bg-ink px-4 py-2.5 ${gi > 0 ? "mt-5" : "mt-1"}`}>
+              <View className={`mb-2 flex-row items-baseline justify-between rounded-[10px] bg-ink px-4 py-2 ${gi > 0 ? "mt-3" : "mt-1"}`}>
                 <Text className="font-gothic-700 text-[14px] text-kinari">{g.day}日目</Text>
                 <Text className="font-gothic-400 text-[11px] text-kinari/80">{g.dateLabel}</Text>
               </View>
@@ -202,12 +202,12 @@ export function ItineraryScreen({
               if (item.type === "edge") {
                 const style = lineStyleFor(item);
                 return (
-                  <View key={`edge-${gi}-${i}`} className="min-h-[40px] flex-row">
+                  <View key={`edge-${gi}-${i}`} className="min-h-[28px] flex-row">
                     <View className="w-12" />
                     <View className="w-[26px]">
                       <LineFull style={style} />
                     </View>
-                    <View className="flex-1 justify-center pb-2 pl-1">
+                    <View className="flex-1 justify-center pb-1 pl-1">
                       {item.explicit ? (
                         // 出発地→最初のスポット等、移動手段が指定された区間は指定手段のみ表示
                         <Text className="font-gothic-500 text-[11px]" style={[{ color: style?.color }, TNUM]}>
@@ -236,12 +236,12 @@ export function ItineraryScreen({
               const isConflict = item.kind === "conflict";
               const isUnconfirmed = item.kind === "unconfirmed";
               return (
-                <View key={`gap-${gi}-${i}`} className="min-h-[56px] flex-row">
+                <View key={`gap-${gi}-${i}`} className="min-h-[38px] flex-row">
                   <View className="w-12" />
                   <View className="w-[26px]">
                     <LineFull style={style} />
                   </View>
-                  <View className="flex-1 justify-center py-2 pl-1">
+                  <View className="flex-1 justify-center py-1 pl-1">
                     {isConflict ? (
                       <View className="self-start rounded-[10px] border border-accent/60 bg-accent/[.06] px-3 py-1.5">
                         <Text className="font-gothic-500 text-[11px] text-accent">
@@ -266,8 +266,9 @@ export function ItineraryScreen({
                       <Pressable onPress={onNavigatePlan} className="self-start rounded-[10px] border border-ink px-3 py-1.5">
                         <Text className="font-gothic-400 text-[11px] text-ink">未確定 · 計画で行き先を追加</Text>
                       </Pressable>
-                    ) : item.durationMin >= 360 ? (
-                      <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
+                    ) : item.durationMin >= 360 && i === g.items.length - 1 && gi < dayGroups.length - 1 ? (
+                      // 実際に日をまたぐ（その日の最後×翌日がある）場合だけ「翌日まで」
+                      <View className="self-start rounded-[10px] border border-muted-light px-3 py-1">
                         <Text className="font-gothic-400 text-[11px] text-muted">翌日まで（宿泊）</Text>
                       </View>
                     ) : (
@@ -333,8 +334,8 @@ function NodeRow({
   const nodeInStyle = useNodeInStyle(justAdded);
   const markerBg = isCurrent ? "#c2492d" : isPast ? "#b7b0a3" : "#2a2622";
   return (
-    <Animated.View style={nodeInStyle} className="min-h-[64px] flex-row">
-      <View className="w-12 items-end pt-2 pr-2">
+    <Animated.View style={nodeInStyle} className="min-h-[50px] flex-row">
+      <View className="w-12 items-end pt-1.5 pr-2">
         <Text className={`font-mincho-600 text-[14px] ${isPast ? "text-muted-light" : "text-ink"}`} style={TNUM}>
           {formatJstTime(new Date(item.time))}
         </Text>
@@ -343,7 +344,7 @@ function NodeRow({
         <LineHalf style={prevStyle} side="top" />
         <LineHalf style={nextStyle} side="bottom" />
         {/* 番号マーカー（＝地点の目印。現在地は薄い赤＋脈動） */}
-        <View className="mt-1.5" style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
+        <View className="mt-1" style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
           {isCurrent && <PulseRing size={22} color="rgba(194,73,45,.45)" />}
           <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: markerBg, alignItems: "center", justifyContent: "center" }}>
             <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>
@@ -352,8 +353,8 @@ function NodeRow({
           </View>
         </View>
       </View>
-      <View className="flex-1 pb-4 pl-1 pt-1">
-        <View className={`rounded-[12px] border px-3 py-2.5 ${isCurrent ? "border-accent/50 bg-accent/[.06]" : "border-black/[.07] bg-white/60"}`}>
+      <View className="flex-1 pb-2 pl-1 pt-0.5">
+        <View className={`rounded-[12px] border px-3 py-2 ${isCurrent ? "border-accent/50 bg-accent/[.06]" : "border-black/[.07] bg-white/60"}`}>
           <View className="flex-row flex-wrap items-center gap-2">
             <Text className={`font-mincho-600 text-[15px] ${isPast ? "text-muted-light" : "text-ink"}`}>{item.event.title || item.place}</Text>
             {isCurrent && (

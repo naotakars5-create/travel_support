@@ -160,6 +160,86 @@ export function sequentialSchedule(
   return slots;
 }
 
+/** 常識的な行動時間帯の終わり（この時刻までに滞在が終わるよう空き埋めする）。 */
+const DAY_END_HOUR = 20;
+
+/**
+ * 旅程に入らなかった予定を、既存スケジュールの空き時間へ詰め込む（入る限り入れる）。
+ * - 各日の 9:00〜20:00 の窓で、既存予定の合間に「滞在＋移動バッファ」が収まる最初の隙間へ配置。
+ * - 営業時間の指定があればその時間内へ寄せる。出発前・帰着後には置かない。
+ * - どうしても入らないものだけが残る（＝「旅程に入らなかった予定」）。
+ */
+export function fillIntoGaps(
+  unplaced: PlanEntry[],
+  slots: ScheduleSlot[],
+  referenceDate: Date,
+  dayCount: number,
+  opts?: { notBefore?: string; notAfter?: string }
+): ScheduleSlot[] {
+  const bufferMs = TRAVEL_BUFFER_MIN * 60000;
+  const notBeforeMs = opts?.notBefore ? new Date(opts.notBefore).getTime() : -Infinity;
+  const notAfterMs = opts?.notAfter ? new Date(opts.notAfter).getTime() : Infinity;
+
+  type Iv = { start: number; end: number };
+  const ivs: Iv[] = slots
+    .map((s) => {
+      const start = new Date(s.arriveAt).getTime();
+      return { start, end: start + Math.max(0, s.stayMin) * 60000 };
+    })
+    .filter((iv) => !Number.isNaN(iv.start))
+    .sort((a, b) => a.start - b.start);
+
+  const added: ScheduleSlot[] = [];
+  // 重要度の高い順に詰める（must → want → optional）
+  const queue = [...unplaced].sort((a, b) => PRIORITY_META[a.priority].weight - PRIORITY_META[b.priority].weight);
+
+  for (const e of queue) {
+    const durMin = Math.max(15, entryDurationMin(e));
+    const durMs = durMin * 60000;
+    let placedAt: number | null = null;
+
+    for (let d = 1; d <= Math.max(1, dayCount) && placedAt === null; d++) {
+      const dayStart = new Date(referenceDate.getTime() + (d - 1) * 86400000);
+      dayStart.setHours(DAY_START_HOUR, 0, 0, 0);
+      const winStart = Math.max(dayStart.getTime(), notBeforeMs);
+      const dayEnd = new Date(referenceDate.getTime() + (d - 1) * 86400000);
+      dayEnd.setHours(DAY_END_HOUR, 0, 0, 0);
+      const winEnd = Math.min(dayEnd.getTime(), notAfterMs);
+      if (winEnd - winStart < durMs) continue;
+
+      let cursor = winStart;
+      const tryPlace = (gapEnd: number, needTrailingBuffer: boolean): boolean => {
+        let start = cursor === winStart ? cursor : cursor + bufferMs;
+        start = clampToOpenHours(start, e);
+        const limit = gapEnd - (needTrailingBuffer ? bufferMs : 0);
+        if (start + durMs <= limit && start >= winStart && start + durMs <= winEnd) {
+          placedAt = start;
+          return true;
+        }
+        return false;
+      };
+
+      for (const iv of ivs) {
+        if (iv.end <= cursor) continue;
+        if (iv.start >= winEnd) break;
+        if (tryPlace(Math.min(iv.start, winEnd), true)) break;
+        cursor = Math.max(cursor, iv.end);
+        if (cursor >= winEnd) break;
+      }
+      if (placedAt === null && cursor < winEnd) {
+        tryPlace(winEnd, false); // 最後の予定のあとの余り時間
+      }
+    }
+
+    if (placedAt !== null) {
+      added.push({ entryId: e.id, arriveAt: new Date(placedAt).toISOString(), stayMin: entryDurationMin(e) });
+      ivs.push({ start: placedAt, end: placedAt + durMs });
+      ivs.sort((a, b) => a.start - b.start);
+    }
+  }
+  return added;
+}
+
 /** entries を、与えたスケジュール（slot の arriveAt 昇順）に合わせて並べ替える。手動並び替えの土台に使う。 */
 export function orderEntriesBySchedule(entries: PlanEntry[], slots: ScheduleSlot[]): PlanEntry[] {
   const order = new Map<string, number>();
