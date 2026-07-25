@@ -1,15 +1,15 @@
 import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
-import { Priority, TransportMode } from "@/lib/types";
+import { GeoPoint, Priority, TransportMode } from "@/lib/types";
 import { PlanEntryInput } from "@/lib/plan";
 import { combineDateAndTime, dateForDay, timeStrFromIso } from "@/lib/date";
 import { fetchPlacePredictions, fetchPlaceDetails, PlacePrediction } from "@/lib/places";
 import { TimeField } from "./PlainFields";
 
+// 宿泊は「宿泊先」として別枠で固定入力するため、通常の追加からは除外。
 const MODE_OPTIONS: { value: TransportMode; label: string }[] = [
   { value: "activity", label: "観光" },
   { value: "dining", label: "食事" },
-  { value: "stay", label: "宿泊" },
   { value: "home", label: "自宅" },
   { value: "rail", label: "鉄道" },
   { value: "bus", label: "バス" },
@@ -56,6 +56,7 @@ function Chip({ active, label, onPress }: { active: boolean; label: string; onPr
 export interface PlanEntryFormInitial {
   title: string;
   place?: string;
+  placeGeo?: GeoPoint;
   mode: TransportMode;
   priority: Priority;
   stayMin?: number;
@@ -80,6 +81,7 @@ export function PlanEntryForm({
   tripDayCount,
   submitLabel = "行き先を追加",
   resetAfterSubmit = true,
+  lockMode = false,
 }: {
   onSubmit: (input: PlanEntryInput) => void;
   initial?: PlanEntryFormInitial;
@@ -89,6 +91,8 @@ export function PlanEntryForm({
   tripDayCount: number;
   submitLabel?: string;
   resetAfterSubmit?: boolean;
+  /** 種別の切替を隠して固定する（宿泊先の専用入力など） */
+  lockMode?: boolean;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [place, setPlace] = useState(initial?.place ?? "");
@@ -108,6 +112,7 @@ export function PlanEntryForm({
   // 営業時間は Place Details から自動取得する（手入力欄は廃止）。
   const [openFrom, setOpenFrom] = useState<string | undefined>(initial?.openFrom);
   const [openTo, setOpenTo] = useState<string | undefined>(initial?.openTo);
+  const [placeGeo, setPlaceGeo] = useState<GeoPoint | undefined>(initial?.placeGeo);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -138,6 +143,7 @@ export function PlanEntryForm({
       const details = await fetchPlaceDetails(p.placeId);
       if (details) {
         if (details.address) setPlace(details.address); // 番地まで含む完全な住所
+        if (details.geo) setPlaceGeo(details.geo); // Places由来の正確な座標
         setOpenFrom(details.openFrom);
         setOpenTo(details.openTo);
       }
@@ -147,7 +153,8 @@ export function PlanEntryForm({
 
   const onPlaceChange = (v: string) => {
     setPlace(v);
-    // 住所を手で変えたら、自動取得した営業時間はいったんクリア（別の場所になり得るため）。
+    // 住所を手で変えたら、自動取得した座標・営業時間はいったんクリア（別の場所になり得るため）。
+    setPlaceGeo(undefined);
     setOpenFrom(undefined);
     setOpenTo(undefined);
   };
@@ -166,6 +173,7 @@ export function PlanEntryForm({
     };
     if (home) {
       input.place = place || undefined;
+      input.placeGeo = placeGeo;
       input.priority = "must";
       input.day = 1;
       input.departAt = iso(1, departTime); // 初日に出発
@@ -179,6 +187,7 @@ export function PlanEntryForm({
       input.fixedTime = true;
     } else if (stay) {
       input.place = place || undefined;
+      input.placeGeo = placeGeo;
       input.arriveBy = iso(day, arriveTime); // チェックイン
       input.checkOut = iso(day + 1, checkOutTime); // 翌日チェックアウト
       input.fixedTime = true;
@@ -186,6 +195,7 @@ export function PlanEntryForm({
       input.openTo = openTo;
     } else {
       input.place = place || undefined;
+      input.placeGeo = placeGeo;
       input.stayMin = stayMin ?? undefined;
       input.arriveBy = iso(day, arriveTime);
       input.fixedTime = arriveTime ? fixedTime : false;
@@ -209,6 +219,7 @@ export function PlanEntryForm({
     setPredictions([]);
     setOpenFrom(undefined);
     setOpenTo(undefined);
+    setPlaceGeo(undefined);
   };
 
   return (
@@ -236,14 +247,16 @@ export function PlanEntryForm({
         )}
       </View>
 
-      <View className="gap-1.5">
-        <Text className="font-gothic-400 text-[10px] text-muted">種別</Text>
-        <View className="flex-row flex-wrap gap-2">
-          {MODE_OPTIONS.map((o) => (
-            <Chip key={o.value} active={o.value === mode} label={o.label} onPress={() => setMode(o.value)} />
-          ))}
+      {!lockMode && (
+        <View className="gap-1.5">
+          <Text className="font-gothic-400 text-[10px] text-muted">種別</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {MODE_OPTIONS.map((o) => (
+              <Chip key={o.value} active={o.value === mode} label={o.label} onPress={() => setMode(o.value)} />
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
       {tripDayCount > 1 && !home && (
         <View className="gap-1.5">

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GeoPoint, isTransitMode, PackingItem, ParseApiResponse, PlanApiResponse, PlanEntry, ScheduleSlot, SpotSuggestion } from "@/lib/types";
 import { buildSeedEntries } from "@/lib/seedEntries";
 import { loadState, saveState } from "@/lib/storage";
-import { loadTrips, saveTrips, SavedTrip } from "@/lib/trips";
+import { loadTrips, saveTrips, SavedTrip, MAX_TRIP_PHOTOS } from "@/lib/trips";
 import { buildRail, firstSeedGeo, lastSeedGeo, RailItem, sortedGroupEvents } from "@/lib/itinerary";
 import { getDayOfState, DayOfState } from "@/lib/dayof";
 import {
@@ -21,7 +21,7 @@ import { buildDefaultPacking } from "@/lib/packing";
 import { DEFAULT_PROFILE, loadProfile, Profile, saveProfile } from "@/lib/profile";
 import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM } from "@/lib/share";
 import { BaseMode, EdgeTravel, createPrecomputedEstimator, guessMode } from "@/lib/transit";
-import { todayDateStr } from "@/lib/date";
+import { dayOfIso, todayDateStr } from "@/lib/date";
 import { apiUrl } from "@/lib/apiBase";
 import { haversineMeters } from "@/lib/geo";
 import { useLiveLocation } from "./useLiveLocation";
@@ -331,8 +331,11 @@ export function useAppState() {
         ? prev.map((e) => {
             if (e.id !== id) return e;
             const next = { ...e, ...patch };
-            // 場所テキストが変わったら座標を無効化し、再ジオコーディングさせる
-            if (patch.place !== undefined || patch.title !== undefined) next.placeGeo = undefined;
+            // 場所テキストが変わったら座標を無効化し、再ジオコーディングさせる。
+            // ただし新しい正確な座標（placeGeo）が渡された場合はそれを優先。
+            if ((patch.place !== undefined || patch.title !== undefined) && patch.placeGeo === undefined) {
+              next.placeGeo = undefined;
+            }
             return next;
           })
         : prev
@@ -353,18 +356,19 @@ export function useAppState() {
       const idx = prev.findIndex((e) => e.id === id);
       if (idx < 0) return prev;
       const day = prev[idx].day ?? 1;
-      // 同じ日の隣（指定方向）を探して入れ替える
+      // 同じ日の隣（指定方向・宿泊は除外）を探して入れ替える
+      const sameDayReorderable = (e: PlanEntry) => (e.day ?? 1) === day && e.mode !== "stay";
       let swapIdx = -1;
       if (dir < 0) {
         for (let i = idx - 1; i >= 0; i--) {
-          if ((prev[i].day ?? 1) === day) {
+          if (sameDayReorderable(prev[i])) {
             swapIdx = i;
             break;
           }
         }
       } else {
         for (let i = idx + 1; i < prev.length; i++) {
-          if ((prev[i].day ?? 1) === day) {
+          if (sameDayReorderable(prev[i])) {
             swapIdx = i;
             break;
           }
@@ -447,15 +451,27 @@ export function useAppState() {
     setComposing(true);
     setComposeError(null);
     try {
+      const tripStart = tripDateRef.current;
       const res = await fetch(apiUrl("/api/plan"), {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ entries: list, referenceDate: new Date().toISOString() }),
+        body: JSON.stringify({
+          entries: list,
+          referenceDate: `${tripStart}T09:00:00+09:00`,
+          dayCount: tripDayCount,
+        }),
       });
       const data = (await res.json()) as PlanApiResponse;
       if (data.kind === "plan") {
-        // AIの順路を「並び順」に反映（以後の手動並び替えがAI結果から続けられる）
-        const reordered = orderEntriesBySchedule(list, data.schedule);
+        // AIの順路を「並び順」に反映し、割り当てられた日付から「何日目」を更新する
+        // （2日目・3日目にもちゃんと配分されるように）
+        const slotById = new Map(data.schedule.map((s) => [s.entryId, s]));
+        const reordered = orderEntriesBySchedule(list, data.schedule).map((e) => {
+          const slot = slotById.get(e.id);
+          if (!slot) return e;
+          const day = dayOfIso(tripStart, slot.arriveAt);
+          return day > 0 ? { ...e, day } : e;
+        });
         setEntries(reordered);
         setSlots(data.schedule);
         // AIの順路を採用したので、この構造は「スケジュール済み」として記録し、ローカル再計算で上書きしない。
@@ -474,7 +490,7 @@ export function useAppState() {
     } finally {
       setComposing(false);
     }
-  }, [entries]);
+  }, [entries, tripDayCount]);
 
   const togglePacking = useCallback((id: string) => {
     setPacking((prev) => prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p)));
@@ -561,6 +577,33 @@ export function useAppState() {
     });
   }, []);
 
+  /** しおりに思い出写真を追加する（最大30枚）。 */
+  const addTripPhotos = useCallback((id: string, photos: string[]) => {
+    setSavedTrips((prev) => {
+      const next = prev.map((t) => {
+        if (t.id !== id) return t;
+        const current = t.photos ?? [];
+        const merged = [...current, ...photos].slice(0, MAX_TRIP_PHOTOS);
+        return { ...t, photos: merged };
+      });
+      void saveTrips(next);
+      return next;
+    });
+  }, []);
+
+  /** しおりの思い出写真を1枚削除する。 */
+  const removeTripPhoto = useCallback((id: string, index: number) => {
+    setSavedTrips((prev) => {
+      const next = prev.map((t) => {
+        if (t.id !== id) return t;
+        const photos = (t.photos ?? []).filter((_, i) => i !== index);
+        return { ...t, photos };
+      });
+      void saveTrips(next);
+      return next;
+    });
+  }, []);
+
   /** 保存した旅を現在の旅程として読み込む（今の内容は上書きされる）。 */
   const loadTrip = useCallback((id: string) => {
     setSavedTrips((prev) => {
@@ -642,6 +685,8 @@ export function useAppState() {
     savedTrips,
     saveCurrentTrip,
     setTripCover,
+    addTripPhotos,
+    removeTripPhoto,
     loadTrip,
     deleteTrip,
     suggestions,

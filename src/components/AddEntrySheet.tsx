@@ -3,6 +3,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PlanEntryForm } from "./PlanEntryForm";
 import { PlanEntryInput } from "@/lib/plan";
+import { TransportMode } from "@/lib/types";
 import { SlideUp } from "./animations";
 
 type Mode = "manual" | "mail";
@@ -14,12 +15,17 @@ export function AddEntrySheet({
   onImportMail,
   tripDate,
   tripDayCount,
+  fixedMode,
+  title = "行き先を追加",
 }: {
   onClose: () => void;
   onAdd: (input: PlanEntryInput) => void;
   onImportMail: (body: string, source: string) => Promise<{ ok: boolean; message?: string }>;
   tripDate: string;
   tripDayCount: number;
+  /** 種別を固定する（宿泊先の専用入力など）。指定時はメール取込を隠す。 */
+  fixedMode?: TransportMode;
+  title?: string;
 }) {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>("manual");
@@ -53,22 +59,31 @@ export function AddEntrySheet({
               <Pressable onPress={onClose} hitSlop={8} className="rounded-full border border-black/[.15] px-3 py-1">
                 <Text className="font-gothic-400 text-[12px] text-muted">‹ 戻る</Text>
               </Pressable>
-              <Text className="font-mincho-600 text-[16px] text-ink">行き先を追加</Text>
+              <Text className="font-mincho-600 text-[16px] text-ink">{title}</Text>
               <View className="w-[52px]" />
             </View>
 
-            <View className="mb-5 flex-row gap-2">
-              <Pressable onPress={() => setMode("manual")} className={`flex-1 rounded-[10px] py-2 ${mode === "manual" ? "bg-ink" : "border border-black/[.1]"}`}>
-                <Text className={`text-center font-gothic-500 text-[11px] ${mode === "manual" ? "text-kinari" : "text-muted"}`}>行き先を入力</Text>
-              </Pressable>
-              <Pressable onPress={() => setMode("mail")} className={`flex-1 rounded-[10px] py-2 ${mode === "mail" ? "bg-ink" : "border border-black/[.1]"}`}>
-                <Text className={`text-center font-gothic-500 text-[11px] ${mode === "mail" ? "text-kinari" : "text-muted"}`}>メールから追加</Text>
-              </Pressable>
-            </View>
+            {!fixedMode && (
+              <View className="mb-5 flex-row gap-2">
+                <Pressable onPress={() => setMode("manual")} className={`flex-1 rounded-[10px] py-2 ${mode === "manual" ? "bg-ink" : "border border-black/[.1]"}`}>
+                  <Text className={`text-center font-gothic-500 text-[11px] ${mode === "manual" ? "text-kinari" : "text-muted"}`}>行き先を入力</Text>
+                </Pressable>
+                <Pressable onPress={() => setMode("mail")} className={`flex-1 rounded-[10px] py-2 ${mode === "mail" ? "bg-ink" : "border border-black/[.1]"}`}>
+                  <Text className={`text-center font-gothic-500 text-[11px] ${mode === "mail" ? "text-kinari" : "text-muted"}`}>メールから追加</Text>
+                </Pressable>
+              </View>
+            )}
 
             <ScrollView keyboardShouldPersistTaps="handled">
-              {mode === "manual" ? (
-                <PlanEntryForm onSubmit={onAdd} tripDate={tripDate} tripDayCount={tripDayCount} />
+              {mode === "manual" || fixedMode ? (
+                <PlanEntryForm
+                  onSubmit={onAdd}
+                  tripDate={tripDate}
+                  tripDayCount={tripDayCount}
+                  initial={fixedMode ? { title: "", mode: fixedMode, priority: "must" } : undefined}
+                  lockMode={Boolean(fixedMode)}
+                  submitLabel={fixedMode === "stay" ? "宿泊先を追加" : "行き先を追加"}
+                />
               ) : (
                 <View className="gap-3">
                   <Text className="-mt-2 font-gothic-400 text-[11px] leading-[18px] text-muted">

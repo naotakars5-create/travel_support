@@ -1,4 +1,4 @@
-import { isTransitMode, ParsedEvent, ParsedField, PlanEntry, Priority, ScheduleSlot, SpotSuggestion, TransportMode } from "./types";
+import { GeoPoint, isTransitMode, ParsedEvent, ParsedField, PlanEntry, Priority, ScheduleSlot, SpotSuggestion, TransportMode } from "./types";
 
 export const PRIORITY_META: Record<Priority, { label: string; short: string; weight: number }> = {
   must: { label: "必ず行く", short: "必須", weight: 0 },
@@ -227,6 +227,13 @@ export function sequentialSchedule(entries: PlanEntry[], referenceDate: Date): S
     dayStart.setHours(DAY_START_HOUR, 0, 0, 0);
     let cursor = dayStart.getTime();
     for (const e of byDay.get(day)!) {
+      // 宿泊は「固定の泊まる場所」。指定のチェックイン時刻に置き、他の予定のカーソルは動かさない。
+      if (e.mode === "stay") {
+        const anchor = entryAnchorTime(e);
+        const ms = anchor ? new Date(anchor).getTime() : cursor;
+        slots.push({ entryId: e.id, arriveAt: new Date(Number.isNaN(ms) ? cursor : ms).toISOString(), stayMin: entryDurationMin(e) });
+        continue;
+      }
       const anchor = e.fixedTime ? entryAnchorTime(e) : null;
       let start: number;
       if (anchor) {
@@ -394,6 +401,8 @@ export function eventToPlanEntry(event: ParsedEvent): PlanEntry {
 export interface PlanEntryInput {
   title: string;
   place?: string;
+  /** 候補選択で得た正確な座標（あればジオコーディングをスキップして精度UP） */
+  placeGeo?: GeoPoint;
   mode: TransportMode;
   priority: Priority;
   stayMin?: number;
@@ -421,6 +430,7 @@ export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | nul
     id,
     title: input.title.trim(),
     place: input.place?.trim() || undefined,
+    placeGeo: input.placeGeo,
     mode: input.mode,
     priority: input.priority,
     stayMin: typeof input.stayMin === "number" && input.stayMin > 0 ? input.stayMin : undefined,

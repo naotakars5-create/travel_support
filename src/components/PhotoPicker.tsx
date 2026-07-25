@@ -10,10 +10,14 @@ let pickerSeq = 0;
  */
 export function PhotoPicker({
   onPicked,
+  onPickedMany,
+  multiple = false,
   maxSize = 512,
   label = "写真を選ぶ",
 }: {
-  onPicked: (dataUrl: string) => void;
+  onPicked?: (dataUrl: string) => void;
+  onPickedMany?: (dataUrls: string[]) => void;
+  multiple?: boolean;
   maxSize?: number;
   label?: string;
 }) {
@@ -25,20 +29,27 @@ export function PhotoPicker({
   const input = createElement("input", {
     type: "file",
     accept: "image/*",
+    multiple,
     style: { display: "none" },
     id: inputId,
-    onChange: (e: { target: { files?: FileList | null; value: string } }) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        if (typeof reader.result === "string") {
-          const out = await downscaleImage(reader.result, maxSize, 0.8);
-          onPicked(out);
-        }
-      };
-      reader.readAsDataURL(file);
+    onChange: async (e: { target: { files?: FileList | null; value: string } }) => {
+      const files = e.target.files ? Array.from(e.target.files) : [];
       e.target.value = ""; // 同じ写真を選び直せるようにリセット
+      if (files.length === 0) return;
+      const readOne = (file: File): Promise<string | null> =>
+        new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = async () => {
+            if (typeof reader.result === "string") resolve(await downscaleImage(reader.result, maxSize, 0.8));
+            else resolve(null);
+          };
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+      const results = (await Promise.all(files.map(readOne))).filter((x): x is string => Boolean(x));
+      if (results.length === 0) return;
+      if (onPickedMany) onPickedMany(results);
+      else if (onPicked) onPicked(results[0]);
     },
   });
   const openPicker = () => {

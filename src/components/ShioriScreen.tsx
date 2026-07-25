@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { ImageBackground, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Image, ImageBackground, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { SavedTrip } from "@/lib/trips";
+import { SavedTrip, MAX_TRIP_PHOTOS } from "@/lib/trips";
 import { PlanEntry } from "@/lib/types";
 import { dateForDay, formatJstTime } from "@/lib/date";
 import { MODE_LABEL } from "@/lib/modeMeta";
@@ -68,6 +68,8 @@ export function ShioriScreen({
   onOpen,
   onDelete,
   onSetCover,
+  onAddPhotos,
+  onRemovePhoto,
 }: {
   trips: SavedTrip[];
   canCreate: boolean;
@@ -75,6 +77,8 @@ export function ShioriScreen({
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
   onSetCover: (id: string, coverPhoto?: string) => void;
+  onAddPhotos: (id: string, photos: string[]) => void;
+  onRemovePhoto: (id: string, index: number) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [createOpen, setCreateOpen] = useState(false);
@@ -141,6 +145,8 @@ export function ShioriScreen({
             setDetailId(null);
           }}
           onSetCover={(photo) => onSetCover(detail.id, photo)}
+          onAddPhotos={(photos) => onAddPhotos(detail.id, photos)}
+          onRemovePhoto={(index) => onRemovePhoto(detail.id, index)}
         />
       )}
     </View>
@@ -233,22 +239,27 @@ function CreateShioriSheet({
   );
 }
 
-/** しおりの中身（表紙＋期間＋日別の行き先）。 */
+/** しおりの中身（表紙＋期間＋日別の行き先＋思い出写真）。 */
 function ShioriDetail({
   trip,
   onClose,
   onOpen,
   onDelete,
   onSetCover,
+  onAddPhotos,
+  onRemovePhoto,
 }: {
   trip: SavedTrip;
   onClose: () => void;
   onOpen: () => void;
   onDelete: () => void;
   onSetCover: (photo?: string) => void;
+  onAddPhotos: (photos: string[]) => void;
+  onRemovePhoto: (index: number) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const photos = trip.photos ?? [];
 
   // 日別に行き先をまとめる
   const byDay = useMemo(() => {
@@ -271,6 +282,14 @@ function ShioriDetail({
           <View className="max-h-[90%] rounded-t-sheet bg-sheet" style={{ paddingBottom: insets.bottom + 20 }}>
             {/* 表紙 */}
             <View className="h-44 overflow-hidden rounded-t-sheet">
+              {/* 戻るボタン */}
+              <Pressable
+                onPress={onClose}
+                hitSlop={8}
+                className="absolute left-3 top-3 z-10 flex-row items-center rounded-full bg-black/45 px-3 py-1.5"
+              >
+                <Text className="font-gothic-500 text-[12px] text-white">‹ 戻る</Text>
+              </Pressable>
               {trip.coverPhoto ? (
                 <ImageBackground source={{ uri: trip.coverPhoto }} resizeMode="cover" style={{ flex: 1, justifyContent: "flex-end" }}>
                   <View className="bg-black/30 p-4">
@@ -313,6 +332,38 @@ function ShioriDetail({
               {trip.entries.length === 0 && (
                 <Text className="py-6 text-center font-gothic-400 text-[12px] text-muted">行き先がありません。</Text>
               )}
+
+              {/* 思い出写真（最大30枚） */}
+              <View className="mt-2 border-t border-black/[.08] pt-3">
+                <View className="flex-row items-center justify-between">
+                  <Text className="font-gothic-500 text-[11px] text-ink">
+                    旅の思い出 <Text className="font-gothic-400 text-[10px] text-muted">{photos.length}/{MAX_TRIP_PHOTOS}</Text>
+                  </Text>
+                  {photos.length < MAX_TRIP_PHOTOS && (
+                    <PhotoPicker onPickedMany={onAddPhotos} multiple maxSize={1000} label="＋ 写真を追加" />
+                  )}
+                </View>
+                {photos.length === 0 ? (
+                  <Text className="mt-2 font-gothic-400 text-[10px] text-muted-light">
+                    旅の写真を追加して、思い出のしおりにできます（最大{MAX_TRIP_PHOTOS}枚）。
+                  </Text>
+                ) : (
+                  <View className="mt-2 flex-row flex-wrap gap-2">
+                    {photos.map((p, i) => (
+                      <View key={`${i}-${p.slice(0, 16)}`} className="overflow-hidden rounded-[10px]">
+                        <Image source={{ uri: p }} style={{ width: 88, height: 88 }} resizeMode="cover" />
+                        <Pressable
+                          onPress={() => onRemovePhoto(i)}
+                          hitSlop={6}
+                          className="absolute right-1 top-1 h-5 w-5 items-center justify-center rounded-full bg-black/55"
+                        >
+                          <Text className="text-[12px] text-white">×</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
             </ScrollView>
 
             {/* 操作 */}
