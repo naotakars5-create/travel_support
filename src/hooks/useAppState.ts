@@ -60,7 +60,7 @@ export function useAppState() {
   // 共有リンクで開かれた「閲覧のみ」状態か
   const [readOnly, setReadOnly] = useState(false);
   // 旅行日（YYYY-MM-DD）と基本の移動手段
-  const [tripDate, setTripDate] = useState<string>(() => todayDateStr());
+  const [tripDate, setTripDateState] = useState<string>(() => todayDateStr());
   const [tripDayCount, setTripDayCountState] = useState<number>(1);
   const [baseMode, setBaseMode] = useState<BaseMode>("car");
   const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
@@ -110,7 +110,7 @@ export function useAppState() {
         setSlots(persisted.slots);
         setPacking(persisted.packing);
         setCurrentNodeKey(persisted.currentNodeKey);
-        if (persisted.tripDate) setTripDate(persisted.tripDate);
+        if (persisted.tripDate) setTripDateState(persisted.tripDate);
         if (persisted.tripDayCount) setTripDayCountState(persisted.tripDayCount);
         if (persisted.baseMode) setBaseMode(persisted.baseMode);
         scheduleSigRef.current = scheduleSignature(ordered);
@@ -148,7 +148,12 @@ export function useAppState() {
   }, [entries]);
 
   // 旅程イベントは entries + slots から都度導出する（座標も entry から引き継ぐ）。
-  const events = useMemo(() => buildEventsFromSchedule(entries ?? [], slots), [entries, slots]);
+  const events = useMemo(() => {
+    // 出発地の日付を旅程（初日/最終日）へ合わせるための基準。state から直接作る。
+    const parsed = new Date(`${tripDate}T09:00:00`);
+    const reference = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    return buildEventsFromSchedule(entries ?? [], slots, { reference, dayCount: tripDayCount });
+  }, [entries, slots, tripDate, tripDayCount]);
 
   // AIが「時間内に収まらない」と外した予定（スロットが無い行き先）。旅程画面の下部に表示する。
   const unplacedEntries = useMemo(() => {
@@ -666,6 +671,36 @@ export function useAppState() {
   }, []);
 
   /**
+   * 旅行の開始日を変更する。
+   * 予定は絶対時刻（ISO）で保持しているため、開始日だけ変えると
+   * 出発地・宿泊・時刻固定の予定が「古い日付」に取り残される。
+   * ここで差分の日数ぶん全予定をまとめてスライドさせ、日付を必ず追従させる。
+   */
+  const setTripDate = useCallback((next: string) => {
+    const prevDate = tripDateRef.current;
+    setTripDateState(next);
+    const a = new Date(`${prevDate}T00:00`);
+    const b = new Date(`${next}T00:00`);
+    if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return;
+    const deltaDays = Math.round((b.getTime() - a.getTime()) / 86400000);
+    if (deltaDays === 0) return;
+    setEntries((prev) => {
+      if (!prev) return prev;
+      const shift = (iso?: string) => {
+        if (!iso) return iso;
+        const t = new Date(iso).getTime();
+        return Number.isNaN(t) ? iso : new Date(t + deltaDays * 86400000).toISOString();
+      };
+      return prev.map((e) => ({
+        ...e,
+        arriveBy: shift(e.arriveBy),
+        departAt: shift(e.departAt),
+        checkOut: shift(e.checkOut),
+      }));
+    });
+  }, []);
+
+  /**
    * 旅行日数を変更する。減らした場合、消えた日（day > n）の予定は最終日へ寄せ、
    * 自宅の帰宅時刻は常に最終日へ合わせる（「幽霊予定」が残らないように）。
    */
@@ -774,7 +809,7 @@ export function useAppState() {
       setSlots(trip.slots);
       setPacking(trip.packing);
       setCurrentNodeKey(null);
-      setTripDate(trip.tripDate);
+      setTripDateState(trip.tripDate);
       setTripDayCountState(trip.tripDayCount);
       setBaseMode(trip.baseMode);
       setSuggestions([]);
