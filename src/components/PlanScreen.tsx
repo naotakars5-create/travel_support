@@ -28,6 +28,7 @@ export function PlanScreen({
   totals,
   scheduleByEntry,
   suggestions,
+  areaSuggestions,
   planNotes,
   composing,
   composeError,
@@ -39,7 +40,6 @@ export function PlanScreen({
   baseMode,
   onSetBaseMode,
   profile,
-  onOpenProfile,
   onOpenAdd,
   onOpenAddLodging,
   onCompose,
@@ -56,6 +56,7 @@ export function PlanScreen({
   totals: PlanTotals;
   scheduleByEntry: Map<string, string>;
   suggestions: SpotSuggestion[];
+  areaSuggestions: SpotSuggestion[];
   planNotes: string | null;
   composing: boolean;
   composeError: string | null;
@@ -67,7 +68,6 @@ export function PlanScreen({
   baseMode: BaseMode;
   onSetBaseMode: (m: BaseMode) => void;
   profile: Profile;
-  onOpenProfile: () => void;
   onOpenAdd: () => void;
   onOpenAddLodging: () => void;
   onCompose: () => void;
@@ -84,6 +84,14 @@ export function PlanScreen({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const togglePick = (title: string) =>
     setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  const [pickedArea, setPickedArea] = useState<Set<string>>(new Set());
+  const togglePickArea = (title: string) =>
+    setPickedArea((prev) => {
       const next = new Set(prev);
       if (next.has(title)) next.delete(title);
       else next.add(title);
@@ -132,18 +140,11 @@ export function PlanScreen({
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
       <View className="px-[26px] pb-3 pt-4">
         <View className="flex-row items-start justify-between">
-          <View className="flex-1 flex-row items-center gap-3">
-            {!readOnly && (
-              <Pressable onPress={onOpenProfile} className="h-10 w-10 items-center justify-center rounded-full bg-white/70 border border-black/[.08]">
-                <Text className="text-[22px]">{profile.avatar}</Text>
-              </Pressable>
-            )}
-            <View>
-              <Text className="font-gothic-400 text-[10px] tracking-[.2em] text-muted">
-                {profile.name ? profile.name : "TABI-NAVI"}
-              </Text>
-              <Text className="mt-1 font-mincho-600 text-[26px] text-ink">{readOnly ? "共有された旅程" : "行き先リスト"}</Text>
-            </View>
+          <View className="flex-1">
+            <Text className="font-gothic-400 text-[10px] tracking-[.2em] text-muted">
+              {profile.name ? profile.name : "TABI-NAVI"}
+            </Text>
+            <Text className="mt-1 font-mincho-600 text-[26px] text-ink">{readOnly ? "共有された旅程" : "行き先リスト"}</Text>
           </View>
           {!readOnly && (
             <View className="mt-1 flex-row items-center gap-2">
@@ -452,6 +453,63 @@ export function PlanScreen({
                 <Text className="mt-1 font-mincho-400 text-[13px] leading-[20px] text-ink">{planNotes}</Text>
               </View>
             )}
+          </View>
+        )}
+
+        {/* この辺のおすすめ（宿泊先などの周辺スポット・最初から表示） */}
+        {!readOnly && areaSuggestions.length > 0 && (
+          <View className="mt-7">
+            <View className="mb-2 flex-row items-center justify-between">
+              <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ · 選んで追加</Text>
+              <Pressable
+                onPress={() =>
+                  setPickedArea((prev) =>
+                    prev.size === areaSuggestions.length ? new Set() : new Set(areaSuggestions.map((s) => s.title))
+                  )
+                }
+                hitSlop={6}
+                className="rounded-full border border-ink/25 px-2.5 py-1"
+              >
+                <Text className="font-gothic-400 text-[10px] text-ink">
+                  {pickedArea.size === areaSuggestions.length ? "選択を解除" : "すべて選択"}
+                </Text>
+              </Pressable>
+            </View>
+            <Text className="mb-2 font-gothic-400 text-[10px] text-muted-light">登録した宿泊先・行き先の周辺から提案しています。</Text>
+            <View className="rounded-[16px] border border-ink/10">
+              {areaSuggestions.map((s, i) => {
+                const on = pickedArea.has(s.title);
+                return (
+                  <Pressable
+                    key={s.title}
+                    onPress={() => togglePickArea(s.title)}
+                    className={`flex-row items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-ink/10" : ""}`}
+                  >
+                    <View className={`h-[20px] w-[20px] items-center justify-center rounded-[6px] border ${on ? "border-ink bg-ink" : "border-black/[.25]"}`}>
+                      {on && <View className="h-[8px] w-[8px] rounded-[2px] bg-kinari" />}
+                    </View>
+                    <View className="flex-1">
+                      <Text className="font-mincho-400 text-[14px] text-ink">{s.title}</Text>
+                      {(s.area || s.note) && (
+                        <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{[s.area, s.note].filter(Boolean).join(" · ")}</Text>
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable
+              disabled={pickedArea.size === 0}
+              onPress={() => {
+                onAddSuggestions(areaSuggestions.filter((s) => pickedArea.has(s.title)));
+                setPickedArea(new Set());
+              }}
+              className={`mt-2 rounded-[12px] py-3 ${pickedArea.size > 0 ? "bg-ink" : "bg-ink/30"}`}
+            >
+              <Text className="text-center font-gothic-500 text-[12px] text-kinari">
+                {pickedArea.size > 0 ? `選択した${pickedArea.size}件を追加` : "追加したいものを選択"}
+              </Text>
+            </Pressable>
           </View>
         )}
 

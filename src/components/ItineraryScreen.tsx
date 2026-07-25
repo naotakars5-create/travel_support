@@ -5,9 +5,8 @@ import { RailItem, computeStats, formatDurationMin, railNodes } from "@/lib/itin
 import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
 import { dayOfIso, formatJstHeadingJa, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { GeoPoint } from "@/lib/types";
-import { RailNodeDot } from "./icons";
 import { RouteMap } from "./RouteMap";
-import { useNodeInStyle } from "./animations";
+import { Blinker, PulseRing, useNodeInStyle } from "./animations";
 
 const MUTED_LIGHT = "#b7b0a3";
 const INK = "#2a2622";
@@ -248,48 +247,58 @@ function NodeRow({
   justAdded: boolean;
 }) {
   const nodeInStyle = useNodeInStyle(justAdded);
+  const markerBg = isCurrent ? "#c2492d" : isPast ? "#b7b0a3" : "#2a2622";
   return (
     <Animated.View style={nodeInStyle} className="min-h-[64px] flex-row">
-      <View className="w-12 items-end pt-1 pr-2">
-        <Text className={`font-mincho-600 text-[15px] ${isPast ? "text-muted-light" : "text-ink"}`} style={TNUM}>
+      <View className="w-12 items-end pt-2 pr-2">
+        <Text className={`font-mincho-600 text-[14px] ${isPast ? "text-muted-light" : "text-ink"}`} style={TNUM}>
           {formatJstTime(new Date(item.time))}
         </Text>
       </View>
-      <View className="w-[26px] items-center justify-center">
+      <View className="w-[26px] items-center">
         <LineHalf style={prevStyle} side="top" />
         <LineHalf style={nextStyle} side="bottom" />
-        <RailNodeDot current={isCurrent} />
+        {/* 番号マーカー（＝地点の目印。現在地は薄い赤＋脈動） */}
+        <View className="mt-1.5" style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
+          {isCurrent && <PulseRing size={22} color="rgba(194,73,45,.45)" />}
+          <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: markerBg, alignItems: "center", justifyContent: "center" }}>
+            <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>
+              {stopNumber ?? ""}
+            </Text>
+          </View>
+        </View>
       </View>
-      <View className="flex-1 pb-4 pl-1">
-        <View className="flex-row flex-wrap items-center gap-2">
-          {stopNumber !== undefined && (
-            <View className={`h-[18px] w-[18px] items-center justify-center rounded-full ${isPast ? "bg-muted-light" : "bg-ink"}`}>
-              <Text className="font-gothic-500 text-[10px] text-kinari" style={TNUM}>
-                {stopNumber}
-              </Text>
-            </View>
+      <View className="flex-1 pb-4 pl-1 pt-1">
+        <View className={`rounded-[12px] border px-3 py-2.5 ${isCurrent ? "border-accent/50 bg-accent/[.06]" : "border-black/[.07] bg-white/60"}`}>
+          <View className="flex-row flex-wrap items-center gap-2">
+            <Text className={`font-mincho-600 text-[15px] ${isPast ? "text-muted-light" : "text-ink"}`}>{item.event.title || item.place}</Text>
+            {isCurrent && (
+              <Blinker>
+                <View className="rounded-full bg-accent/15 px-2 py-[2px]">
+                  <Text className="font-gothic-500 text-[9px] text-accent">● 現在地</Text>
+                </View>
+              </Blinker>
+            )}
+            {item.confidence < 0.5 && (
+              <View className="rounded-full border border-mode-bus px-2 py-[1px]">
+                <Text className="font-gothic-400 text-[9px] text-mode-bus">要確認</Text>
+              </View>
+            )}
+          </View>
+          {item.place && item.place !== item.event.title && (
+            <Text className="mt-1 font-gothic-400 text-[10px] text-muted-light">{item.place}</Text>
           )}
-          <Text className={`font-mincho-600 text-[15px] ${isPast ? "text-muted-light" : "text-ink"}`}>{item.event.title || item.place}</Text>
-          {isCurrent && (
-            <View className="rounded-full border border-ink px-2 py-[1px]">
-              <Text className="font-gothic-400 text-[9px] text-ink">現在地</Text>
-            </View>
-          )}
-          {item.confidence < 0.5 && (
-            <View className="rounded-full border border-mode-bus px-2 py-[1px]">
-              <Text className="font-gothic-400 text-[9px] text-mode-bus">要確認</Text>
+          {(item.stayMin || item.sub) && (
+            <View className="mt-1 flex-row flex-wrap items-center gap-x-2 gap-y-0.5">
+              {item.stayMin ? (
+                <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                  滞在 {formatDurationMin(item.stayMin)}
+                </Text>
+              ) : null}
+              {item.sub && <Text className="font-gothic-400 text-[11px] text-muted">{item.sub}</Text>}
             </View>
           )}
         </View>
-        {item.place && item.place !== item.event.title && (
-          <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted-light">{item.place}</Text>
-        )}
-        {item.stayMin ? (
-          <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
-            滞在 {formatDurationMin(item.stayMin)}
-          </Text>
-        ) : null}
-        {item.sub && <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted">{item.sub}</Text>}
       </View>
     </Animated.View>
   );

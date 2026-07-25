@@ -37,6 +37,7 @@ export default function Home() {
           totals={app.totals}
           scheduleByEntry={app.scheduleByEntry}
           suggestions={app.suggestions}
+          areaSuggestions={app.areaSuggestions}
           planNotes={app.planNotes}
           composing={app.composing}
           composeError={app.composeError}
@@ -48,7 +49,6 @@ export default function Home() {
           baseMode={app.baseMode}
           onSetBaseMode={app.setBaseMode}
           profile={app.profile}
-          onOpenProfile={() => setProfileOpen(true)}
           onOpenAdd={() => setAddOpen(true)}
           onOpenAddLodging={() => setAddLodgingOpen(true)}
           onCompose={app.composeWithAi}
