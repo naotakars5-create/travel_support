@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextStyle, View } from 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PlanEntry, Priority, SpotSuggestion } from "@/lib/types";
 import { PlanTotals, PRIORITY_META, effectiveStayMin } from "@/lib/plan";
+import { Profile } from "@/lib/profile";
 import { BaseMode } from "@/lib/transit";
 import { MODE_LABEL } from "@/lib/modeMeta";
 import { formatDurationMin } from "@/lib/itinerary";
@@ -30,6 +31,8 @@ export function PlanScreen({
   onSetTripDate,
   baseMode,
   onSetBaseMode,
+  profile,
+  onOpenProfile,
   onOpenAdd,
   onCompose,
   onRemoveEntry,
@@ -51,6 +54,8 @@ export function PlanScreen({
   onSetTripDate: (v: string) => void;
   baseMode: BaseMode;
   onSetBaseMode: (m: BaseMode) => void;
+  profile: Profile;
+  onOpenProfile: () => void;
   onOpenAdd: () => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
@@ -75,9 +80,18 @@ export function PlanScreen({
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
       <View className="px-[26px] pb-3 pt-4">
         <View className="flex-row items-start justify-between">
-          <View>
-            <Text className="font-gothic-400 text-[10px] tracking-[.2em] text-muted">TABI-NAVI</Text>
-            <Text className="mt-1 font-mincho-600 text-[26px] text-ink">{readOnly ? "共有された旅程" : "行き先リスト"}</Text>
+          <View className="flex-1 flex-row items-center gap-3">
+            {!readOnly && (
+              <Pressable onPress={onOpenProfile} className="h-10 w-10 items-center justify-center rounded-full bg-white/70 border border-black/[.08]">
+                <Text className="text-[22px]">{profile.avatar}</Text>
+              </Pressable>
+            )}
+            <View>
+              <Text className="font-gothic-400 text-[10px] tracking-[.2em] text-muted">
+                {profile.name ? profile.name : "TABI-NAVI"}
+              </Text>
+              <Text className="mt-1 font-mincho-600 text-[26px] text-ink">{readOnly ? "共有された旅程" : "行き先リスト"}</Text>
+            </View>
           </View>
           {!readOnly && (
             <View className="mt-1 flex-row items-center gap-2">

@@ -16,6 +16,7 @@ import {
   suggestionToEntry,
 } from "@/lib/plan";
 import { buildDefaultPacking } from "@/lib/packing";
+import { DEFAULT_PROFILE, loadProfile, Profile, saveProfile } from "@/lib/profile";
 import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM } from "@/lib/share";
 import { BaseMode, EdgeTravel, createPrecomputedEstimator, guessMode } from "@/lib/transit";
 import { todayDateStr } from "@/lib/date";
@@ -57,6 +58,7 @@ export function useAppState() {
   // 旅行日（YYYY-MM-DD）と基本の移動手段
   const [tripDate, setTripDate] = useState<string>(() => todayDateStr());
   const [baseMode, setBaseMode] = useState<BaseMode>("car");
+  const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
 
   const initializedRef = useRef(false);
   // 「構造」が既にスケジュール済みかを追跡し、座標だけ埋まった時の不要な再ローカル化を防ぐ。
@@ -67,6 +69,10 @@ export function useAppState() {
     if (initializedRef.current) return;
     initializedRef.current = true;
     void (async () => {
+      // プロフィール（名前・アイコン）は共有/通常どちらでも自分のものを読み込む
+      const savedProfile = await loadProfile();
+      if (savedProfile) setProfileState(savedProfile);
+
       // 共有リンクで開かれた場合は、URLのプランを「閲覧のみ」で読み込む（保存済みは上書きしない）
       const shared = readSharedPlanFromUrl();
       if (shared) {
@@ -405,6 +411,11 @@ export function useAppState() {
     setTimeout(() => setFlash({ visible: false, text: "" }), 1900);
   }, [entries]);
 
+  const setProfile = useCallback((p: Profile) => {
+    setProfileState(p);
+    void saveProfile(p);
+  }, []);
+
   const recordArrival = useCallback((nodeKey: string, place: string) => {
     setCurrentNodeKey(nodeKey);
     setFlash({ visible: true, text: `${place} に到着\n到着を記録しました` });
@@ -447,6 +458,8 @@ export function useAppState() {
     setTripDate,
     baseMode,
     setBaseMode,
+    profile,
+    setProfile,
     suggestions,
     planNotes,
     composing,
