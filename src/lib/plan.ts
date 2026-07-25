@@ -251,8 +251,17 @@ export function orderEntriesBySchedule(entries: PlanEntry[], slots: ScheduleSlot
   });
 }
 
+/** ISO時刻の「時刻」はそのままに、日付だけを基準日から days 日後へ合わせる。 */
+function alignToDay(iso: string, reference: Date, days: number): string {
+  const src = new Date(iso);
+  if (Number.isNaN(src.getTime())) return iso;
+  const d = new Date(reference.getTime() + Math.max(0, days) * 86400000);
+  d.setHours(src.getHours(), src.getMinutes(), 0, 0);
+  return d.toISOString();
+}
+
 /** 1件の PlanEntry を、種別に応じた ParsedEvent（複数になる場合あり）へ変換する。 */
-function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
+function entryToEvents(entry: PlanEntry, slot: ScheduleSlot, ctx?: { reference: Date; dayCount: number }): ParsedEvent[] {
   const base = {
     id: `evt-${entry.id}`,
     mode: entry.mode,
@@ -264,11 +273,15 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
     confidence: 1,
   };
 
-  // 自宅 → 「出発」と「帰宅」の2つの地点イベント（別々の日時になりうる）
+  // 出発地 → 「出発（初日）」と「帰着（最終日）」の2つの地点イベント。
+  // 開始日を変更した場合などに古い日付へ取り残されないよう、
+  // 時刻はそのままに日付だけを旅行日程（初日/最終日）へ必ず合わせる。
   if (entry.mode === "home") {
     const placeText = entryPlaceText(entry);
     const events: ParsedEvent[] = [];
-    const departMs = new Date(entry.departAt ?? slot.arriveAt).getTime();
+    const departIso = ctx && entry.departAt ? alignToDay(entry.departAt, ctx.reference, 0) : entry.departAt;
+    const returnIso = ctx && entry.arriveBy ? alignToDay(entry.arriveBy, ctx.reference, ctx.dayCount - 1) : entry.arriveBy;
+    const departMs = new Date(departIso ?? slot.arriveAt).getTime();
     if (!Number.isNaN(departMs)) {
       events.push({
         ...base,
@@ -280,7 +293,7 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
         travelMode: entry.travelMode,
       });
     }
-    const returnMs = entry.arriveBy ? new Date(entry.arriveBy).getTime() : NaN;
+    const returnMs = returnIso ? new Date(returnIso).getTime() : NaN;
     if (!Number.isNaN(returnMs)) {
       events.push({
         ...base,
@@ -381,13 +394,18 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
  * スケジュール（ローカル or AI 由来）と行き先リストから、路線図パイプライン（buildRail）が
  * 受け取る ParsedEvent 列を生成する。種別ごとに地点/区間/宿泊のイベントへ変換する。
  */
-export function buildEventsFromSchedule(entries: PlanEntry[], slots: ScheduleSlot[]): ParsedEvent[] {
+export function buildEventsFromSchedule(
+  entries: PlanEntry[],
+  slots: ScheduleSlot[],
+  /** 旅行の初日（朝）と日数。出発地の日付を旅程へ合わせるために使う */
+  ctx?: { reference: Date; dayCount: number }
+): ParsedEvent[] {
   const byId = new Map(entries.map((e) => [e.id, e]));
   const events: ParsedEvent[] = [];
   for (const slot of slots) {
     const entry = byId.get(slot.entryId);
     if (!entry) continue;
-    events.push(...entryToEvents(entry, slot));
+    events.push(...entryToEvents(entry, slot, ctx));
   }
   return events.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 }
