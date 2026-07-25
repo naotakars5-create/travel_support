@@ -331,6 +331,21 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
       },
     ];
     if (!Number.isNaN(outMs) && outMs > startMs) {
+      // 連泊の場合、中間日の朝も「宿から出発」を置く（その日の起点がホテルになる）。
+      const nights = Math.max(1, Math.round((outMs - startMs) / 86400000));
+      for (let n = 1; n < nights; n++) {
+        const morning = new Date(startMs + n * 86400000);
+        morning.setHours(9, 0, 0, 0);
+        events.push({
+          ...base,
+          id: `evt-${entry.id}-stay${n}`,
+          placeTo: entryPlaceText(entry),
+          placeToGeo: entry.placeGeo,
+          startAt: morning.toISOString(),
+          detail: `連泊${n + 1}日目 · ここから出発`,
+          price: undefined,
+        });
+      }
       events.push({
         ...base,
         id: `evt-${entry.id}-out`,

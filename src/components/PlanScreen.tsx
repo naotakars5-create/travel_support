@@ -52,6 +52,7 @@ export function PlanScreen({
   onRemoveEntry,
   onEditEntry,
   onSetEntryDay,
+  onToggleFixed,
   onMoveEntry,
   onMoveEntryToEdge,
   onAddSuggestions,
@@ -83,6 +84,7 @@ export function PlanScreen({
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
   onSetEntryDay: (id: string, day: number) => void;
+  onToggleFixed: (id: string) => void;
   onMoveEntry: (id: string, dir: -1 | 1) => void;
   onMoveEntryToEdge: (id: string, dir: -1 | 1) => void;
   onAddSuggestions: (list: SpotSuggestion[]) => void;
@@ -175,10 +177,10 @@ export function PlanScreen({
       </View>
       <View className="h-px w-full bg-black/[.08]" />
 
-      <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 12, paddingBottom: 90 }}>
+      <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 90 }}>
         {!readOnly && (
-          <View className="mb-4 gap-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
-            <View className="flex-row flex-wrap items-end justify-between gap-3">
+          <View className="mb-3 gap-2 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
+            <View className="flex-row flex-wrap items-end justify-between gap-2">
               <DateOnlyField label="開始日" value={tripDate} onChange={onSetTripDate} />
               <View className="gap-1">
                 <Text className="font-gothic-400 text-[10px] text-muted">日数</Text>
@@ -229,7 +231,7 @@ export function PlanScreen({
           </View>
         )}
         {totals.totalCost > 0 && (
-          <View className="mb-4 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
+          <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
             <View className="flex-row items-baseline justify-between">
               <Text className="font-gothic-500 text-[10px] tracking-[.1em] text-muted">予算のめやす</Text>
               <Text className="font-mincho-600 text-[16px] text-ink" style={TNUM}>
@@ -257,7 +259,7 @@ export function PlanScreen({
         )}
         {/* 出発地（固定・旅の起点/終点。ここから1件目のスポットへの移動も計算） */}
         {!readOnly && (
-          <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
+          <View className="mb-2.5 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
             <View className="flex-row items-center justify-between">
               <Text className="font-gothic-500 text-[11px] text-ink">出発地（固定）</Text>
               {!startPoint && (
@@ -298,7 +300,7 @@ export function PlanScreen({
 
         {/* 宿泊先（固定・並び替え対象外） */}
         {!readOnly && (
-          <View className="mb-4 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
+          <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
             <View className="flex-row items-center justify-between">
               <Text className="font-gothic-500 text-[11px] text-ink">宿泊先（固定）</Text>
               <Pressable onPress={onOpenAddLodging} className="rounded-full border border-ink/25 px-3 py-1">
@@ -341,7 +343,7 @@ export function PlanScreen({
 
         {/* Day タブ（複数日程のとき）。並び替えは各日の中で行う。 */}
         {tripDayCount > 1 && entries.length > 0 && (
-          <View className="mb-3 flex-row flex-wrap gap-2">
+          <View className="mb-2 flex-row flex-wrap gap-2">
             <Pressable
               onPress={() => setSelectedDay("all")}
               className={`rounded-[10px] border px-3 py-1.5 ${activeDay === "all" ? "border-ink bg-ink" : "border-black/[.15] bg-white/50"}`}
@@ -398,44 +400,62 @@ export function PlanScreen({
                     <Text className="font-gothic-500 text-[10px] text-kinari" style={TNUM}>{num}</Text>
                   </View>
                 </View>
-                <Pressable disabled={readOnly} onPress={() => onEditEntry(e.id)} className="flex-1">
+                <View className="flex-1">
                   <View className="flex-row items-center gap-1.5">
-                    {range ? (
-                      <Text className="font-mincho-600 text-[13px] text-ink" style={TNUM}>{range}</Text>
-                    ) : (
-                      <Text className="font-gothic-400 text-[10px] text-muted-light">時刻未定</Text>
+                    <Pressable disabled={readOnly} onPress={() => onEditEntry(e.id)}>
+                      {range ? (
+                        <Text className="font-mincho-600 text-[13px] text-ink" style={TNUM}>{range}</Text>
+                      ) : (
+                        <Text className="font-gothic-400 text-[10px] text-muted-light">時刻未定</Text>
+                      )}
+                    </Pressable>
+                    {/* 時刻を固定（AIに動かされたくない予定）。時刻が入っている時だけ有効 */}
+                    {!readOnly && (
+                      <Pressable
+                        onPress={() => onToggleFixed(e.id)}
+                        hitSlop={6}
+                        className={`flex-row items-center gap-1 rounded-full border px-2 py-[2px] ${
+                          e.fixedTime ? "border-ink bg-ink" : "border-black/[.2]"
+                        }`}
+                      >
+                        <Text className={`font-gothic-500 text-[9px] ${e.fixedTime ? "text-kinari" : "text-muted"}`}>
+                          {e.fixedTime ? "✓ 時刻固定" : "時刻を固定"}
+                        </Text>
+                      </Pressable>
                     )}
-                    {e.fixedTime && <Text className="font-gothic-400 text-[9px] text-ink">固定</Text>}
+                    {readOnly && e.fixedTime && <Text className="font-gothic-400 text-[9px] text-ink">固定</Text>}
                   </View>
-                  <View className="mt-0.5 flex-row items-center gap-1.5">
-                    <Text className="font-mincho-600 text-[15px] text-ink">{e.title}</Text>
-                    {!readOnly && <Text className="font-gothic-400 text-[10px] text-muted-light">編集 ›</Text>}
-                  </View>
-                  {e.place && (
-                    <Text numberOfLines={1} className="mt-0.5 font-gothic-400 text-[10px] text-muted-light">
-                      {e.place}
-                    </Text>
-                  )}
-                  <View className="mt-1.5 flex-row flex-wrap items-center gap-1.5">
-                    <View className={`rounded-full border px-2 py-[1px] ${ps.border}`}>
-                      <Text className={`font-gothic-400 text-[9px] ${ps.text}`}>{PRIORITY_META[e.priority].label}</Text>
+                  <Pressable disabled={readOnly} onPress={() => onEditEntry(e.id)}>
+                    <View className="mt-0.5 flex-row items-center gap-1.5">
+                      <Text className="font-mincho-600 text-[15px] text-ink">{e.title}</Text>
+                      {!readOnly && <Text className="font-gothic-400 text-[10px] text-muted-light">編集 ›</Text>}
                     </View>
-                    <Text className="font-gothic-400 text-[10px] text-muted">{MODE_LABEL[e.mode]}</Text>
-                    <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
-                      · 滞在{formatDurationMin(effectiveStayMin(e))}
-                    </Text>
-                    {typeof e.cost === "number" && e.cost > 0 && (
-                      <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
-                        · {formatYen(e.cost)}
+                    {e.place && (
+                      <Text numberOfLines={1} className="mt-0.5 font-gothic-400 text-[10px] text-muted-light">
+                        {e.place}
                       </Text>
                     )}
-                    {(e.openFrom || e.openTo) && (
+                    <View className="mt-1 flex-row flex-wrap items-center gap-1.5">
+                      <View className={`rounded-full border px-2 py-[1px] ${ps.border}`}>
+                        <Text className={`font-gothic-400 text-[9px] ${ps.text}`}>{PRIORITY_META[e.priority].label}</Text>
+                      </View>
+                      <Text className="font-gothic-400 text-[10px] text-muted">{MODE_LABEL[e.mode]}</Text>
                       <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
-                        · 営業{e.openFrom ?? "?"}〜{e.openTo ?? "?"}
+                        · 滞在{formatDurationMin(effectiveStayMin(e))}
                       </Text>
-                    )}
-                  </View>
-                </Pressable>
+                      {typeof e.cost === "number" && e.cost > 0 && (
+                        <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                          · {formatYen(e.cost)}
+                        </Text>
+                      )}
+                      {(e.openFrom || e.openTo) && (
+                        <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                          · 営業{e.openFrom ?? "?"}〜{e.openTo ?? "?"}
+                        </Text>
+                      )}
+                    </View>
+                  </Pressable>
+                </View>
                 {/* 並び替え（上下タップ／長押しで先頭・末尾へ）＋削除 */}
                 {!readOnly && (
                   <View className="items-center justify-center gap-1.5">

@@ -62,7 +62,9 @@ export function buildPlanUserMessage(params: { entries: PlanEntry[]; referenceDa
       e.day && e.day > 1 ? `何日目: ${e.day}日目${e.fixedTime ? "（この日に厳守）" : "（希望。効率が上がるなら調整可）"}` : null,
       typeof e.stayMin === "number" ? `滞在: ${e.stayMin}分` : null,
       e.openFrom || e.openTo ? `営業時間: ${e.openFrom ?? "?"}〜${e.openTo ?? "?"}` : null,
-      e.arriveBy ? `到着目安: ${e.arriveBy}${e.fixedTime ? "（固定・厳守）" : "（目安）"}` : "到着目安: なし（自由に配置してよい）",
+      e.arriveBy
+        ? `到着時刻: ${e.arriveBy}${e.fixedTime ? "（★時刻固定・絶対に変更しない）" : "（目安・調整可）"}`
+        : "到着目安: なし（自由に配置してよい）",
     ].filter(Boolean);
     return parts.join(" / ");
   });

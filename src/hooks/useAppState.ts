@@ -296,11 +296,14 @@ export function useAppState() {
   const dayOfState: DayOfState = useMemo(() => getDayOfState(rail, currentNodeKey), [rail, currentNodeKey]);
   const totals = useMemo(() => computePlanTotals(entries ?? []), [entries]);
 
-  // 計画中の「この辺のおすすめ」：宿泊先（無ければ最初に座標が付いた行き先）の周辺スポットを提案する。
+  // 計画中の「この辺のおすすめ」：宿泊先を最優先の基点にする。
+  // 出発地（自宅・集合場所）は旅先ではないので基点から必ず除外する。
   const areaRefGeo = useMemo(() => {
     const list = entries ?? [];
     const lodging = list.find((e) => e.mode === "stay" && e.placeGeo);
-    return (lodging ?? list.find((e) => e.placeGeo))?.placeGeo ?? null;
+    if (lodging) return lodging.placeGeo ?? null;
+    const spot = list.find((e) => e.mode !== "home" && e.placeGeo);
+    return spot?.placeGeo ?? null;
   }, [entries]);
   const areaRefKey = areaRefGeo ? `${areaRefGeo.lat.toFixed(3)},${areaRefGeo.lng.toFixed(3)}` : null;
   const [rawAreaSpots, setRawAreaSpots] = useState<Spot[]>([]);
@@ -438,6 +441,23 @@ export function useAppState() {
       return next;
     });
   }, []);
+
+  /**
+   * 「時刻固定」を切り替える。固定にする時、まだ時刻が入っていなければ
+   * 現在の組み上げ結果の時刻を確定値として書き込む（AIに動かされなくなる）。
+   */
+  const toggleEntryFixed = useCallback((id: string) => {
+    setEntries((prev) => {
+      if (!prev) return prev;
+      const slotByEntry = new Map(slots.map((s) => [s.entryId, s.arriveAt]));
+      return prev.map((e) => {
+        if (e.id !== id) return e;
+        if (e.fixedTime) return { ...e, fixedTime: false };
+        const arriveBy = e.arriveBy ?? slotByEntry.get(e.id);
+        return { ...e, fixedTime: true, arriveBy };
+      });
+    });
+  }, [slots]);
 
   /** 行き先を同じ日の先頭（dir<0）／末尾（dir>0）へ一気に動かす（長押し操作用）。 */
   const moveEntryToEdge = useCallback((id: string, dir: -1 | 1) => {
@@ -846,6 +866,7 @@ export function useAppState() {
     editEntry,
     removeEntry,
     setEntryDay,
+    toggleEntryFixed,
     moveEntry,
     moveEntryToEdge,
     importFromMail,

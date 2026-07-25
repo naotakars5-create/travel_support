@@ -59,6 +59,7 @@ export default function Home() {
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
           onSetEntryDay={app.setEntryDay}
+          onToggleFixed={app.toggleEntryFixed}
           onMoveEntry={app.moveEntry}
           onMoveEntryToEdge={app.moveEntryToEdge}
           onAddSuggestions={app.addSuggestions}
