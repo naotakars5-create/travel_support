@@ -36,7 +36,6 @@ export function PlanScreen({
   onSetBaseMode,
   profile,
   onOpenProfile,
-  onOpenTrips,
   onOpenAdd,
   onCompose,
   onRemoveEntry,
@@ -63,7 +62,6 @@ export function PlanScreen({
   onSetBaseMode: (m: BaseMode) => void;
   profile: Profile;
   onOpenProfile: () => void;
-  onOpenTrips: () => void;
   onOpenAdd: () => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
@@ -113,9 +111,6 @@ export function PlanScreen({
           </View>
           {!readOnly && (
             <View className="mt-1 flex-row items-center gap-2">
-              <Pressable onPress={onOpenTrips} className="h-7 items-center justify-center rounded-[8px] border border-ink/25 px-3">
-                <Text className="font-gothic-500 text-[11px] text-ink">履歴</Text>
-              </Pressable>
               <Pressable onPress={onShare} className="h-7 items-center justify-center rounded-[8px] border border-ink/25 px-3">
                 <Text className="font-gothic-500 text-[11px] text-ink">共有</Text>
               </Pressable>

@@ -1,0 +1,339 @@
+import { useMemo, useState } from "react";
+import { ImageBackground, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SavedTrip } from "@/lib/trips";
+import { PlanEntry } from "@/lib/types";
+import { dateForDay, formatJstTime } from "@/lib/date";
+import { MODE_LABEL } from "@/lib/modeMeta";
+import { PhotoPicker } from "./PhotoPicker";
+import { SlideUp } from "./animations";
+
+const MUTED = "#8a8378";
+// 表紙写真が無いしおりの背景色（インデックスで割り当て）。
+const COVER_COLORS = ["#4f7a5b", "#4d5b7c", "#a8804a", "#7c5b4d", "#8a6d8f", "#5b7c78"];
+
+/** "2023-09-01" → "2023.09.01" */
+function dot(dateStr: string): string {
+  return dateStr.split("-").join(".");
+}
+
+/** 旅の期間表記（開始 〜 終了）。 */
+function dateRange(trip: SavedTrip): string {
+  const start = dot(trip.tripDate);
+  if (trip.tripDayCount <= 1) return start;
+  const end = dateForDay(trip.tripDate, trip.tripDayCount);
+  return `${start} 〜 ${dot(end)}`;
+}
+
+function entryTime(e: PlanEntry): number {
+  const t = e.departAt ?? e.arriveBy;
+  return t ? new Date(t).getTime() : Number.MAX_SAFE_INTEGER;
+}
+
+/** 1枚のしおりカード（表紙写真＋タイトル＋期間）。 */
+function ShioriCard({ trip, index, onPress }: { trip: SavedTrip; index: number; onPress: () => void }) {
+  const bg = COVER_COLORS[index % COVER_COLORS.length];
+  const Header = (
+    <View className="p-2.5">
+      <Text numberOfLines={1} className="font-mincho-600 text-[14px] text-white" style={{ textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4 }}>
+        {trip.name}
+      </Text>
+      <View className="mt-1 h-px w-full bg-white/40" />
+      <Text className="mt-1 font-gothic-400 text-[10px] text-white/90" style={{ textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4 }}>
+        {dateRange(trip)}
+      </Text>
+    </View>
+  );
+  return (
+    <Pressable onPress={onPress} className="mb-3 w-[48%] overflow-hidden rounded-[14px] border border-black/[.08]" style={{ aspectRatio: 0.82 }}>
+      {trip.coverPhoto ? (
+        <ImageBackground source={{ uri: trip.coverPhoto }} resizeMode="cover" style={{ flex: 1, justifyContent: "flex-start" }}>
+          <View className="bg-black/25">{Header}</View>
+        </ImageBackground>
+      ) : (
+        <View style={{ flex: 1, backgroundColor: bg }} className="justify-between">
+          {Header}
+          <Text className="self-end p-3 text-[34px]">🧭</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+/** 旅のしおり一覧（写真つきカードのグリッド）。 */
+export function ShioriScreen({
+  trips,
+  canCreate,
+  onCreate,
+  onOpen,
+  onDelete,
+  onSetCover,
+}: {
+  trips: SavedTrip[];
+  canCreate: boolean;
+  onCreate: (name: string, coverPhoto?: string) => void;
+  onOpen: (id: string) => void;
+  onDelete: (id: string) => void;
+  onSetCover: (id: string, coverPhoto?: string) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = detailId ? trips.find((t) => t.id === detailId) ?? null : null;
+
+  return (
+    <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
+      <View className="flex-row items-center justify-between px-[26px] pb-3 pt-4">
+        <Text className="font-mincho-600 text-[26px] text-ink">旅のしおり ✈</Text>
+      </View>
+      <View className="h-px w-full bg-black/[.08]" />
+
+      <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 16, paddingBottom: 110 }}>
+        {trips.length === 0 ? (
+          <View className="mt-16 items-center">
+            <Text className="text-[40px]">📖</Text>
+            <Text className="mt-3 text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
+              まだしおりがありません。{"\n"}計画で行き先を作ったら、右下の＋で{"\n"}表紙写真つきのしおりにできます。
+            </Text>
+          </View>
+        ) : (
+          <View className="flex-row flex-wrap justify-between">
+            {trips.map((t, i) => (
+              <ShioriCard key={t.id} trip={t} index={i} onPress={() => setDetailId(t.id)} />
+            ))}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* ＋ しおりを作る */}
+      <Pressable
+        onPress={() => setCreateOpen(true)}
+        className="absolute right-6 h-14 w-14 items-center justify-center rounded-full bg-ink shadow"
+        style={{ bottom: insets.bottom + 20 }}
+      >
+        <View className="relative h-[16px] w-[16px]">
+          <View className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 bg-kinari" />
+          <View className="absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2 bg-kinari" />
+        </View>
+      </Pressable>
+
+      {createOpen && (
+        <CreateShioriSheet
+          canCreate={canCreate}
+          onClose={() => setCreateOpen(false)}
+          onCreate={(name, cover) => {
+            onCreate(name, cover);
+            setCreateOpen(false);
+          }}
+        />
+      )}
+
+      {detail && (
+        <ShioriDetail
+          trip={detail}
+          onClose={() => setDetailId(null)}
+          onOpen={() => {
+            onOpen(detail.id);
+            setDetailId(null);
+          }}
+          onDelete={() => {
+            onDelete(detail.id);
+            setDetailId(null);
+          }}
+          onSetCover={(photo) => onSetCover(detail.id, photo)}
+        />
+      )}
+    </View>
+  );
+}
+
+/** しおりを新規作成する（名前＋表紙写真、今の旅程から）。 */
+function CreateShioriSheet({
+  canCreate,
+  onClose,
+  onCreate,
+}: {
+  canCreate: boolean;
+  onClose: () => void;
+  onCreate: (name: string, coverPhoto?: string) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [name, setName] = useState("");
+  const [cover, setCover] = useState<string | undefined>(undefined);
+
+  return (
+    <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <View className="flex-1">
+        <Pressable className="flex-1 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <SlideUp trigger="create-shiori">
+          <View className="max-h-[88%] rounded-t-sheet bg-sheet px-6 pt-3" style={{ paddingBottom: insets.bottom + 24 }}>
+            <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />
+            <View className="mb-4 flex-row items-center justify-between">
+              <Pressable onPress={onClose} hitSlop={8} className="rounded-full border border-black/[.15] px-3 py-1">
+                <Text className="font-gothic-400 text-[12px] text-muted">‹ 戻る</Text>
+              </Pressable>
+              <Text className="font-mincho-600 text-[16px] text-ink">しおりを作る</Text>
+              <View className="w-[52px]" />
+            </View>
+
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {/* 表紙プレビュー */}
+              <View className="items-center gap-3">
+                <View className="h-40 w-full overflow-hidden rounded-[14px] border border-black/[.1]" style={{ backgroundColor: cover ? undefined : "#4f7a5b" }}>
+                  {cover ? (
+                    <ImageBackground source={{ uri: cover }} resizeMode="cover" style={{ flex: 1, justifyContent: "flex-start" }}>
+                      <View className="bg-black/25 p-3">
+                        <Text numberOfLines={1} className="font-mincho-600 text-[16px] text-white">{name || "旅のタイトル"}</Text>
+                      </View>
+                    </ImageBackground>
+                  ) : (
+                    <View className="flex-1 justify-start p-3">
+                      <Text numberOfLines={1} className="font-mincho-600 text-[16px] text-white">{name || "旅のタイトル"}</Text>
+                    </View>
+                  )}
+                </View>
+                <View className="flex-row items-center gap-2">
+                  <PhotoPicker onPicked={setCover} maxSize={800} label={cover ? "写真を変更" : "表紙写真を選ぶ"} />
+                  {cover && (
+                    <Pressable onPress={() => setCover(undefined)} className="rounded-full border border-black/[.15] px-3 py-1.5">
+                      <Text className="font-gothic-400 text-[11px] text-muted">写真を外す</Text>
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+
+              <View className="mt-5 gap-1">
+                <Text className="font-gothic-400 text-[10px] text-muted">タイトル（絵文字も使えます）</Text>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="例: 沖縄弾丸旅行 ✈️"
+                  placeholderTextColor={MUTED}
+                  className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
+                />
+              </View>
+
+              <Pressable
+                disabled={!canCreate}
+                onPress={() => onCreate(name, cover)}
+                className={`mt-5 rounded-[12px] px-4 py-3 ${canCreate ? "bg-ink" : "bg-ink/30"}`}
+              >
+                <Text className="text-center font-gothic-500 text-[12px] text-kinari">
+                  {canCreate ? "今の旅程をしおりにする" : "先に計画で行き先を追加してください"}
+                </Text>
+              </Pressable>
+              <Text className="mt-2 text-center font-gothic-400 text-[10px] text-muted-light">
+                今の「行き先リスト」の内容がこのしおりに保存されます。
+              </Text>
+            </ScrollView>
+          </View>
+        </SlideUp>
+      </View>
+    </Modal>
+  );
+}
+
+/** しおりの中身（表紙＋期間＋日別の行き先）。 */
+function ShioriDetail({
+  trip,
+  onClose,
+  onOpen,
+  onDelete,
+  onSetCover,
+}: {
+  trip: SavedTrip;
+  onClose: () => void;
+  onOpen: () => void;
+  onDelete: () => void;
+  onSetCover: (photo?: string) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // 日別に行き先をまとめる
+  const byDay = useMemo(() => {
+    const map = new Map<number, PlanEntry[]>();
+    for (const e of trip.entries) {
+      const d = e.day && e.day > 0 ? e.day : 1;
+      const arr = map.get(d) ?? [];
+      arr.push(e);
+      map.set(d, arr);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => entryTime(a) - entryTime(b));
+    return [...map.entries()].sort((a, b) => a[0] - b[0]);
+  }, [trip.entries]);
+
+  return (
+    <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <View className="flex-1">
+        <Pressable className="flex-1 bg-[rgba(28,25,21,.4)]" onPress={onClose} />
+        <SlideUp trigger={trip.id}>
+          <View className="max-h-[90%] rounded-t-sheet bg-sheet" style={{ paddingBottom: insets.bottom + 20 }}>
+            {/* 表紙 */}
+            <View className="h-44 overflow-hidden rounded-t-sheet">
+              {trip.coverPhoto ? (
+                <ImageBackground source={{ uri: trip.coverPhoto }} resizeMode="cover" style={{ flex: 1, justifyContent: "flex-end" }}>
+                  <View className="bg-black/30 p-4">
+                    <Text className="font-mincho-700 text-[22px] text-white">{trip.name}</Text>
+                    <Text className="mt-1 font-gothic-400 text-[11px] text-white/90">{dateRange(trip)}</Text>
+                  </View>
+                </ImageBackground>
+              ) : (
+                <View style={{ flex: 1, backgroundColor: "#4f7a5b" }} className="justify-end p-4">
+                  <Text className="font-mincho-700 text-[22px] text-white">{trip.name}</Text>
+                  <Text className="mt-1 font-gothic-400 text-[11px] text-white/90">{dateRange(trip)}</Text>
+                </View>
+              )}
+            </View>
+
+            <ScrollView className="px-6" contentContainerStyle={{ paddingTop: 14, paddingBottom: 14 }}>
+              {byDay.map(([day, list]) => (
+                <View key={day} className="mb-4">
+                  {trip.tripDayCount > 1 && (
+                    <Text className="mb-1.5 font-gothic-500 text-[11px] text-ink">{day}日目</Text>
+                  )}
+                  <View className="gap-2">
+                    {list.map((e) => (
+                      <View key={e.id} className="flex-row gap-3">
+                        <Text className="w-[42px] font-mincho-600 text-[13px] text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+                          {e.arriveBy ? formatJstTime(new Date(e.arriveBy)) : e.departAt ? formatJstTime(new Date(e.departAt)) : "—"}
+                        </Text>
+                        <View className="flex-1">
+                          <Text className="font-mincho-600 text-[14px] text-ink">{e.title}</Text>
+                          <Text className="font-gothic-400 text-[10px] text-muted-light">
+                            {MODE_LABEL[e.mode]}
+                            {e.place ? ` · ${e.place}` : ""}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))}
+              {trip.entries.length === 0 && (
+                <Text className="py-6 text-center font-gothic-400 text-[12px] text-muted">行き先がありません。</Text>
+              )}
+            </ScrollView>
+
+            {/* 操作 */}
+            <View className="flex-row items-center gap-2 px-6 pt-2">
+              <Pressable onPress={onOpen} className="flex-1 rounded-[12px] bg-ink py-3">
+                <Text className="text-center font-gothic-500 text-[12px] text-kinari">このしおりを開いて編集</Text>
+              </Pressable>
+              <PhotoPicker onPicked={onSetCover} maxSize={800} label="表紙" />
+              {confirmDelete ? (
+                <Pressable onPress={onDelete} className="rounded-[12px] border border-accent px-3 py-3">
+                  <Text className="font-gothic-500 text-[12px] text-accent">削除する</Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={() => setConfirmDelete(true)} className="rounded-[12px] border border-black/[.15] px-3 py-3">
+                  <Text className="font-gothic-400 text-[12px] text-muted">削除</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        </SlideUp>
+      </View>
+    </Modal>
+  );
+}

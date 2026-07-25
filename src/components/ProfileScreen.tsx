@@ -1,12 +1,8 @@
 import { useState } from "react";
-import { Image, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Profile } from "@/lib/profile";
-import { SavedTrip } from "@/lib/trips";
-import { formatDateStrJa } from "@/lib/date";
 import { SlideUp } from "./animations";
-
-const MUTED = "#8a8378";
 
 /** アイコン表示（写真があれば写真、無ければ絵文字）。 */
 function Avatar({ profile, size }: { profile: Profile; size: number }) {
@@ -26,26 +22,8 @@ interface InfoContent {
 }
 
 /** マイページ（プロフィール・旅の履歴・各種設定）。下タブの独立画面。 */
-export function ProfileScreen({
-  profile,
-  onEditProfile,
-  savedTrips,
-  canSaveTrip,
-  onSaveTrip,
-  onLoadTrip,
-  onDeleteTrip,
-}: {
-  profile: Profile;
-  onEditProfile: () => void;
-  savedTrips: SavedTrip[];
-  canSaveTrip: boolean;
-  onSaveTrip: (name: string) => void;
-  onLoadTrip: (id: string) => void;
-  onDeleteTrip: (id: string) => void;
-}) {
+export function ProfileScreen({ profile, onEditProfile }: { profile: Profile; onEditProfile: () => void }) {
   const insets = useSafeAreaInsets();
-  const [tripName, setTripName] = useState("");
-  const [confirmId, setConfirmId] = useState<string | null>(null);
   const [info, setInfo] = useState<InfoContent | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -108,78 +86,13 @@ export function ProfileScreen({
           </Pressable>
         </View>
 
-        {/* 旅の履歴 */}
-        <Text className="mb-2 mt-8 font-gothic-500 text-[10px] tracking-[.15em] text-muted">旅の履歴</Text>
-        <View className="gap-1.5 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
-          <Text className="font-gothic-500 text-[10px] tracking-[.1em] text-muted">今の旅程を保存</Text>
-          <TextInput
-            value={tripName}
-            onChangeText={setTripName}
-            placeholder="旅の名前（例: 大阪日帰り）"
-            placeholderTextColor={MUTED}
-            className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
-          />
-          <Pressable
-            disabled={!canSaveTrip}
-            onPress={() => {
-              onSaveTrip(tripName);
-              setTripName("");
-            }}
-            className={`mt-1 rounded-[10px] px-4 py-2.5 ${canSaveTrip ? "bg-ink" : "bg-ink/30"}`}
-          >
-            <Text className="text-center font-gothic-500 text-[12px] text-kinari">
-              {canSaveTrip ? "この旅程を保存" : "行き先を追加してください"}
-            </Text>
-          </Pressable>
-        </View>
-
-        {savedTrips.length === 0 ? (
-          <Text className="mt-3 text-center font-gothic-400 text-[11px] leading-[18px] text-muted-light">
-            まだ保存した旅はありません。{"\n"}気に入った旅程を保存すると、ここから呼び出せます。
+        {/* 旅の履歴（しおり）への導線 */}
+        <View className="mt-8 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
+          <Text className="font-gothic-500 text-[11px] text-ink">旅のしおり</Text>
+          <Text className="mt-1 font-gothic-400 text-[10px] leading-[16px] text-muted">
+            保存した旅は下タブの「しおり」に、表紙写真つきで一覧表示されます。
           </Text>
-        ) : (
-          <View className="mt-3 overflow-hidden rounded-[16px] border border-ink/10">
-            {savedTrips.map((t, i) => (
-              <View key={t.id} className={`px-4 py-3 ${i > 0 ? "border-t border-ink/10" : ""}`}>
-                <View className="flex-row items-center justify-between gap-3">
-                  <Pressable onPress={() => onLoadTrip(t.id)} className="flex-1">
-                    <Text className="font-mincho-600 text-[15px] text-ink">{t.name}</Text>
-                    <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">
-                      {formatDateStrJa(t.tripDate)}
-                      {t.tripDayCount > 1 ? `〜${t.tripDayCount}日間` : ""} · 行き先{t.entries.length}件
-                    </Text>
-                  </Pressable>
-                  {confirmId === t.id ? (
-                    <View className="flex-row items-center gap-2">
-                      <Pressable onPress={() => setConfirmId(null)} hitSlop={6} className="rounded-full border border-black/[.15] px-2.5 py-1">
-                        <Text className="font-gothic-400 text-[10px] text-muted">やめる</Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => {
-                          onDeleteTrip(t.id);
-                          setConfirmId(null);
-                        }}
-                        hitSlop={6}
-                        className="rounded-full border border-accent px-2.5 py-1"
-                      >
-                        <Text className="font-gothic-500 text-[10px] text-accent">削除</Text>
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <View className="flex-row items-center gap-3">
-                      <Pressable onPress={() => onLoadTrip(t.id)} hitSlop={6} className="rounded-full bg-ink px-3 py-1.5">
-                        <Text className="font-gothic-500 text-[11px] text-kinari">開く</Text>
-                      </Pressable>
-                      <Pressable onPress={() => setConfirmId(t.id)} hitSlop={8}>
-                        <Text className="font-gothic-400 text-[16px] text-muted-light">×</Text>
-                      </Pressable>
-                    </View>
-                  )}
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
+        </View>
 
         {/* 各種設定 */}
         <Text className="mb-2 mt-8 font-gothic-500 text-[10px] tracking-[.15em] text-muted">設定</Text>

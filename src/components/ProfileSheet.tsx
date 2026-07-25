@@ -1,66 +1,11 @@
-import { createElement, useState } from "react";
-import { Image, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useState } from "react";
+import { Image, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AVATAR_CHOICES, Profile } from "@/lib/profile";
+import { PhotoPicker } from "./PhotoPicker";
 import { SlideUp } from "./animations";
 
 const MUTED = "#8a8378";
-
-/** 画像を最大256pxへ縮小して JPEG の data URL にする（端末保存の容量オーバーを防ぐ）。 */
-function downscaleToDataUrl(dataUrl: string, onDone: (out: string) => void) {
-  const img = new window.Image();
-  img.onload = () => {
-    const max = 256;
-    const scale = Math.min(1, max / Math.max(img.width, img.height));
-    const w = Math.max(1, Math.round(img.width * scale));
-    const h = Math.max(1, Math.round(img.height * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      onDone(dataUrl);
-      return;
-    }
-    ctx.drawImage(img, 0, 0, w, h);
-    onDone(canvas.toDataURL("image/jpeg", 0.85));
-  };
-  img.onerror = () => onDone(dataUrl);
-  img.src = dataUrl;
-}
-
-/** Web: 画像ファイルを選んで（縮小して）data URL を返すボタン。 */
-function WebPhotoPicker({ onPicked }: { onPicked: (dataUrl: string) => void }) {
-  const input = createElement("input", {
-    type: "file",
-    accept: "image/*",
-    style: { display: "none" },
-    id: "tabinavi-photo-input",
-    onChange: (e: { target: { files?: FileList | null } }) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === "string") downscaleToDataUrl(reader.result, onPicked);
-      };
-      reader.readAsDataURL(file);
-    },
-  });
-  const openPicker = () => {
-    if (typeof document !== "undefined") {
-      const el = document.getElementById("tabinavi-photo-input") as HTMLInputElement | null;
-      el?.click();
-    }
-  };
-  return (
-    <>
-      {input}
-      <Pressable onPress={openPicker} className="rounded-full border border-ink/25 px-4 py-1.5">
-        <Text className="font-gothic-500 text-[11px] text-ink">写真を選ぶ</Text>
-      </Pressable>
-    </>
-  );
-}
 
 /** 名前・アイコン（絵文字/写真）を登録/編集するプロフィール画面（半モーダル）。 */
 export function ProfileSheet({
@@ -103,11 +48,7 @@ export function ProfileSheet({
                   </View>
                 )}
                 <View className="flex-row items-center gap-2">
-                  {Platform.OS === "web" ? (
-                    <WebPhotoPicker onPicked={setPhoto} />
-                  ) : (
-                    <Text className="font-gothic-400 text-[10px] text-muted-light">写真の設定はブラウザ版でご利用ください</Text>
-                  )}
+                  <PhotoPicker onPicked={setPhoto} maxSize={256} label="写真を選ぶ" />
                   {photo && (
                     <Pressable onPress={() => setPhoto(undefined)} className="rounded-full border border-black/[.15] px-3 py-1.5">
                       <Text className="font-gothic-400 text-[11px] text-muted">写真を外す</Text>

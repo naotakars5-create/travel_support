@@ -11,7 +11,7 @@ import { AddEntrySheet } from "@/components/AddEntrySheet";
 import { EditEntrySheet } from "@/components/EditEntrySheet";
 import { ProfileScreen } from "@/components/ProfileScreen";
 import { ProfileSheet } from "@/components/ProfileSheet";
-import { TripsSheet } from "@/components/TripsSheet";
+import { ShioriScreen } from "@/components/ShioriScreen";
 import { FlashOverlay } from "@/components/FlashOverlay";
 
 export default function Home() {
@@ -19,7 +19,6 @@ export default function Home() {
   const [addOpen, setAddOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [tripsOpen, setTripsOpen] = useState(false);
   const dark = app.tab === "today";
   const editingEntry = editId ? app.entries?.find((e) => e.id === editId) ?? null : null;
 
@@ -49,7 +48,6 @@ export default function Home() {
           onSetBaseMode={app.setBaseMode}
           profile={app.profile}
           onOpenProfile={() => setProfileOpen(true)}
-          onOpenTrips={() => setTripsOpen(true)}
           onOpenAdd={() => setAddOpen(true)}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
@@ -85,16 +83,20 @@ export default function Home() {
       {app.tab === "packing" && (
         <PackingScreen items={app.packing} onToggle={app.togglePacking} onAdd={app.addPacking} onRemove={app.removePacking} />
       )}
-      {app.tab === "profile" && (
-        <ProfileScreen
-          profile={app.profile}
-          onEditProfile={() => setProfileOpen(true)}
-          savedTrips={app.savedTrips}
-          canSaveTrip={(app.entries?.length ?? 0) > 0}
-          onSaveTrip={app.saveCurrentTrip}
-          onLoadTrip={app.loadTrip}
-          onDeleteTrip={app.deleteTrip}
+      {app.tab === "shiori" && (
+        <ShioriScreen
+          trips={app.savedTrips}
+          canCreate={(app.entries?.length ?? 0) > 0}
+          onCreate={app.saveCurrentTrip}
+          onOpen={(id) => {
+            app.loadTrip(id);
+          }}
+          onDelete={app.deleteTrip}
+          onSetCover={app.setTripCover}
         />
+      )}
+      {app.tab === "profile" && (
+        <ProfileScreen profile={app.profile} onEditProfile={() => setProfileOpen(true)} />
       )}
 
       <BottomNav tab={app.tab} onChange={app.setTab} dark={dark} />
@@ -128,17 +130,6 @@ export default function Home() {
       )}
 
       {profileOpen && <ProfileSheet profile={app.profile} onClose={() => setProfileOpen(false)} onSave={app.setProfile} />}
-
-      {tripsOpen && (
-        <TripsSheet
-          trips={app.savedTrips}
-          canSave={(app.entries?.length ?? 0) > 0}
-          onSave={app.saveCurrentTrip}
-          onLoad={app.loadTrip}
-          onDelete={app.deleteTrip}
-          onClose={() => setTripsOpen(false)}
-        />
-      )}
 
       <FlashOverlay visible={app.flash.visible} text={app.flash.text} />
     </View>

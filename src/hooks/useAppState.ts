@@ -28,7 +28,7 @@ import { useLiveLocation } from "./useLiveLocation";
 /** この距離（メートル）以内に近づいたら、GPSで到着を自動記録する。 */
 const ARRIVAL_THRESHOLD_METERS = 120;
 
-export type Tab = "plan" | "itin" | "today" | "packing" | "profile";
+export type Tab = "plan" | "itin" | "today" | "packing" | "shiori" | "profile";
 
 interface FlashState {
   visible: boolean;
@@ -484,14 +484,15 @@ export function useAppState() {
     void saveProfile(p);
   }, []);
 
-  /** 現在の旅程を名前を付けて履歴に保存する。 */
+  /** 現在の旅程を名前（＋表紙写真）を付けてしおり／履歴に保存する。 */
   const saveCurrentTrip = useCallback(
-    (name: string) => {
+    (name: string, coverPhoto?: string) => {
       const list = entries ?? [];
       if (list.length === 0) return;
       const trip: SavedTrip = {
         id: genId("trip"),
         name: name.trim() || `${tripDate} の旅`,
+        coverPhoto,
         savedAt: new Date().toISOString(),
         entries: list,
         slots,
@@ -505,11 +506,20 @@ export function useAppState() {
         void saveTrips(next);
         return next;
       });
-      setFlash({ visible: true, text: `「${trip.name}」を保存しました\n履歴からいつでも呼び出せます` });
+      setFlash({ visible: true, text: `「${trip.name}」をしおりに保存しました` });
       setTimeout(() => setFlash({ visible: false, text: "" }), 1900);
     },
     [entries, slots, packing, tripDate, tripDayCount, baseMode]
   );
+
+  /** しおりの表紙写真を更新する。 */
+  const setTripCover = useCallback((id: string, coverPhoto?: string) => {
+    setSavedTrips((prev) => {
+      const next = prev.map((t) => (t.id === id ? { ...t, coverPhoto } : t));
+      void saveTrips(next);
+      return next;
+    });
+  }, []);
 
   /** 保存した旅を現在の旅程として読み込む（今の内容は上書きされる）。 */
   const loadTrip = useCallback((id: string) => {
@@ -591,6 +601,7 @@ export function useAppState() {
     setProfile,
     savedTrips,
     saveCurrentTrip,
+    setTripCover,
     loadTrip,
     deleteTrip,
     suggestions,

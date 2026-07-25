@@ -9,6 +9,8 @@ export interface SavedTrip {
   id: string;
   /** 旅の名前（例: 大阪日帰り） */
   name: string;
+  /** しおりの表紙写真（data URL・任意） */
+  coverPhoto?: string;
   /** 保存日時（ISO8601） */
   savedAt: string;
   entries: PlanEntry[];
