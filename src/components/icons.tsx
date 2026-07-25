@@ -3,7 +3,7 @@ import { View } from "react-native";
 /** 幾何形のみで構成するアイコン群（円・正方形・線・リング）。アイコンライブラリは使わない。 */
 
 /** ミニマルなベル（お知らせ）アイコン。幾何形のみ・単色。 */
-export function BellIcon({ color = "#2a2622", size = 18 }: { color?: string; size?: number }) {
+export function BellIcon({ color = "#23201D", size = 18 }: { color?: string; size?: number }) {
   return (
     <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
       {/* 本体（上が丸く下が開いた輪郭） */}
@@ -27,7 +27,7 @@ export function BellIcon({ color = "#2a2622", size = 18 }: { color?: string; siz
 }
 
 export function SignalDots({ dark }: { dark?: boolean }) {
-  const color = dark ? "#ece5d7" : "#2a2622";
+  const color = dark ? "#F4EFE5" : "#23201D";
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
       <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color }} />

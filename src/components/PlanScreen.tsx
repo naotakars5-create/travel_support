@@ -14,11 +14,12 @@ import { DateOnlyField } from "./PlainFields";
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 
 // 日ごとの淡い背景色（複数日程で日を見分けやすくする）。1日目は無地。
-const DAY_TINTS = ["", "bg-mode-rail/[.06]", "bg-mode-air/[.06]", "bg-mode-bus/[.07]", "bg-accent/[.05]"];
+// 有彩色は「今・完了」専用のため、日の区別は砂色（surface）の濃淡で行う。
+const DAY_TINTS = ["", "bg-surface/50", "bg-surface/80", "bg-surface/30", "bg-surface/60"];
 const dayTint = (day: number): string => DAY_TINTS[(Math.max(1, day) - 1) % DAY_TINTS.length];
 
 const PRIORITY_STYLE: Record<Priority, { border: string; text: string }> = {
-  must: { border: "border-accent", text: "text-accent" },
+  must: { border: "border-ink", text: "text-ink" },
   want: { border: "border-ink/40", text: "text-ink" },
   optional: { border: "border-muted-light", text: "text-muted" },
 };
@@ -396,7 +397,7 @@ export function PlanScreen({
                     ) : (
                       <Text className="font-gothic-400 text-[10px] text-muted-light">時刻未定</Text>
                     )}
-                    {e.fixedTime && <Text className="font-gothic-400 text-[9px] text-accent">固定</Text>}
+                    {e.fixedTime && <Text className="font-gothic-400 text-[9px] text-ink">固定</Text>}
                   </View>
                   <View className="mt-0.5 flex-row items-center gap-1.5">
                     <Text className="font-mincho-600 text-[15px] text-ink">{e.title}</Text>
@@ -421,7 +422,7 @@ export function PlanScreen({
                       </Text>
                     )}
                     {(e.openFrom || e.openTo) && (
-                      <Text className="font-gothic-400 text-[10px] text-mode-rail" style={TNUM}>
+                      <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
                         · 営業{e.openFrom ?? "?"}〜{e.openTo ?? "?"}
                       </Text>
                     )}
@@ -490,13 +491,13 @@ export function PlanScreen({
               onPress={onCompose}
               className={`flex-row items-center justify-center gap-2 rounded-[12px] py-3.5 ${composing ? "bg-ink/40" : "bg-ink"}`}
             >
-              {composing && <ActivityIndicator size="small" color="#f3efe6" />}
+              {composing && <ActivityIndicator size="small" color="#F4EFE5" />}
               <Text className="font-gothic-500 text-[12px] text-kinari">{composing ? "AIが旅程を組んでいます…" : "AIで旅程を組む"}</Text>
             </Pressable>
             <Text className="mt-2 text-center font-gothic-400 text-[10px] text-muted-light">
               時間未定のままでOK。重要度と移動効率をもとに複数日へ自動配置します。入りきらない予定は旅程の下部へ。
             </Text>
-            {composeError && <Text className="mt-2 text-center font-gothic-400 text-[11px] text-accent">{composeError}</Text>}
+            {composeError && <Text className="mt-2 text-center font-gothic-400 text-[11px] text-ink">{composeError}</Text>}
             {planNotes && (
               <View className="mt-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
                 <Text className="font-gothic-500 text-[10px] tracking-[.1em] text-muted">AIのメモ</Text>
@@ -512,7 +513,7 @@ export function PlanScreen({
             <Text className="mb-1 font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ</Text>
             {areaSuggestionsLoading ? (
               <View className="flex-row items-center gap-2">
-                <ActivityIndicator size="small" color="#8a8378" />
+                <ActivityIndicator size="small" color="#6E675C" />
                 <Text className="font-gothic-400 text-[11px] text-muted-light">周辺のおすすめを探しています…</Text>
               </View>
             ) : (

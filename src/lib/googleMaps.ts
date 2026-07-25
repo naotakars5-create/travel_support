@@ -276,17 +276,17 @@ export function staticRouteMapUrl(
 
   if (points.length > 1) {
     const path = points.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join("|");
-    url.searchParams.append("path", `color:0xc2492dcc|weight:4|${path}`);
+    url.searchParams.append("path", `color:0xD96F4Ccc|weight:4|${path}`);
   }
   points.forEach((p, i) => {
     // ラベル指定があればそれを（行き先の通し番号）、無ければ連番。Static Maps のラベルは英数字1文字のみ。
     const raw = labels?.[i] ?? String(i + 1);
     const label = /^[0-9A-Za-z]$/.test(raw) ? raw : "";
-    url.searchParams.append("markers", `color:0x2a2622|label:${label}|${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
+    url.searchParams.append("markers", `color:0x23201D|label:${label}|${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
   });
   // 現在地は青いマーカーで表示（ラベルなし）
   if (me) {
-    url.searchParams.append("markers", `color:0x1a73e8|${me.lat.toFixed(5)},${me.lng.toFixed(5)}`);
+    url.searchParams.append("markers", `color:0xD96F4C|${me.lat.toFixed(5)},${me.lng.toFixed(5)}`);
     if (points.length === 0) url.searchParams.set("zoom", "15");
   }
   url.searchParams.set("key", apiKey());

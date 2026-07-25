@@ -5,26 +5,34 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        kinari: "#f3efe6",
-        ink: "#2a2622",
-        muted: "#8a8378",
-        "muted-light": "#b7b0a3",
-        bezel: "#1c1915",
+        // ===== カラートークン（この6色以外は使わない）=====
+        base: "#F4EFE5", // 画面背景・生成り
+        surface: "#E7DFD0", // カード面・区切り・砂
+        ink: "#23201D", // 文字・主要ボタン・墨
+        muted: "#6E675C", // 補助テキスト（ink-muted）
+        accent: "#D96F4C", // テラコッタ：今・進行中だけ
+        highlight: "#F0B429", // マスタード：完了・達成だけ
+        // ===== 旧トークン名のエイリアス（値は上の6トークンに統一）=====
+        kinari: "#F4EFE5", // = base
+        "muted-light": "#6E675C", // = muted
+        bezel: "#23201D", // = ink
+        sheet: "#E7DFD0", // = surface
         mode: {
-          air: "#4d5b7c",
-          rail: "#4f7a5b",
-          bus: "#a8804a",
-          walk: "#9a9384",
+          air: "#6E675C",
+          rail: "#6E675C",
+          bus: "#6E675C",
+          walk: "#6E675C",
         },
-        accent: "#c2492d",
+        // ===== ダークテーマ（当日タブ）=====
+        // 補助文字は base の不透明度違い（新しい色は足さない）。
+        // ink-muted(#6E675C) は暗背景でコントラスト3.2と不足するため使わない。
         day: {
-          bg: "#24201b",
-          text: "#ece5d7",
-          text2: "#8f8674",
-          text3: "#6b6459",
-          nav: "#1f1b16",
+          bg: "#1A1815",
+          text: "#F4EFE5",
+          text2: "rgba(244,239,229,0.72)",
+          text3: "rgba(244,239,229,0.55)",
+          nav: "#1A1815",
         },
-        sheet: "#efe9dd",
       },
       fontFamily: {
         // ウェイトごとに読み込んだ実フォントを割り当てる（React Nativeはウェイト合成非対応のため）
