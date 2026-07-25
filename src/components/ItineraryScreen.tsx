@@ -97,6 +97,7 @@ export function ItineraryScreen({
     const groups: DayGroup[] = [];
     let current: DayGroup | null = null;
     let prevDate: string | null = null;
+    let spotSeq = 0; // その日のスポット番号（出発地点は0、スポットは1から）
     for (const item of rail) {
       if (item.type === "node") {
         const dk = new Date(item.time).toDateString();
@@ -111,12 +112,15 @@ export function ItineraryScreen({
           };
           groups.push(current);
           prevDate = dk;
+          spotSeq = 0;
         }
       }
       if (!current) continue; // 先頭にnode以外は来ない想定の保険
       current.items.push(item);
       if (item.type === "node") {
-        const num = current.numberOf.size + 1;
+        // その日の起点（ホテルのチェックアウト・出発地の出発）は「0」。回るスポットは1から数える。
+        const isDeparturePoint = /-(out|depart)$/.test(item.event.id) && current.numberOf.size === 0;
+        const num = isDeparturePoint ? 0 : ++spotSeq;
         current.numberOf.set(item.key, num);
         if (item.geo) {
           current.mapPoints.push(item.geo);

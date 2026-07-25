@@ -82,7 +82,7 @@ export function AddEntrySheet({
                   tripDayCount={tripDayCount}
                   initial={fixedMode ? { title: "", mode: fixedMode, priority: "must" } : undefined}
                   lockMode={Boolean(fixedMode)}
-                  submitLabel={fixedMode === "stay" ? "宿泊先を追加" : "行き先を追加"}
+                  submitLabel={fixedMode === "stay" ? "宿泊先を追加" : fixedMode === "home" ? "出発地を設定" : "行き先を追加"}
                 />
               ) : (
                 <View className="gap-3">
