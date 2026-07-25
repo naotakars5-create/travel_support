@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PackingItem } from "@/lib/types";
 import { packingProgress } from "@/lib/packing";
+import { Illustration } from "./Illustration";
 
 const MUTED = "#6E675C";
 
@@ -64,6 +65,14 @@ export function PackingScreen({
             </Pressable>
           </View>
         ))}
+
+        {/* 全部チェックできたときだけ「準備完了」を出す（1つでも外れたら消える） */}
+        {total > 0 && done === total && (
+          <View className="mt-5 items-center">
+            <Illustration name="packed-done" size="md" alt="" />
+            <Text className="mt-2 font-mincho-600 text-[15px] text-ink">準備完了です</Text>
+          </View>
+        )}
 
         <View className="mt-4 flex-row items-stretch gap-2">
           <TextInput

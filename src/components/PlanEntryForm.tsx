@@ -105,6 +105,14 @@ export function PlanEntryForm({
   const [arriveTime, setArriveTime] = useState<string>(timeStrFromIso(initial?.arriveBy));
   const [departTime, setDepartTime] = useState<string>(timeStrFromIso(initial?.departAt));
   const [checkOutTime, setCheckOutTime] = useState<string>(timeStrFromIso(initial?.checkOut));
+  // 宿泊の泊数（同じ宿に連泊する場合に使う）
+  const [nights, setNights] = useState<number>(() => {
+    if (!initial?.arriveBy || !initial?.checkOut) return 1;
+    const inMs = new Date(initial.arriveBy).getTime();
+    const outMs = new Date(initial.checkOut).getTime();
+    if (Number.isNaN(inMs) || Number.isNaN(outMs)) return 1;
+    return Math.max(1, Math.round((outMs - inMs) / 86400000) || 1);
+  });
   const [fixedTime, setFixedTime] = useState(initial?.fixedTime ?? false);
   const [cost, setCost] = useState(typeof initial?.cost === "number" ? String(initial.cost) : "");
   const [detail, setDetail] = useState(initial?.detail ?? "");
@@ -191,7 +199,7 @@ export function PlanEntryForm({
       input.place = place || undefined;
       input.placeGeo = placeGeo;
       input.arriveBy = iso(day, arriveTime); // チェックイン
-      input.checkOut = iso(day + 1, checkOutTime); // 翌日チェックアウト
+      input.checkOut = iso(day + nights, checkOutTime); // 泊数ぶん後の日にチェックアウト
       input.fixedTime = true;
       input.openFrom = openFrom;
       input.openTo = openTo;
@@ -339,19 +347,27 @@ export function PlanEntryForm({
       ) : stay ? (
         <>
           <View className="gap-1">
-            <Text className="font-gothic-400 text-[10px] text-muted">場所・住所（宿泊先。候補から選ぶと番地まで自動入力）</Text>
+            <Text className="font-gothic-400 text-[10px] text-muted">住所（宿泊先候補から選ぶと番地まで自動入力）</Text>
             <TextInput
               value={place}
               onChangeText={onPlaceChange}
-              placeholder="例: ホテル日航大阪"
+              placeholder="例: 大阪府大阪市中央区西心斎橋1-2-3"
               placeholderTextColor={MUTED}
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
             />
             <OpenHoursNote loading={loadingDetails} openFrom={openFrom} openTo={openTo} />
           </View>
+          <View className="gap-1.5">
+            <Text className="font-gothic-400 text-[10px] text-muted">泊数（同じ宿に連泊する場合）</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {[1, 2, 3, 4].map((n) => (
+                <Chip key={n} active={nights === n} label={`${n}泊`} onPress={() => setNights(n)} />
+              ))}
+            </View>
+          </View>
           <View className="flex-row gap-3">
-            <TimeField label="チェックイン" value={arriveTime} onChange={setArriveTime} />
-            <TimeField label="チェックアウト（翌日）" value={checkOutTime} onChange={setCheckOutTime} />
+            <TimeField label={`チェックイン（${day}日目）`} value={arriveTime} onChange={setArriveTime} />
+            <TimeField label={`チェックアウト（${day + nights}日目）`} value={checkOutTime} onChange={setCheckOutTime} />
           </View>
         </>
       ) : (

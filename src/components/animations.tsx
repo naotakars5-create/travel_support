@@ -66,6 +66,24 @@ export function PulseRing({ size = 13, color = "rgba(35,32,29,.5)" }: { size?: n
   );
 }
 
+/** 上下に4pxだけゆっくり漂う（AI生成中のイラスト用）。唯一のイラストアニメーション。 */
+export function Floater({ children }: { children: React.ReactNode }) {
+  const [y] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(y, { toValue: -4, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(y, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [y]);
+
+  return <Animated.View style={{ transform: [{ translateY: y }] }}>{children}</Animated.View>;
+}
+
 /** CSS `animate-blink` 相当：一定間隔で表示/非表示を繰り返す（カウントダウンのコロン用） */
 export function Blinker({ children }: { children: React.ReactNode }) {
   const [opacity] = useState(() => new Animated.Value(1));

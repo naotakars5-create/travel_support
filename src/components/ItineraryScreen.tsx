@@ -6,6 +6,8 @@ import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
 import { dayOfIso, formatJstHeadingJa, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { GeoPoint, PlanEntry } from "@/lib/types";
 import { PRIORITY_META } from "@/lib/plan";
+import { pickBenchIllustration } from "@/lib/illustrations";
+import { Illustration } from "./Illustration";
 import { RouteMap } from "./RouteMap";
 import { Blinker, PulseRing, useNodeInStyle } from "./animations";
 
@@ -37,19 +39,20 @@ function lineBorderStyle(style: LineStyle | null) {
   };
 }
 
-function LineHalf({ style, side }: { style: LineStyle | null; side: "top" | "bottom" }) {
-  return (
-    <View
-      style={[
-        { position: "absolute", left: 12, width: 1, [side]: 0, height: "50%" } as const,
-        lineBorderStyle(style),
-      ]}
-    />
-  );
-}
-
 function LineFull({ style }: { style: LineStyle | null }) {
   return <View style={[{ position: "absolute", left: 12, top: 0, width: 1, height: "100%" } as const, lineBorderStyle(style)]} />;
+}
+
+/**
+ * 空き時間ブロックの安定シード。直前の地点の時刻（無ければ日と位置）を使う。
+ * 再レンダリングしても値が変わらないため、同じブロックには常に同じ絵が出る。
+ */
+function gapSeed(group: DayGroup, item: RailItem, groupIndex: number, itemIndex: number): string {
+  for (let i = itemIndex - 1; i >= 0; i--) {
+    const prev = group.items[i];
+    if (prev.type === "node") return prev.time;
+  }
+  return `${groupIndex}-${itemIndex}-${item.type}`;
 }
 
 /** 1日分の旅程（日番号・日付・その日の rail 要素・地点番号）。 */
@@ -190,17 +193,12 @@ export function ItineraryScreen({
               <RouteMap points={g.mapPoints} me={liveLocation} labels={g.mapLabels} />
             )}
             {g.items.map((item, i) => {
-              const prev = g.items[i - 1];
-              const next = g.items[i + 1];
-
               if (item.type === "node") {
                 return (
                   <NodeRow
                     key={item.key}
                     item={item}
                     stopNumber={g.numberOf.get(item.key)}
-                    prevStyle={lineStyleFor(prev)}
-                    nextStyle={lineStyleFor(next)}
                     isCurrent={item.key === currentNodeKey}
                     isNext={item.key === nextUpcomingKey}
                     isPast={item.nodeIndex < currentIndex && item.key !== currentNodeKey}
@@ -282,10 +280,14 @@ export function ItineraryScreen({
                         <Text className="font-gothic-400 text-[11px] text-muted">翌日まで（宿泊）</Text>
                       </View>
                     ) : (
-                      <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
-                        <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>
-                          空き時間 · {formatDurationMin(item.durationMin)}
-                        </Text>
+                      <View className="flex-row items-center gap-2">
+                        {/* 直前ノードの時刻をシードに、常に同じ絵を出す（Math.randomは使わない） */}
+                        <Illustration name={pickBenchIllustration(gapSeed(g, item, gi, i))} size="sm" alt="" />
+                        <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
+                          <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>
+                            空き時間 · {formatDurationMin(item.durationMin)}
+                          </Text>
+                        </View>
                       </View>
                     )}
                   </View>
@@ -327,8 +329,6 @@ export function ItineraryScreen({
 function NodeRow({
   item,
   stopNumber,
-  prevStyle,
-  nextStyle,
   isCurrent,
   isNext,
   isPast,
@@ -336,8 +336,6 @@ function NodeRow({
 }: {
   item: Extract<RailItem, { type: "node" }>;
   stopNumber?: number;
-  prevStyle: LineStyle | null;
-  nextStyle: LineStyle | null;
   isCurrent: boolean;
   /** 現在時刻より後の最初の予定（次に向かう先） */
   isNext: boolean;
@@ -347,17 +345,15 @@ function NodeRow({
   const nodeInStyle = useNodeInStyle(justAdded);
   const markerBg = isCurrent ? "#D96F4C" : isPast ? "#6E675C" : "#23201D";
   return (
-    <Animated.View style={nodeInStyle} className="min-h-[50px] flex-row">
-      <View className="w-12 items-end pt-1.5 pr-2">
+    <Animated.View style={nodeInStyle} className="min-h-[44px] flex-row">
+      <View className="w-12 items-end pt-1 pr-2">
         <Text className={`font-mincho-600 text-[14px] ${isPast ? "text-muted-light" : "text-ink"}`} style={TNUM}>
           {formatJstTime(new Date(item.time))}
         </Text>
       </View>
       <View className="w-[26px] items-center">
-        <LineHalf style={prevStyle} side="top" />
-        <LineHalf style={nextStyle} side="bottom" />
-        {/* 番号マーカー（＝地点の目印。現在地は薄い赤＋脈動） */}
-        <View className="mt-1" style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
+        {/* 番号マーカー自体が地点の目印。上下の縦線は引かない（番号の上に棒が出るため） */}
+        <View style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
           {isCurrent && <PulseRing size={22} color="rgba(217,111,76,.45)" />}
           <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: markerBg, alignItems: "center", justifyContent: "center" }}>
             <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>
@@ -366,7 +362,7 @@ function NodeRow({
           </View>
         </View>
       </View>
-      <View className="flex-1 pb-2 pl-1 pt-0.5">
+      <View className="flex-1 pb-1.5 pl-1">
         <View
           className={`rounded-[12px] border px-3 py-2 ${isCurrent ? "border-accent/50 bg-accent/[.06]" : "border-black/[.07] bg-white/60"}`}
           // 次に向かう予定：左に3pxのテラコッタ縦ボーダー（今・進行中の合図）

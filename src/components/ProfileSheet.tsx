@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Image, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AVATAR_CHOICES, Profile } from "@/lib/profile";
+import { AVATAR_CHOICES, normalizeAvatar, Profile } from "@/lib/profile";
+import { IllustrationName } from "@/lib/illustrations";
+import { illustrationUri } from "./Illustration";
 import { PhotoPicker } from "./PhotoPicker";
 import { SlideUp } from "./animations";
 
@@ -38,15 +40,15 @@ export function ProfileSheet({
             </View>
 
             <ScrollView keyboardShouldPersistTaps="handled">
-              {/* アイコンプレビュー（写真優先） */}
+              {/* アイコンプレビュー（写真優先・無ければ選択中のイラスト） */}
               <View className="items-center gap-3">
-                {photo ? (
-                  <Image source={{ uri: photo }} style={{ width: 84, height: 84, borderRadius: 42 }} resizeMode="cover" />
-                ) : (
-                  <View className="h-20 w-20 items-center justify-center rounded-full bg-white/70">
-                    <Text className="text-[40px]">{avatar}</Text>
-                  </View>
-                )}
+                <View className="h-[84px] w-[84px] overflow-hidden rounded-full bg-surface">
+                  <Image
+                    source={{ uri: photo ?? illustrationUri(normalizeAvatar(avatar) as IllustrationName) }}
+                    style={{ width: 84, height: 84 }}
+                    resizeMode="cover"
+                  />
+                </View>
                 <View className="flex-row items-center gap-2">
                   <PhotoPicker onPicked={setPhoto} maxSize={256} label="写真を選ぶ" />
                   {photo && (
@@ -59,16 +61,16 @@ export function ProfileSheet({
 
               <View className="mt-5 gap-1.5">
                 <Text className="font-gothic-400 text-[10px] text-muted">アイコン（写真が無いとき使われます）</Text>
-                <View className="flex-row flex-wrap gap-2">
+                <View className="flex-row gap-3">
                   {AVATAR_CHOICES.map((a) => {
-                    const active = a === avatar;
+                    const active = normalizeAvatar(avatar) === a;
                     return (
                       <Pressable
                         key={a}
                         onPress={() => setAvatar(a)}
-                        className={`h-11 w-11 items-center justify-center rounded-full border ${active ? "border-ink bg-white" : "border-black/[.12] bg-white/50"}`}
+                        className={`h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 ${active ? "border-ink bg-white" : "border-black/[.12] bg-white/50"}`}
                       >
-                        <Text className="text-[22px]">{a}</Text>
+                        <Image source={{ uri: illustrationUri(a as IllustrationName) }} style={{ width: 60, height: 60 }} resizeMode="cover" />
                       </Pressable>
                     );
                   })}

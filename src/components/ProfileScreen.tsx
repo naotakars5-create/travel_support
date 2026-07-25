@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { Image, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Profile } from "@/lib/profile";
+import { normalizeAvatar, Profile } from "@/lib/profile";
+import { IllustrationName } from "@/lib/illustrations";
+import { illustrationUri } from "./Illustration";
 import { BellIcon } from "./icons";
 import { SlideUp } from "./animations";
 
-/** アイコン表示（写真があれば写真、無ければ絵文字）。 */
+/** アイコン表示（写真があれば写真、無ければイラスト）。 */
 function Avatar({ profile, size }: { profile: Profile; size: number }) {
-  if (profile.photo) {
-    return <Image source={{ uri: profile.photo }} style={{ width: size, height: size, borderRadius: size / 2 }} resizeMode="cover" />;
-  }
+  const uri = profile.photo ?? illustrationUri(normalizeAvatar(profile.avatar) as IllustrationName);
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2 }} className="items-center justify-center bg-white/70">
-      <Text style={{ fontSize: size * 0.5 }}>{profile.avatar}</Text>
+    <View style={{ width: size, height: size, borderRadius: size / 2 }} className="overflow-hidden bg-surface">
+      <Image source={{ uri }} style={{ width: size, height: size }} resizeMode="cover" />
     </View>
   );
 }
