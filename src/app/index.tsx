@@ -9,12 +9,14 @@ import { DayOfScreen } from "@/components/DayOfScreen";
 import { PackingScreen } from "@/components/PackingScreen";
 import { AddEntrySheet } from "@/components/AddEntrySheet";
 import { EditEntrySheet } from "@/components/EditEntrySheet";
+import { ProfileSheet } from "@/components/ProfileSheet";
 import { FlashOverlay } from "@/components/FlashOverlay";
 
 export default function Home() {
   const app = useAppState();
   const [addOpen, setAddOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const dark = app.tab === "today";
   const editingEntry = editId ? app.entries?.find((e) => e.id === editId) ?? null : null;
 
@@ -40,10 +42,13 @@ export default function Home() {
           onSetTripDate={app.setTripDate}
           baseMode={app.baseMode}
           onSetBaseMode={app.setBaseMode}
+          profile={app.profile}
+          onOpenProfile={() => setProfileOpen(true)}
           onOpenAdd={() => setAddOpen(true)}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
+          onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
           onAddSuggestion={app.addSuggestion}
           onShare={app.shareCurrentPlan}
           onImportShared={app.importSharedToOwn}
@@ -55,6 +60,7 @@ export default function Home() {
           currentNodeKey={app.currentNodeKey}
           justAddedEventId={app.justAddedEventId}
           liveLocation={app.liveLocation}
+          now={app.now}
           onNavigatePlan={() => app.setTab("plan")}
         />
       )}
@@ -99,6 +105,8 @@ export default function Home() {
           }}
         />
       )}
+
+      {profileOpen && <ProfileSheet profile={app.profile} onClose={() => setProfileOpen(false)} onSave={app.setProfile} />}
 
       <FlashOverlay visible={app.flash.visible} text={app.flash.text} />
     </View>

@@ -45,7 +45,15 @@ export function AddEntrySheet({
         <Pressable className="flex-1 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
         <SlideUp trigger="add-entry">
           <View className="max-h-[88%] rounded-t-sheet bg-sheet px-6 pt-3" style={{ paddingBottom: insets.bottom + 24 }}>
-            <View className="mx-auto mb-4 h-1 w-9 rounded-full bg-black/[.14]" />
+            <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />
+
+            <View className="mb-3 flex-row items-center justify-between">
+              <Pressable onPress={onClose} hitSlop={8} className="rounded-full border border-black/[.15] px-3 py-1">
+                <Text className="font-gothic-400 text-[12px] text-muted">‹ 戻る</Text>
+              </Pressable>
+              <Text className="font-mincho-600 text-[16px] text-ink">行き先を追加</Text>
+              <View className="w-[52px]" />
+            </View>
 
             <View className="mb-5 flex-row gap-2">
               <Pressable onPress={() => setMode("manual")} className={`flex-1 rounded-[10px] py-2 ${mode === "manual" ? "bg-ink" : "border border-black/[.1]"}`}>

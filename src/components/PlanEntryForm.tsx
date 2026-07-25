@@ -197,8 +197,8 @@ export function PlanEntryForm({
             keyboardType="number-pad"
             placeholder="例: 1200"
             placeholderTextColor={MUTED}
-            className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
-            style={{ fontVariant: ["tabular-nums"] }}
+            className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 font-mincho-400 text-[14px] text-ink"
+            style={{ height: 42, fontVariant: ["tabular-nums"] }}
           />
         </View>
       </View>

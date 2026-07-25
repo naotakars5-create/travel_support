@@ -29,7 +29,10 @@ export function EditEntrySheet({
           <View className="max-h-[88%] rounded-t-sheet bg-sheet px-6 pt-3" style={{ paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />
             <View className="mb-3 flex-row items-center justify-between">
-              <Text className="font-mincho-600 text-[18px] text-ink">行き先を編集</Text>
+              <Pressable onPress={onClose} hitSlop={8} className="rounded-full border border-black/[.15] px-3 py-1">
+                <Text className="font-gothic-400 text-[12px] text-muted">‹ 戻る</Text>
+              </Pressable>
+              <Text className="font-mincho-600 text-[16px] text-ink">行き先を編集</Text>
               <Pressable onPress={onDelete} hitSlop={8} className="rounded-full border border-black/[.15] px-3 py-1">
                 <Text className="font-gothic-400 text-[11px] text-muted">削除</Text>
               </Pressable>

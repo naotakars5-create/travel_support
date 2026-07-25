@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, TextStyle, View } from "react-native";
+import { Linking, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DayOfState, computeCountdown } from "@/lib/dayof";
 import { formatDurationMin, RailNode } from "@/lib/itinerary";
@@ -48,24 +48,32 @@ function NearbySpots({
   }, [lat, lng, freeMinutes, preferIndoor]);
 
   if (spots.length === 0) return null;
+  const openSpot = (s: Spot) => {
+    const query = s.lat != null && s.lng != null ? `${s.lat},${s.lng}` : encodeURIComponent(s.name);
+    void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+  };
   return (
     <View className="mt-7 w-full">
       <Text className="mb-2 font-gothic-400 text-[10px] tracking-[.15em] text-day-text3">
         {preferIndoor ? "近くの屋内スポット（雨のため）" : "近くの観光スポット"}
-        {live ? "（現在地から）" : ""}
+        {live ? "（現在地から）" : ""} · タップで地図
       </Text>
       <View className="rounded-[16px] border border-day-text/10">
         {spots.map((s, i) => (
-          <View key={s.name} className={`flex-row items-start justify-between px-4 py-3 ${i > 0 ? "border-t border-day-text/10" : ""}`}>
+          <Pressable
+            key={s.name}
+            onPress={() => openSpot(s)}
+            className={`flex-row items-start justify-between px-4 py-3 ${i > 0 ? "border-t border-day-text/10" : ""}`}
+          >
             <View className="flex-1 pr-2">
               <Text className="font-mincho-400 text-[14px] text-day-text">{s.name}</Text>
               <Text className="mt-0.5 font-gothic-400 text-[10px] text-day-text2">{[s.category, s.note].filter(Boolean).join(" · ")}</Text>
               {s.address && <Text className="mt-0.5 font-gothic-400 text-[10px] text-day-text3">{s.address}</Text>}
             </View>
             <Text className="mt-0.5 font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
-              徒歩 {s.walkMin}分
+              徒歩 {s.walkMin}分 ›
             </Text>
-          </View>
+          </Pressable>
         ))}
       </View>
     </View>
