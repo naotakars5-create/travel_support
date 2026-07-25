@@ -6,6 +6,8 @@ import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
 import { dayOfIso, formatJstHeadingJa, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { GeoPoint, PlanEntry } from "@/lib/types";
 import { PRIORITY_META } from "@/lib/plan";
+import { pickBenchIllustration } from "@/lib/illustrations";
+import { Illustration } from "./Illustration";
 import { RouteMap } from "./RouteMap";
 import { Blinker, PulseRing, useNodeInStyle } from "./animations";
 
@@ -50,6 +52,18 @@ function LineHalf({ style, side }: { style: LineStyle | null; side: "top" | "bot
 
 function LineFull({ style }: { style: LineStyle | null }) {
   return <View style={[{ position: "absolute", left: 12, top: 0, width: 1, height: "100%" } as const, lineBorderStyle(style)]} />;
+}
+
+/**
+ * 空き時間ブロックの安定シード。直前の地点の時刻（無ければ日と位置）を使う。
+ * 再レンダリングしても値が変わらないため、同じブロックには常に同じ絵が出る。
+ */
+function gapSeed(group: DayGroup, item: RailItem, groupIndex: number, itemIndex: number): string {
+  for (let i = itemIndex - 1; i >= 0; i--) {
+    const prev = group.items[i];
+    if (prev.type === "node") return prev.time;
+  }
+  return `${groupIndex}-${itemIndex}-${item.type}`;
 }
 
 /** 1日分の旅程（日番号・日付・その日の rail 要素・地点番号）。 */
@@ -282,10 +296,14 @@ export function ItineraryScreen({
                         <Text className="font-gothic-400 text-[11px] text-muted">翌日まで（宿泊）</Text>
                       </View>
                     ) : (
-                      <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
-                        <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>
-                          空き時間 · {formatDurationMin(item.durationMin)}
-                        </Text>
+                      <View className="flex-row items-center gap-2">
+                        {/* 直前ノードの時刻をシードに、常に同じ絵を出す（Math.randomは使わない） */}
+                        <Illustration name={pickBenchIllustration(gapSeed(g, item, gi, i))} size="sm" alt="" />
+                        <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
+                          <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>
+                            空き時間 · {formatDurationMin(item.durationMin)}
+                          </Text>
+                        </View>
                       </View>
                     )}
                   </View>

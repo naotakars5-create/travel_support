@@ -6,11 +6,10 @@ import { PlanEntry } from "@/lib/types";
 import { dateForDay, formatJstTime } from "@/lib/date";
 import { MODE_LABEL } from "@/lib/modeMeta";
 import { PhotoPicker } from "./PhotoPicker";
+import { Illustration, illustrationUri } from "./Illustration";
 import { SlideUp } from "./animations";
 
 const MUTED = "#6E675C";
-// 表紙写真が無いしおりの背景色（インデックスで割り当て）。
-const COVER_COLORS = ["#23201D", "#6E675C"]; // 写真なし表紙は墨/補助色のみ（6トークン外の色は使わない）
 
 /** "2023-09-01" → "2023.09.01" */
 function dot(dateStr: string): string {
@@ -31,30 +30,35 @@ function entryTime(e: PlanEntry): number {
 }
 
 /** 1枚のしおりカード（表紙写真＋タイトル＋期間）。 */
-function ShioriCard({ trip, index, onPress }: { trip: SavedTrip; index: number; onPress: () => void }) {
-  const bg = COVER_COLORS[index % COVER_COLORS.length];
+function ShioriCard({ trip, onPress }: { trip: SavedTrip; onPress: () => void }) {
+  // 表紙は「ユーザーの写真 > 既定イラスト」。どちらも上部に墨のグラデを重ねて白文字を可読にする。
+  const coverUri = trip.coverPhoto ?? illustrationUri("cover-default");
+  // 墨の半透明を上から下へ段階的に薄くして擬似グラデにする（追加ライブラリなし）。
   const Header = (
-    <View className="p-2.5">
-      <Text numberOfLines={1} className="font-mincho-600 text-[14px] text-white" style={{ textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4 }}>
-        {trip.name}
-      </Text>
-      <View className="mt-1 h-px w-full bg-white/40" />
-      <Text className="mt-1 font-gothic-400 text-[10px] text-white/90" style={{ textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 4 }}>
-        {dateRange(trip)}
-      </Text>
+    <View>
+      <View className="absolute inset-x-0 top-0 h-[34px] bg-ink/55" />
+      <View className="absolute inset-x-0 top-[34px] h-[14px] bg-ink/30" />
+      <View className="absolute inset-x-0 top-[48px] h-[10px] bg-ink/12" />
+      <View className="px-2.5 pb-4 pt-2.5">
+        <Text numberOfLines={1} className="font-mincho-600 text-[14px] text-white">
+          {trip.name}
+        </Text>
+        <View className="mt-1 h-px w-full bg-white/40" />
+        <Text className="mt-1 font-gothic-400 text-[10px] text-white/90">{dateRange(trip)}</Text>
+      </View>
     </View>
   );
   return (
-    <Pressable onPress={onPress} className="mb-3 w-[48%] overflow-hidden rounded-[14px] border border-black/[.08]" style={{ aspectRatio: 0.82 }}>
-      {trip.coverPhoto ? (
-        <ImageBackground source={{ uri: trip.coverPhoto }} resizeMode="cover" style={{ flex: 1, justifyContent: "flex-start" }}>
-          <View className="bg-black/25">{Header}</View>
-        </ImageBackground>
-      ) : (
-        <View style={{ flex: 1, backgroundColor: bg }} className="justify-start">
-          {Header}
-        </View>
-      )}
+    <Pressable onPress={onPress} className="mb-3 w-[48%] overflow-hidden rounded-[14px] border border-black/[.08] bg-surface" style={{ aspectRatio: 0.82 }}>
+      <ImageBackground
+        source={{ uri: coverUri }}
+        resizeMode="cover"
+        // 既定イラストは下側（人物）を見せたいので bottom 寄せ
+        imageStyle={trip.coverPhoto ? undefined : { resizeMode: "cover", top: undefined, bottom: 0 }}
+        style={{ flex: 1, justifyContent: "flex-start" }}
+      >
+        {Header}
+      </ImageBackground>
     </Pressable>
   );
 }
@@ -93,16 +97,20 @@ export function ShioriScreen({
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 16, paddingBottom: 110 }}>
         {trips.length === 0 ? (
-          <View className="mt-16 items-center">
-            <Text className="text-[40px]">📖</Text>
-            <Text className="mt-3 text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
-              まだしおりがありません。{"\n"}計画で行き先を作ったら、右下の＋で{"\n"}表紙写真つきのしおりにできます。
+          <View className="mt-14 items-center">
+            <Illustration name="empty-suitcase" size="lg" alt="" />
+            <Text className="mt-3 font-mincho-600 text-[16px] text-ink">まだ旅がありません</Text>
+            <Text className="mt-1.5 text-center font-gothic-400 text-[11px] leading-[18px] text-muted">
+              計画で行き先を作ったら、{"\n"}表紙つきのしおりにできます。
             </Text>
+            <Pressable onPress={() => setCreateOpen(true)} className="mt-5 rounded-[12px] bg-ink px-6 py-3">
+              <Text className="font-gothic-500 text-[12px] text-kinari">新しいしおりを作る</Text>
+            </Pressable>
           </View>
         ) : (
           <View className="flex-row flex-wrap justify-between">
-            {trips.map((t, i) => (
-              <ShioriCard key={t.id} trip={t} index={i} onPress={() => setDetailId(t.id)} />
+            {trips.map((t) => (
+              <ShioriCard key={t.id} trip={t} onPress={() => setDetailId(t.id)} />
             ))}
           </View>
         )}
@@ -184,18 +192,17 @@ function CreateShioriSheet({
             <ScrollView keyboardShouldPersistTaps="handled">
               {/* 表紙プレビュー */}
               <View className="items-center gap-3">
-                <View className="h-40 w-full overflow-hidden rounded-[14px] border border-black/[.1]" style={{ backgroundColor: cover ? undefined : "#23201D" }}>
-                  {cover ? (
-                    <ImageBackground source={{ uri: cover }} resizeMode="cover" style={{ flex: 1, justifyContent: "flex-start" }}>
-                      <View className="bg-black/25 p-3">
-                        <Text numberOfLines={1} className="font-mincho-600 text-[16px] text-white">{name || "旅のタイトル"}</Text>
-                      </View>
-                    </ImageBackground>
-                  ) : (
-                    <View className="flex-1 justify-start p-3">
+                <View className="h-40 w-full overflow-hidden rounded-[14px] border border-black/[.1] bg-surface">
+                  <ImageBackground
+                    source={{ uri: cover ?? illustrationUri("cover-default") }}
+                    resizeMode="cover"
+                    imageStyle={cover ? undefined : { top: undefined, bottom: 0 }}
+                    style={{ flex: 1, justifyContent: "flex-start" }}
+                  >
+                    <View className="bg-ink/45 p-3">
                       <Text numberOfLines={1} className="font-mincho-600 text-[16px] text-white">{name || "旅のタイトル"}</Text>
                     </View>
-                  )}
+                  </ImageBackground>
                 </View>
                 <View className="flex-row items-center gap-2">
                   <PhotoPicker onPicked={setCover} maxSize={800} label={cover ? "写真を変更" : "表紙写真を選ぶ"} />
@@ -290,19 +297,17 @@ function ShioriDetail({
               >
                 <Text className="font-gothic-500 text-[12px] text-white">‹ 戻る</Text>
               </Pressable>
-              {trip.coverPhoto ? (
-                <ImageBackground source={{ uri: trip.coverPhoto }} resizeMode="cover" style={{ flex: 1, justifyContent: "flex-end" }}>
-                  <View className="bg-black/30 p-4">
-                    <Text className="font-mincho-700 text-[22px] text-white">{trip.name}</Text>
-                    <Text className="mt-1 font-gothic-400 text-[11px] text-white/90">{dateRange(trip)}</Text>
-                  </View>
-                </ImageBackground>
-              ) : (
-                <View style={{ flex: 1, backgroundColor: "#23201D" }} className="justify-end p-4">
+              <ImageBackground
+                source={{ uri: trip.coverPhoto ?? illustrationUri("cover-default") }}
+                resizeMode="cover"
+                imageStyle={trip.coverPhoto ? undefined : { top: undefined, bottom: 0 }}
+                style={{ flex: 1, justifyContent: "flex-end" }}
+              >
+                <View className="bg-ink/45 p-4">
                   <Text className="font-mincho-700 text-[22px] text-white">{trip.name}</Text>
                   <Text className="mt-1 font-gothic-400 text-[11px] text-white/90">{dateRange(trip)}</Text>
                 </View>
-              )}
+              </ImageBackground>
             </View>
 
             <ScrollView className="px-6" contentContainerStyle={{ paddingTop: 14, paddingBottom: 14 }}>

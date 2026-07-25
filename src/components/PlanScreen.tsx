@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PlanEntry, Priority, SpotSuggestion } from "@/lib/types";
 import { PlanTotals, PRIORITY_META, effectiveStayMin, entryDurationMin, COST_CATEGORY_LABEL, COST_CATEGORY_ORDER } from "@/lib/plan";
@@ -10,6 +10,8 @@ import { formatDurationMin } from "@/lib/itinerary";
 import { dateForDay, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { formatYen } from "@/lib/format";
 import { DateOnlyField } from "./PlainFields";
+import { Illustration, illustrationUri } from "./Illustration";
+import { Floater } from "./animations";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 
@@ -265,9 +267,12 @@ export function PlanScreen({
               )}
             </View>
             {!startPoint ? (
-              <Text className="mt-1 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
-                自宅・集合場所（例: 東京駅）を設定すると、旅の起点・終点になり、最初のスポットまでの移動時間も計算します。
-              </Text>
+              <View className="mt-1 flex-row items-center gap-3">
+                <Image source={{ uri: illustrationUri("icon-home") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
+                <Text className="flex-1 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+                  自宅・集合場所（例: 東京駅）を設定すると、旅の起点・終点になり、最初のスポットまでの移動時間も計算します。
+                </Text>
+              </View>
             ) : (
               <View className="mt-2 flex-row items-center gap-2">
                 <Pressable onPress={() => onEditEntry(startPoint.id)} className="flex-1">
@@ -301,9 +306,12 @@ export function PlanScreen({
               </Pressable>
             </View>
             {lodging.length === 0 ? (
-              <Text className="mt-1 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
-                ホテル等はここで固定登録します。旅程の並び替え対象にはなりません。
-              </Text>
+              <View className="mt-1 flex-row items-center gap-3">
+                <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
+                <Text className="flex-1 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+                  ホテル等はここで固定登録します。旅程の並び替え対象にはなりません。
+                </Text>
+              </View>
             ) : (
               <View className="mt-2 gap-2">
                 {lodging.map((e) => (
@@ -581,6 +589,17 @@ export function PlanScreen({
           </View>
         )}
       </ScrollView>
+
+      {/* AIで旅程を組んでいる間のオーバーレイ（イラストは上下4pxのふわふわのみ） */}
+      {composing && (
+        <View className="absolute inset-0 items-center justify-center bg-base/90">
+          <Floater>
+            <Illustration name="loading-map" size="md" alt="" />
+          </Floater>
+          <Text className="mt-4 font-mincho-600 text-[15px] text-ink">旅程を組み立てています</Text>
+          <Text className="mt-1.5 font-gothic-400 text-[11px] text-muted">少しお待ちください</Text>
+        </View>
+      )}
     </View>
   );
 }
