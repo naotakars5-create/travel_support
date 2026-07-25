@@ -11,6 +11,8 @@ export interface SavedTrip {
   name: string;
   /** しおりの表紙写真（data URL・任意） */
   coverPhoto?: string;
+  /** 旅の思い出写真（data URL・最大30枚） */
+  photos?: string[];
   /** 保存日時（ISO8601） */
   savedAt: string;
   entries: PlanEntry[];
@@ -20,6 +22,9 @@ export interface SavedTrip {
   tripDayCount: number;
   baseMode: BaseMode;
 }
+
+/** 思い出写真の上限枚数。 */
+export const MAX_TRIP_PHOTOS = 30;
 
 export async function loadTrips(): Promise<SavedTrip[]> {
   try {

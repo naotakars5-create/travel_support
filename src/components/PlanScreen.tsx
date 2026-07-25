@@ -13,6 +13,10 @@ import { DateOnlyField } from "./PlainFields";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 
+// 日ごとの淡い背景色（複数日程で日を見分けやすくする）。1日目は無地。
+const DAY_TINTS = ["", "bg-mode-rail/[.06]", "bg-mode-air/[.06]", "bg-mode-bus/[.07]", "bg-accent/[.05]"];
+const dayTint = (day: number): string => DAY_TINTS[(Math.max(1, day) - 1) % DAY_TINTS.length];
+
 const PRIORITY_STYLE: Record<Priority, { border: string; text: string }> = {
   must: { border: "border-accent", text: "text-accent" },
   want: { border: "border-ink/40", text: "text-ink" },
@@ -37,6 +41,7 @@ export function PlanScreen({
   profile,
   onOpenProfile,
   onOpenAdd,
+  onOpenAddLodging,
   onCompose,
   onRemoveEntry,
   onEditEntry,
@@ -64,6 +69,7 @@ export function PlanScreen({
   profile: Profile;
   onOpenProfile: () => void;
   onOpenAdd: () => void;
+  onOpenAddLodging: () => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
@@ -87,11 +93,13 @@ export function PlanScreen({
   // 表示時刻：固定予定は目安到着を厳守、それ以外は組み上げ結果（自動計算）の時刻を優先
   const timeOf = (e: PlanEntry): string | null =>
     (e.fixedTime && e.arriveBy ? e.arriveBy : scheduleByEntry.get(e.id) ?? e.arriveBy) ?? null;
-  // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番
+  // 宿泊は「宿泊先（固定）」として別枠。並び替えの対象外。
+  const lodging = entries.filter((e) => e.mode === "stay");
+  // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番（宿泊は除外）
   const indexOf = new Map(entries.map((e, i) => [e.id, i]));
-  const ordered = [...entries].sort(
-    (a, b) => (a.day ?? 1) - (b.day ?? 1) || (indexOf.get(a.id) ?? 0) - (indexOf.get(b.id) ?? 0)
-  );
+  const ordered = entries
+    .filter((e) => e.mode !== "stay")
+    .sort((a, b) => (a.day ?? 1) - (b.day ?? 1) || (indexOf.get(a.id) ?? 0) - (indexOf.get(b.id) ?? 0));
   // 日ごとの通し番号（1,2,3…）
   const numberOf = new Map<string, number>();
   const dayCounter = new Map<number, number>();
@@ -237,6 +245,46 @@ export function PlanScreen({
             </View>
           </View>
         )}
+        {/* 宿泊先（固定・並び替え対象外） */}
+        {!readOnly && (
+          <View className="mb-4 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
+            <View className="flex-row items-center justify-between">
+              <Text className="font-gothic-500 text-[11px] text-ink">宿泊先（固定）</Text>
+              <Pressable onPress={onOpenAddLodging} className="rounded-full border border-ink/25 px-3 py-1">
+                <Text className="font-gothic-500 text-[10px] text-ink">＋ 宿泊先</Text>
+              </Pressable>
+            </View>
+            {lodging.length === 0 ? (
+              <Text className="mt-1 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+                ホテル等はここで固定登録します。旅程の並び替え対象にはなりません。
+              </Text>
+            ) : (
+              <View className="mt-2 gap-2">
+                {lodging.map((e) => (
+                  <View key={e.id} className="flex-row items-center gap-2">
+                    <Pressable onPress={() => onEditEntry(e.id)} className="flex-1">
+                      <Text className="font-mincho-600 text-[13px] text-ink">🏨 {e.title}</Text>
+                      <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                        {tripDayCount > 1 ? `${e.day ?? 1}日目 · ` : ""}
+                        {e.arriveBy ? `IN ${formatJstTime(new Date(e.arriveBy))}` : ""}
+                        {e.checkOut ? ` → OUT ${formatJstTime(new Date(e.checkOut))}` : ""}
+                      </Text>
+                      {e.place && (
+                        <Text numberOfLines={1} className="font-gothic-400 text-[10px] text-muted-light">
+                          {e.place}
+                        </Text>
+                      )}
+                    </Pressable>
+                    <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8}>
+                      <Text className="font-gothic-400 text-[15px] text-muted-light">×</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Day タブ（複数日程のとき）。並び替えは各日の中で行う。 */}
         {tripDayCount > 1 && entries.length > 0 && (
           <View className="mb-3 flex-row flex-wrap gap-2">
@@ -273,8 +321,22 @@ export function PlanScreen({
           const ps = PRIORITY_STYLE[e.priority];
           const num = numberOf.get(e.id);
           const range = timeRange(e);
+          const day = e.day ?? 1;
+          const showHeader = activeDay === "all" && tripDayCount > 1 && num === 1;
           return (
-            <View key={e.id} className="border-b border-black/[.06] py-3.5">
+            <View key={e.id}>
+              {showHeader && (
+                <View className="mb-1 mt-3 flex-row items-center gap-2">
+                  <View className="h-[18px] w-[18px] items-center justify-center rounded-full bg-ink">
+                    <Text className="font-gothic-500 text-[9px] text-kinari" style={TNUM}>{day}</Text>
+                  </View>
+                  <Text className="font-gothic-500 text-[12px] text-ink">
+                    {day}日目 · {formatJstMonthDayJa(new Date(`${dateForDay(tripDate, day)}T00:00`))}
+                  </Text>
+                  <View className="h-px flex-1 bg-black/[.1]" />
+                </View>
+              )}
+              <View className={`border-b border-black/[.06] px-2 py-3.5 ${dayTint(day)}`}>
               <View className="flex-row gap-2">
                 {/* 番号 */}
                 <View className="w-[22px] items-center pt-0.5">
@@ -365,6 +427,7 @@ export function PlanScreen({
                   })}
                 </View>
               )}
+              </View>
             </View>
           );
         })}

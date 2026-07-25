@@ -17,6 +17,7 @@ import { FlashOverlay } from "@/components/FlashOverlay";
 export default function Home() {
   const app = useAppState();
   const [addOpen, setAddOpen] = useState(false);
+  const [addLodgingOpen, setAddLodgingOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const dark = app.tab === "today";
@@ -49,6 +50,7 @@ export default function Home() {
           profile={app.profile}
           onOpenProfile={() => setProfileOpen(true)}
           onOpenAdd={() => setAddOpen(true)}
+          onOpenAddLodging={() => setAddLodgingOpen(true)}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
@@ -94,6 +96,8 @@ export default function Home() {
           }}
           onDelete={app.deleteTrip}
           onSetCover={app.setTripCover}
+          onAddPhotos={app.addTripPhotos}
+          onRemovePhoto={app.removeTripPhoto}
         />
       )}
       {app.tab === "profile" && (
@@ -110,6 +114,22 @@ export default function Home() {
           onAdd={(input) => {
             app.addEntry(input);
             setAddOpen(false);
+            app.setTab("plan");
+          }}
+          onImportMail={app.importFromMail}
+        />
+      )}
+
+      {addLodgingOpen && (
+        <AddEntrySheet
+          tripDate={app.tripDate}
+          tripDayCount={app.tripDayCount}
+          fixedMode="stay"
+          title="宿泊先を追加"
+          onClose={() => setAddLodgingOpen(false)}
+          onAdd={(input) => {
+            app.addEntry(input);
+            setAddLodgingOpen(false);
             app.setTab("plan");
           }}
           onImportMail={app.importFromMail}

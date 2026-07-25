@@ -38,8 +38,8 @@ export const PLAN_SYSTEM_PROMPT = `あなたは日本の個人旅行者のため
 - "notes" は組み方の一言メモ（例: 「昼食の予約に合わせ午前は美術館、午後は買い物を配置しました」）。40〜80字程度。
 - 出力はJSONのみ。マークダウンや説明文は絶対に付けない。`;
 
-export function buildPlanUserMessage(params: { entries: PlanEntry[]; referenceDateIso: string }): string {
-  const { entries, referenceDateIso } = params;
+export function buildPlanUserMessage(params: { entries: PlanEntry[]; referenceDateIso: string; dayCount?: number }): string {
+  const { entries, referenceDateIso, dayCount = 1 } = params;
   const lines = entries.map((e) => {
     // 自宅は「出発（departAt）」と「帰宅（arriveBy）」を明示する
     if (e.mode === "home") {
@@ -66,13 +66,32 @@ export function buildPlanUserMessage(params: { entries: PlanEntry[]; referenceDa
     return parts.join(" / ");
   });
 
+  const start = new Date(referenceDateIso);
+  const dayList = Array.from({ length: Math.max(1, dayCount) }, (_, i) => {
+    const d = new Date(start.getTime() + i * 86400000);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${i + 1}日目 = ${y}-${m}-${day}`;
+  }).join(" / ");
+
+  const multiDayNote =
+    dayCount > 1
+      ? [
+          `この旅行は【${dayCount}日間】です（${dayList}）。`,
+          `**1日に詰め込みすぎず、${dayCount}日間へバランスよく配分してください。** 「何日目」が指定された予定はその日に置き、指定が無い予定も各日へ振り分ける。`,
+          `各予定の arriveAt は、割り当てた「その日の日付」＋時刻（+09:00）にすること（全部を初日にしない）。`,
+        ].join("\n")
+      : "上記を1日の順路に組み上げてください。";
+
   return [
-    `基準日（今日・タイムゾーン+09:00）: ${referenceDateIso}`,
+    `基準日（1日目・タイムゾーン+09:00）: ${referenceDateIso}`,
+    multiDayNote,
     "",
     "----- 行きたい場所リスト -----",
     ...lines,
     "----- ここまで -----",
     "",
-    "上記を1日の順路に組み上げ、指定のJSONスキーマのみを出力してください。",
+    "指定のJSONスキーマのみを出力してください。",
   ].join("\n");
 }
