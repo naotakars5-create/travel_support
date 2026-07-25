@@ -1,4 +1,5 @@
-import { ParsedEvent, TransportMode } from "./types";
+import { GeoPoint, ParsedEvent, TransportMode } from "./types";
+import { haversineMeters } from "./geo";
 
 /** 旅行全体の「基本の移動手段」。当日の出発カウントダウン等の計算に使う。 */
 export type BaseMode = "car" | "walk";
@@ -56,6 +57,39 @@ export const heuristicTransitEstimator: TransitEstimator = {
   },
 };
 
+// 距離ベースの所要時間換算（実測が取れない/0の時のフォールバック）。
+const WALK_METERS_PER_MIN = 80; // 約4.8km/h
+const DRIVE_METERS_PER_MIN = 350; // 市街地の平均 約21km/h（信号・渋滞込み）
+
+/** イベントの到着側座標（次区間の起点）。 */
+function endGeoOf(ev: ParsedEvent): GeoPoint | undefined {
+  return ev.placeToGeo ?? ev.placeFromGeo;
+}
+/** イベントの出発側座標（前区間の終点）。 */
+function startGeoOf(ev: ParsedEvent): GeoPoint | undefined {
+  return ev.placeFromGeo ?? ev.placeToGeo;
+}
+
+/** 2地点の座標から、車・徒歩の所要時間（分）を直線距離ベースで見積もる。座標が無ければ空。 */
+function distanceEstimate(from: ParsedEvent, to: ParsedEvent): { driving?: number; walking?: number } {
+  const a = endGeoOf(from);
+  const b = startGeoOf(to);
+  if (!a || !b) return {};
+  const meters = haversineMeters(a, b);
+  if (!Number.isFinite(meters) || meters <= 0) return {};
+  return {
+    driving: Math.max(1, Math.round(meters / DRIVE_METERS_PER_MIN)),
+    walking: Math.max(1, Math.round(meters / WALK_METERS_PER_MIN)),
+  };
+}
+
+/** 正の値を優先して返す（実測が0や欠損なら距離ベースにフォールバック）。 */
+function pickPositive(measured: number | undefined, fallback: number | undefined): number | undefined {
+  if (typeof measured === "number" && measured > 0) return measured;
+  if (typeof fallback === "number" && fallback > 0) return fallback;
+  return undefined;
+}
+
 /**
  * event-id ペア（`${from.id}:${to.id}`）をキーに、事前計算済みの実測値（Directions API 由来・車/徒歩）を返す。
  * baseMode に応じて所要時間を選び、driving/walking の両方も添える。
@@ -65,10 +99,14 @@ export function createPrecomputedEstimator(cache: Record<string, EdgeTravel>, ba
   return {
     estimate(from, to) {
       const t = cache[`${from.id}:${to.id}`];
-      if (t && (t.driving != null || t.walking != null)) {
-        const chosen = baseMode === "car" ? t.driving ?? t.walking : t.walking ?? t.driving;
+      const dist = distanceEstimate(from, to);
+      // 実測（Directions）を優先し、0や欠損なら距離ベースへフォールバック（0分表示を防ぐ）。
+      const driving = pickPositive(t?.driving, dist.driving);
+      const walking = pickPositive(t?.walking, dist.walking);
+      if (driving != null || walking != null) {
+        const chosen = baseMode === "car" ? driving ?? walking : walking ?? driving;
         const mode: TransportMode = baseMode === "car" ? "car" : "walk";
-        return { mode, durationMin: chosen ?? 0, driving: t.driving, walking: t.walking };
+        return { mode, durationMin: chosen ?? 0, driving, walking };
       }
       return heuristicTransitEstimator.estimate(from, to);
     },
