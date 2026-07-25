@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PackingItem } from "@/lib/types";
 import { packingProgress } from "@/lib/packing";
 
-const MUTED = "#8a8378";
+const MUTED = "#6E675C";
 
 export function PackingScreen({
   items,
@@ -35,6 +35,15 @@ export function PackingScreen({
         <Text className="mt-1 font-gothic-400 text-[11px] text-muted" style={{ fontVariant: ["tabular-nums"] }}>
           {done} / {total} 準備済み
         </Text>
+        {/* 進捗バー：準備完了（全チェック）でマスタード、それまでは墨 */}
+        {total > 0 && (
+          <View className="mt-2 h-[5px] w-full overflow-hidden rounded-full bg-surface">
+            <View
+              className={`h-full rounded-full ${done === total ? "bg-highlight" : "bg-ink"}`}
+              style={{ width: `${Math.round((done / total) * 100)}%` }}
+            />
+          </View>
+        )}
       </View>
       <View className="h-px w-full bg-black/[.08]" />
 
@@ -42,8 +51,9 @@ export function PackingScreen({
         {items.map((item) => (
           <View key={item.id} className="flex-row items-center gap-3 border-b border-black/[.06] py-3">
             <Pressable onPress={() => onToggle(item.id)} hitSlop={8}>
-              <View className={`h-[22px] w-[22px] items-center justify-center rounded-[6px] border ${item.checked ? "border-ink bg-ink" : "border-black/[.25]"}`}>
-                {item.checked && <View className="h-[9px] w-[9px] rounded-[2px] bg-kinari" />}
+              {/* チェック済みはマスタード塗り（完了＝highlight） */}
+              <View className={`h-[22px] w-[22px] items-center justify-center rounded-[6px] border ${item.checked ? "border-highlight bg-highlight" : "border-black/[.25]"}`}>
+                {item.checked && <View className="h-[9px] w-[9px] rounded-[2px] bg-ink" />}
               </View>
             </Pressable>
             <Pressable className="flex-1" onPress={() => onToggle(item.id)}>

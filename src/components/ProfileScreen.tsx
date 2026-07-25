@@ -70,7 +70,7 @@ export function ProfileScreen({ profile, onEditProfile }: { profile: Profile; on
           onPress={() => setNotifOpen(true)}
           className="h-10 w-10 items-center justify-center rounded-full border border-black/[.08] bg-white/70"
         >
-          <BellIcon color="#2a2622" size={18} />
+          <BellIcon color="#23201D" size={18} />
         </Pressable>
       </View>
       <View className="h-px w-full bg-black/[.08]" />
@@ -104,7 +104,7 @@ export function ProfileScreen({ profile, onEditProfile }: { profile: Profile; on
               onPress={() => (m.action ? m.action() : setInfo(m.content))}
               className={`flex-row items-center justify-between px-4 py-3.5 ${i > 0 ? "border-t border-ink/10" : ""}`}
             >
-              <Text className={`font-gothic-400 text-[13px] ${m.key === "logout" ? "text-accent" : "text-ink"}`}>{m.label}</Text>
+              <Text className={`font-gothic-400 text-[13px] ${m.key === "logout" ? "text-ink" : "text-ink"}`}>{m.label}</Text>
               <Text className="font-gothic-400 text-[14px] text-muted-light">›</Text>
             </Pressable>
           ))}

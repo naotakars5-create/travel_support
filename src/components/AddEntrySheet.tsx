@@ -7,7 +7,7 @@ import { TransportMode } from "@/lib/types";
 import { SlideUp } from "./animations";
 
 type Mode = "manual" | "mail";
-const MUTED = "#8a8378";
+const MUTED = "#6E675C";
 
 export function AddEntrySheet({
   onClose,
@@ -112,13 +112,13 @@ export function AddEntrySheet({
                       className="min-h-[160px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[12px] leading-[18px] text-ink"
                     />
                   </View>
-                  {error && <Text className="font-gothic-400 text-[11px] text-accent">{error}</Text>}
+                  {error && <Text className="font-gothic-400 text-[11px] text-ink">{error}</Text>}
                   <Pressable
                     disabled={!body.trim() || importing}
                     onPress={runImport}
                     className={`mt-1 flex-row items-center justify-center gap-2 rounded-[12px] px-4 py-3 ${body.trim() && !importing ? "bg-ink" : "bg-ink/30"}`}
                   >
-                    {importing && <ActivityIndicator size="small" color="#f3efe6" />}
+                    {importing && <ActivityIndicator size="small" color="#F4EFE5" />}
                     <Text className="text-center font-gothic-500 text-[12px] text-kinari">{importing ? "解析中…" : "メールを解析して追加"}</Text>
                   </Pressable>
                 </View>

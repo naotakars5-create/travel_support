@@ -9,8 +9,8 @@ import { PRIORITY_META } from "@/lib/plan";
 import { RouteMap } from "./RouteMap";
 import { Blinker, PulseRing, useNodeInStyle } from "./animations";
 
-const MUTED_LIGHT = "#b7b0a3";
-const INK = "#2a2622";
+const MUTED_LIGHT = "#6E675C";
+const INK = "#23201D";
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 
 interface LineStyle {
@@ -90,6 +90,15 @@ export function ItineraryScreen({
   const heading = formatJstHeadingJa(new Date());
   const currentNode = rail.find((i) => i.type === "node" && i.key === currentNodeKey);
   const currentIndex = currentNode && currentNode.type === "node" ? currentNode.nodeIndex : -1;
+
+  // 現在時刻より後の最初の予定（＝次に向かう予定）。左に3pxのテラコッタを付けて示す。
+  const nextUpcomingKey = useMemo(() => {
+    const nowMs = now.getTime();
+    for (const item of rail) {
+      if (item.type === "node" && new Date(item.time).getTime() > nowMs) return item.key;
+    }
+    return null;
+  }, [rail, now]);
 
   // rail を「日」ごとのグループに分割し、日内で地点番号（1,2,3…）と地図の点列を作る。
   // 番号は日ごとにリセットされ、その日の地図マーカーと一致する。
@@ -193,6 +202,7 @@ export function ItineraryScreen({
                     prevStyle={lineStyleFor(prev)}
                     nextStyle={lineStyleFor(next)}
                     isCurrent={item.key === currentNodeKey}
+                    isNext={item.key === nextUpcomingKey}
                     isPast={item.nodeIndex < currentIndex && item.key !== currentNodeKey}
                     justAdded={item.event.id === justAddedEventId}
                   />
@@ -243,8 +253,8 @@ export function ItineraryScreen({
                   </View>
                   <View className="flex-1 justify-center py-1 pl-1">
                     {isConflict ? (
-                      <View className="self-start rounded-[10px] border border-accent/60 bg-accent/[.06] px-3 py-1.5">
-                        <Text className="font-gothic-500 text-[11px] text-accent">
+                      <View className="self-start rounded-[10px] border border-ink/50 bg-surface px-3 py-1.5">
+                        <Text className="font-gothic-500 text-[11px] text-ink">
                           {item.durationMin < 0 ? "予定が重なっています" : "移動時間が足りない可能性があります"}
                         </Text>
                         {(item.driving != null || item.walking != null || item.requiredMin != null) && (
@@ -288,8 +298,8 @@ export function ItineraryScreen({
         {/* AIが時間内に収まらないと判断して外した予定 */}
         {unplaced.length > 0 && (
           <View className="mt-7">
-            <Text className="mb-2 font-gothic-500 text-[10px] tracking-[.15em] text-accent">旅程に入らなかった予定</Text>
-            <View className="rounded-[16px] border border-accent/40">
+            <Text className="mb-2 font-gothic-500 text-[10px] tracking-[.15em] text-ink">旅程に入らなかった予定</Text>
+            <View className="rounded-[16px] border border-ink/25">
               {unplaced.map((e, i) => (
                 <View key={e.id} className={`flex-row items-center justify-between px-4 py-3 ${i > 0 ? "border-t border-black/[.06]" : ""}`}>
                   <View className="flex-1 pr-2">
@@ -297,8 +307,8 @@ export function ItineraryScreen({
                     <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{PRIORITY_META[e.priority].label}</Text>
                   </View>
                   {e.priority !== "must" && (
-                    <Pressable onPress={() => onBumpPriority(e.id)} className="rounded-full border border-accent px-3 py-1.5">
-                      <Text className="font-gothic-500 text-[11px] text-accent">必ず行くにする</Text>
+                    <Pressable onPress={() => onBumpPriority(e.id)} className="rounded-full border border-ink px-3 py-1.5">
+                      <Text className="font-gothic-500 text-[11px] text-ink">必ず行くにする</Text>
                     </Pressable>
                   )}
                 </View>
@@ -320,6 +330,7 @@ function NodeRow({
   prevStyle,
   nextStyle,
   isCurrent,
+  isNext,
   isPast,
   justAdded,
 }: {
@@ -328,11 +339,13 @@ function NodeRow({
   prevStyle: LineStyle | null;
   nextStyle: LineStyle | null;
   isCurrent: boolean;
+  /** 現在時刻より後の最初の予定（次に向かう先） */
+  isNext: boolean;
   isPast: boolean;
   justAdded: boolean;
 }) {
   const nodeInStyle = useNodeInStyle(justAdded);
-  const markerBg = isCurrent ? "#c2492d" : isPast ? "#b7b0a3" : "#2a2622";
+  const markerBg = isCurrent ? "#D96F4C" : isPast ? "#6E675C" : "#23201D";
   return (
     <Animated.View style={nodeInStyle} className="min-h-[50px] flex-row">
       <View className="w-12 items-end pt-1.5 pr-2">
@@ -345,7 +358,7 @@ function NodeRow({
         <LineHalf style={nextStyle} side="bottom" />
         {/* 番号マーカー（＝地点の目印。現在地は薄い赤＋脈動） */}
         <View className="mt-1" style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
-          {isCurrent && <PulseRing size={22} color="rgba(194,73,45,.45)" />}
+          {isCurrent && <PulseRing size={22} color="rgba(217,111,76,.45)" />}
           <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: markerBg, alignItems: "center", justifyContent: "center" }}>
             <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>
               {stopNumber === -1 ? "着" : stopNumber ?? ""}
@@ -354,19 +367,23 @@ function NodeRow({
         </View>
       </View>
       <View className="flex-1 pb-2 pl-1 pt-0.5">
-        <View className={`rounded-[12px] border px-3 py-2 ${isCurrent ? "border-accent/50 bg-accent/[.06]" : "border-black/[.07] bg-white/60"}`}>
+        <View
+          className={`rounded-[12px] border px-3 py-2 ${isCurrent ? "border-accent/50 bg-accent/[.06]" : "border-black/[.07] bg-white/60"}`}
+          // 次に向かう予定：左に3pxのテラコッタ縦ボーダー（今・進行中の合図）
+          style={isNext && !isCurrent ? { borderLeftWidth: 3, borderLeftColor: "#D96F4C" } : undefined}
+        >
           <View className="flex-row flex-wrap items-center gap-2">
             <Text className={`font-mincho-600 text-[15px] ${isPast ? "text-muted-light" : "text-ink"}`}>{item.event.title || item.place}</Text>
             {isCurrent && (
               <Blinker>
                 <View className="rounded-full bg-accent/15 px-2 py-[2px]">
-                  <Text className="font-gothic-500 text-[9px] text-accent">● 現在地</Text>
+                  <Text className="font-gothic-500 text-[9px] text-ink">● 現在地</Text>
                 </View>
               </Blinker>
             )}
             {item.confidence < 0.5 && (
-              <View className="rounded-full border border-mode-bus px-2 py-[1px]">
-                <Text className="font-gothic-400 text-[9px] text-mode-bus">要確認</Text>
+              <View className="rounded-full border border-muted px-2 py-[1px]">
+                <Text className="font-gothic-400 text-[9px] text-muted">要確認</Text>
               </View>
             )}
           </View>

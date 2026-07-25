@@ -5,7 +5,7 @@ import { AVATAR_CHOICES, Profile } from "@/lib/profile";
 import { PhotoPicker } from "./PhotoPicker";
 import { SlideUp } from "./animations";
 
-const MUTED = "#8a8378";
+const MUTED = "#6E675C";
 
 /** 名前・アイコン（絵文字/写真）を登録/編集するプロフィール画面（半モーダル）。 */
 export function ProfileSheet({

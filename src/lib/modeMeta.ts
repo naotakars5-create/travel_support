@@ -12,16 +12,18 @@ export const MODE_LABEL: Record<TransportMode, string> = {
   home: "出発地",
 };
 
+// 移動・種別の線色はすべて補助色（ink-muted）に統一。
+// 有彩色（テラコッタ/マスタード）は「今・進行中」「完了」専用のため、ここでは使わない。
 export const MODE_COLOR: Record<TransportMode, string> = {
-  air: "#4d5b7c",
-  rail: "#4f7a5b",
-  bus: "#a8804a",
-  walk: "#9a9384",
-  car: "#a8804a",
-  stay: "#4f7a5b",
-  dining: "#4f7a5b",
-  activity: "#4f7a5b",
-  home: "#7c5b4d",
+  air: "#6E675C",
+  rail: "#6E675C",
+  bus: "#6E675C",
+  walk: "#6E675C",
+  car: "#6E675C",
+  stay: "#6E675C",
+  dining: "#6E675C",
+  activity: "#6E675C",
+  home: "#6E675C",
 };
 
 export const MODE_DASHED: Partial<Record<TransportMode, boolean>> = {

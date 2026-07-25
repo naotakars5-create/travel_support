@@ -24,7 +24,7 @@ const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
 ];
 
 const STAY_OPTIONS = [30, 60, 90, 120];
-const MUTED = "#8a8378";
+const MUTED = "#6E675C";
 
 const TRANSIT_MODES: TransportMode[] = ["air", "rail", "bus", "car"];
 const isTransit = (m: TransportMode) => TRANSIT_MODES.includes(m);
@@ -36,7 +36,7 @@ function OpenHoursNote({ loading, openFrom, openTo }: { loading: boolean; openFr
   }
   if (openFrom || openTo) {
     return (
-      <Text className="font-gothic-400 text-[10px] text-mode-rail">
+      <Text className="font-gothic-400 text-[10px] text-muted">
         営業時間 {openFrom ?? "?"}〜{openTo ?? "?"}（自動取得・AIがこの時間内に組みます）
       </Text>
     );

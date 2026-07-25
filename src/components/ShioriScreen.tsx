@@ -8,9 +8,9 @@ import { MODE_LABEL } from "@/lib/modeMeta";
 import { PhotoPicker } from "./PhotoPicker";
 import { SlideUp } from "./animations";
 
-const MUTED = "#8a8378";
+const MUTED = "#6E675C";
 // 表紙写真が無いしおりの背景色（インデックスで割り当て）。
-const COVER_COLORS = ["#4f7a5b", "#4d5b7c", "#a8804a", "#7c5b4d", "#8a6d8f", "#5b7c78"];
+const COVER_COLORS = ["#23201D", "#6E675C"]; // 写真なし表紙は墨/補助色のみ（6トークン外の色は使わない）
 
 /** "2023-09-01" → "2023.09.01" */
 function dot(dateStr: string): string {
@@ -184,7 +184,7 @@ function CreateShioriSheet({
             <ScrollView keyboardShouldPersistTaps="handled">
               {/* 表紙プレビュー */}
               <View className="items-center gap-3">
-                <View className="h-40 w-full overflow-hidden rounded-[14px] border border-black/[.1]" style={{ backgroundColor: cover ? undefined : "#4f7a5b" }}>
+                <View className="h-40 w-full overflow-hidden rounded-[14px] border border-black/[.1]" style={{ backgroundColor: cover ? undefined : "#23201D" }}>
                   {cover ? (
                     <ImageBackground source={{ uri: cover }} resizeMode="cover" style={{ flex: 1, justifyContent: "flex-start" }}>
                       <View className="bg-black/25 p-3">
@@ -298,7 +298,7 @@ function ShioriDetail({
                   </View>
                 </ImageBackground>
               ) : (
-                <View style={{ flex: 1, backgroundColor: "#4f7a5b" }} className="justify-end p-4">
+                <View style={{ flex: 1, backgroundColor: "#23201D" }} className="justify-end p-4">
                   <Text className="font-mincho-700 text-[22px] text-white">{trip.name}</Text>
                   <Text className="mt-1 font-gothic-400 text-[11px] text-white/90">{dateRange(trip)}</Text>
                 </View>
@@ -368,13 +368,13 @@ function ShioriDetail({
 
             {/* 操作 */}
             {confirmOpen && (
-              <Text className="px-6 pb-1 text-center font-gothic-400 text-[10px] leading-[15px] text-accent">
+              <Text className="px-6 pb-1 text-center font-gothic-400 text-[10px] leading-[15px] text-ink">
                 今の「行き先リスト」はこのしおりの内容に置き換わります。先に計画を保存していなければ戻せません。
               </Text>
             )}
             <View className="flex-row items-center gap-2 px-6 pt-2">
               {confirmOpen ? (
-                <Pressable onPress={onOpen} className="flex-1 rounded-[12px] bg-accent py-3">
+                <Pressable onPress={onOpen} className="flex-1 rounded-[12px] bg-ink py-3">
                   <Text className="text-center font-gothic-500 text-[12px] text-kinari">今の計画を置き換えて開く</Text>
                 </Pressable>
               ) : (
@@ -384,8 +384,8 @@ function ShioriDetail({
               )}
               <PhotoPicker onPicked={onSetCover} maxSize={800} label="表紙" />
               {confirmDelete ? (
-                <Pressable onPress={onDelete} className="rounded-[12px] border border-accent px-3 py-3">
-                  <Text className="font-gothic-500 text-[12px] text-accent">削除する</Text>
+                <Pressable onPress={onDelete} className="rounded-[12px] border border-ink px-3 py-3">
+                  <Text className="font-gothic-500 text-[12px] text-ink">削除する</Text>
                 </Pressable>
               ) : (
                 <Pressable onPress={() => setConfirmDelete(true)} className="rounded-[12px] border border-black/[.15] px-3 py-3">

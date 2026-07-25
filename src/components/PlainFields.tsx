@@ -17,7 +17,7 @@ const WEB_INPUT_STYLE = {
   padding: "0 12px",
   height: 42,
   fontSize: 14,
-  color: "#2a2622",
+  color: "#23201D",
   fontFamily: "ZenOldMincho_400Regular, serif",
   width: "100%",
   boxSizing: "border-box" as const,

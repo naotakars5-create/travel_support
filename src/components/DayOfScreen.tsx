@@ -282,7 +282,7 @@ function FreeHero({
   return (
     <View className="items-center">
       <Text className="font-gothic-400 text-[11px] tracking-[.08em] text-day-text2">空き時間 · 予定より早く回れています</Text>
-      <Text className="mt-3 font-mincho-900 text-[62px] leading-[56px] text-day-text" style={TNUM}>
+      <Text className="mt-3 font-mincho-900 text-[62px] leading-[56px] text-highlight" style={TNUM}>
         {formatDurationMin(state.freeMin)}
       </Text>
       <Text className="mt-2 font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
