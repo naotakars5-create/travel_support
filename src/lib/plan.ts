@@ -197,6 +197,7 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
         placeTo: placeText,
         placeToGeo: entry.placeGeo,
         startAt: new Date(departMs).toISOString(),
+        travelMode: entry.travelMode,
       });
     }
     const returnMs = entry.arriveBy ? new Date(entry.arriveBy).getTime() : NaN;
@@ -208,6 +209,7 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
         placeTo: placeText,
         placeToGeo: entry.placeGeo,
         startAt: new Date(returnMs).toISOString(),
+        travelMode: entry.travelMode,
       });
     }
     return events;
@@ -342,6 +344,8 @@ export interface PlanEntryInput {
   /** 営業・開館時間 "HH:MM" */
   openFrom?: string;
   openTo?: string;
+  /** 出発地: 最初のスポットへの移動手段 */
+  travelMode?: "car" | "walk" | "rail";
 }
 
 export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | null {
@@ -366,6 +370,7 @@ export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | nul
     checkOut: input.checkOut || undefined,
     openFrom: input.openFrom || undefined,
     openTo: input.openTo || undefined,
+    travelMode: input.travelMode,
   };
 }
 

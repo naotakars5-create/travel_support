@@ -118,11 +118,15 @@ export function ItineraryScreen({
       if (!current) continue; // 先頭にnode以外は来ない想定の保険
       current.items.push(item);
       if (item.type === "node") {
+        const isHome = item.event.mode === "home";
         // その日の起点（ホテルのチェックアウト・出発地の出発）は「0」。回るスポットは1から数える。
+        // 帰着（自宅・集合場所へ戻る）は番号を振らず「着」。
         const isDeparturePoint = /-(out|depart)$/.test(item.event.id) && current.numberOf.size === 0;
-        const num = isDeparturePoint ? 0 : ++spotSeq;
+        const isReturnPoint = isHome && /-return$/.test(item.event.id);
+        const num = isReturnPoint ? -1 : isDeparturePoint ? 0 : ++spotSeq;
         current.numberOf.set(item.key, num);
-        if (item.geo) {
+        // 自宅（出発地）はプライバシーのため地図には載せない
+        if (item.geo && !isHome) {
           current.mapPoints.push(item.geo);
           current.mapLabels.push(String(num));
         }
@@ -204,7 +208,12 @@ export function ItineraryScreen({
                       <LineFull style={style} />
                     </View>
                     <View className="flex-1 justify-center pb-2 pl-1">
-                      {item.driving != null || item.walking != null ? (
+                      {item.explicit ? (
+                        // 出発地→最初のスポット等、移動手段が指定された区間は指定手段のみ表示
+                        <Text className="font-gothic-500 text-[11px]" style={[{ color: style?.color }, TNUM]}>
+                          {item.mode === "rail" ? "電車・バス" : MODE_LABEL[item.mode]} {formatDurationMin(item.durationMin)}
+                        </Text>
+                      ) : item.driving != null || item.walking != null ? (
                         <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
                           {[
                             item.driving != null ? `車 ${formatDurationMin(item.driving)}` : null,
@@ -338,7 +347,7 @@ function NodeRow({
           {isCurrent && <PulseRing size={22} color="rgba(194,73,45,.45)" />}
           <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: markerBg, alignItems: "center", justifyContent: "center" }}>
             <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>
-              {stopNumber ?? ""}
+              {stopNumber === -1 ? "着" : stopNumber ?? ""}
             </Text>
           </View>
         </View>

@@ -70,6 +70,7 @@ export interface PlanEntryFormInitial {
   checkOut?: string;
   openFrom?: string;
   openTo?: string;
+  travelMode?: "car" | "walk" | "rail";
 }
 
 /** 行き先を入力するフォーム。種別で入力欄が変わり、複数日程では「何日目」を選べる。 */
@@ -112,6 +113,7 @@ export function PlanEntryForm({
   const [openFrom, setOpenFrom] = useState<string | undefined>(initial?.openFrom);
   const [openTo, setOpenTo] = useState<string | undefined>(initial?.openTo);
   const [placeGeo, setPlaceGeo] = useState<GeoPoint | undefined>(initial?.placeGeo);
+  const [travelMode, setTravelMode] = useState<"car" | "walk" | "rail">(initial?.travelMode ?? "car");
   const [loadingDetails, setLoadingDetails] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -178,6 +180,7 @@ export function PlanEntryForm({
       input.departAt = iso(1, departTime); // 初日に出発
       input.arriveBy = iso(tripDayCount, arriveTime); // 最終日に帰宅
       input.fixedTime = true;
+      input.travelMode = travelMode;
     } else if (transit) {
       input.placeFrom = placeFrom || undefined;
       input.placeTo = placeTo || undefined;
@@ -219,6 +222,7 @@ export function PlanEntryForm({
     setOpenFrom(undefined);
     setOpenTo(undefined);
     setPlaceGeo(undefined);
+    setTravelMode("car");
   };
 
   return (
@@ -285,8 +289,22 @@ export function PlanEntryForm({
             <TimeField label="出発時刻（初日）" value={departTime} onChange={setDepartTime} />
             <TimeField label={tripDayCount > 1 ? `帰着時刻（${tripDayCount}日目）` : "帰着時刻"} value={arriveTime} onChange={setArriveTime} />
           </View>
+          <View className="gap-1.5">
+            <Text className="font-gothic-400 text-[10px] text-muted">最初のスポットへの移動手段（帰りも同じ）</Text>
+            <View className="flex-row gap-2">
+              {(
+                [
+                  { value: "car", label: "車" },
+                  { value: "rail", label: "電車・バス" },
+                  { value: "walk", label: "徒歩" },
+                ] as const
+              ).map((o) => (
+                <Chip key={o.value} active={travelMode === o.value} label={o.label} onPress={() => setTravelMode(o.value)} />
+              ))}
+            </View>
+          </View>
           <Text className="font-gothic-400 text-[10px] text-muted">
-            旅の起点・終点になります（自宅・集合場所など）。最初の行き先への移動もここから計算します。
+            旅の起点・終点になります（自宅・集合場所など）。最初の行き先への移動時間もここから計算します。
           </Text>
         </>
       ) : transit ? (
