@@ -274,6 +274,7 @@ export function PlanScreen({
                   <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
                     {startPoint.departAt ? `出発 ${formatJstTime(new Date(startPoint.departAt))}（初日）` : ""}
                     {startPoint.arriveBy ? ` → 帰着 ${formatJstTime(new Date(startPoint.arriveBy))}${tripDayCount > 1 ? `（${tripDayCount}日目）` : ""}` : ""}
+                    {` · 移動 ${startPoint.travelMode === "walk" ? "徒歩" : startPoint.travelMode === "rail" ? "電車・バス" : "車"}`}
                   </Text>
                   {startPoint.place && (
                     <Text numberOfLines={1} className="font-gothic-400 text-[10px] text-muted-light">

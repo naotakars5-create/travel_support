@@ -4,10 +4,12 @@ import { haversineMeters } from "./geo";
 /** 旅行全体の「基本の移動手段」。当日の出発カウントダウン等の計算に使う。 */
 export type BaseMode = "car" | "walk";
 
-/** 1区間の実測移動時間（分）。車・徒歩の両方を保持する。 */
+/** 1区間の実測移動時間（分）。車・徒歩（必要なら公共交通）を保持する。 */
 export interface EdgeTravel {
   driving?: number;
   walking?: number;
+  /** 公共交通（電車・バス）の実測時間（分）。出発地の移動手段が電車の時に取得 */
+  transit?: number;
 }
 
 export interface TransitEstimate {
@@ -16,6 +18,8 @@ export interface TransitEstimate {
   /** 実測の車・徒歩時間（分・取得できた場合）。両方表示に使う。 */
   driving?: number;
   walking?: number;
+  /** ユーザーが移動手段を指定した区間（出発地→最初のスポット等）。表示は指定手段のみ */
+  explicit?: boolean;
 }
 
 /**
@@ -103,6 +107,23 @@ export function createPrecomputedEstimator(cache: Record<string, EdgeTravel>, ba
       // 実測（Directions）を優先し、0や欠損なら距離ベースへフォールバック（0分表示を防ぐ）。
       const driving = pickPositive(t?.driving, dist.driving);
       const walking = pickPositive(t?.walking, dist.walking);
+
+      // 出発地（自宅・集合場所）が絡む区間は、指定された移動手段（未指定なら車）で見積もる。
+      // 「自宅から1件目まで徒歩」のような非現実的な表示を防ぐ。
+      const desired =
+        from.mode === "home" ? from.travelMode ?? "car" : to.mode === "home" ? to.travelMode ?? "car" : undefined;
+      if (desired) {
+        let dur: number | undefined;
+        if (desired === "car") dur = driving ?? walking;
+        else if (desired === "walk") dur = walking ?? driving;
+        else dur = pickPositive(t?.transit, undefined) ?? driving; // 電車・バス: 実測が無ければ車で代用
+        return {
+          mode: desired,
+          durationMin: dur ?? DEFAULT_DURATION_BY_MODE[desired],
+          explicit: true,
+        };
+      }
+
       if (driving != null || walking != null) {
         const chosen = baseMode === "car" ? driving ?? walking : walking ?? driving;
         const mode: TransportMode = baseMode === "car" ? "car" : "walk";

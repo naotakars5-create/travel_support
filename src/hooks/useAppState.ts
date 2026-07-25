@@ -226,7 +226,7 @@ export function useAppState() {
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchDir(origin: GeoPoint, destination: GeoPoint, mode: "car" | "walk"): Promise<number | null> {
+    async function fetchDir(origin: GeoPoint, destination: GeoPoint, mode: "car" | "walk" | "rail"): Promise<number | null> {
       try {
         const res = await fetch(apiUrl("/api/directions"), {
           method: "POST",
@@ -243,32 +243,38 @@ export function useAppState() {
 
     async function run() {
       const sorted = sortedGroupEvents(events);
-      const pending: { key: string; origin: GeoPoint; destination: GeoPoint }[] = [];
+      const pending: { key: string; origin: GeoPoint; destination: GeoPoint; needTransit: boolean }[] = [];
       for (let i = 0; i < sorted.length - 1; i++) {
         const prev = sorted[i];
         const next = sorted[i + 1];
         const key = `${prev.id}:${next.id}`;
-        if (transitCacheRef.current[key]) continue;
+        // 出発地の移動手段が「電車・バス」の区間は、公共交通の実測時間も必要
+        const needTransit =
+          (prev.mode === "home" && prev.travelMode === "rail") || (next.mode === "home" && next.travelMode === "rail");
+        const cached = transitCacheRef.current[key];
+        if (cached && (!needTransit || cached.transit != null)) continue;
         const origin = lastSeedGeo(prev);
         const destination = firstSeedGeo(next);
         if (!origin || !destination) continue;
         const mode = guessMode(prev.placeTo ?? prev.title, next.placeFrom ?? next.title);
         if (mode === "air") continue; // Directions APIでは空路は扱わない
-        pending.push({ key, origin, destination });
+        pending.push({ key, origin, destination, needTransit });
       }
       if (pending.length === 0) return;
 
-      // 各区間について車・徒歩の両方の実測時間を取得する。
+      // 各区間について車・徒歩（必要なら公共交通）の実測時間を取得する。
       const results = await Promise.all(
         pending.map(async (p) => {
-          const [driving, walking] = await Promise.all([
+          const [driving, walking, transitMin] = await Promise.all([
             fetchDir(p.origin, p.destination, "car"),
             fetchDir(p.origin, p.destination, "walk"),
+            p.needTransit ? fetchDir(p.origin, p.destination, "rail") : Promise.resolve(null),
           ]);
           const travel: EdgeTravel = {};
           if (driving != null) travel.driving = driving;
           if (walking != null) travel.walking = walking;
-          if (travel.driving == null && travel.walking == null) return null;
+          if (transitMin != null) travel.transit = transitMin;
+          if (travel.driving == null && travel.walking == null && travel.transit == null) return null;
           return [p.key, travel] as const;
         })
       );
