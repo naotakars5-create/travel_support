@@ -71,6 +71,22 @@ export interface PlanEntry {
   detail?: string;
   /** 由来。"手入力" | "メール" | 事業者名 など */
   source: string;
+  /** 何日目か（1始まり）。複数日程で使う。未指定は1日目扱い。 */
+  day?: number;
+
+  // --- 移動系（鉄道・バス・飛行機・車）専用 ---
+  /** 出発地 */
+  placeFrom?: string;
+  placeFromGeo?: GeoPoint;
+  /** 到着地 */
+  placeTo?: string;
+  placeToGeo?: GeoPoint;
+  /** 出発時刻（ISO8601）。移動系で使う（arriveBy は到着時刻になる） */
+  departAt?: string;
+
+  // --- 宿泊専用 ---
+  /** チェックアウト時刻（ISO8601）。宿泊で使う（arriveBy はチェックイン） */
+  checkOut?: string;
 }
 
 /** AIが返す1件の時刻割り当て（どの行き先に、何時に着いて、何分居るか）。 */

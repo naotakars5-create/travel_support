@@ -9,12 +9,14 @@ import { SlideUp } from "./animations";
 export function EditEntrySheet({
   entry,
   tripDate,
+  tripDayCount,
   onClose,
   onSave,
   onDelete,
 }: {
   entry: PlanEntry;
   tripDate: string;
+  tripDayCount: number;
   onClose: () => void;
   onSave: (input: PlanEntryInput) => void;
   onDelete: () => void;
@@ -41,6 +43,7 @@ export function EditEntrySheet({
               <PlanEntryForm
                 initial={entry}
                 tripDate={tripDate}
+                tripDayCount={tripDayCount}
                 submitLabel="保存"
                 resetAfterSubmit={false}
                 onSubmit={(input) => {

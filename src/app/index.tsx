@@ -40,6 +40,8 @@ export default function Home() {
           readOnly={app.readOnly}
           tripDate={app.tripDate}
           onSetTripDate={app.setTripDate}
+          tripDayCount={app.tripDayCount}
+          onSetTripDayCount={app.setTripDayCount}
           baseMode={app.baseMode}
           onSetBaseMode={app.setBaseMode}
           profile={app.profile}
@@ -61,6 +63,7 @@ export default function Home() {
           justAddedEventId={app.justAddedEventId}
           liveLocation={app.liveLocation}
           now={app.now}
+          tripDate={app.tripDate}
           onNavigatePlan={() => app.setTab("plan")}
         />
       )}
@@ -83,6 +86,7 @@ export default function Home() {
       {addOpen && (
         <AddEntrySheet
           tripDate={app.tripDate}
+          tripDayCount={app.tripDayCount}
           onClose={() => setAddOpen(false)}
           onAdd={(input) => {
             app.addEntry(input);
@@ -97,6 +101,7 @@ export default function Home() {
         <EditEntrySheet
           entry={editingEntry}
           tripDate={app.tripDate}
+          tripDayCount={app.tripDayCount}
           onClose={() => setEditId(null)}
           onSave={(input) => app.editEntry(editingEntry.id, input)}
           onDelete={() => {

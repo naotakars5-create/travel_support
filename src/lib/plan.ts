@@ -1,4 +1,4 @@
-import { ParsedEvent, PlanEntry, Priority, ScheduleSlot, SpotSuggestion, TransportMode } from "./types";
+import { isTransitMode, ParsedEvent, ParsedField, PlanEntry, Priority, ScheduleSlot, SpotSuggestion, TransportMode } from "./types";
 
 export const PRIORITY_META: Record<Priority, { label: string; short: string; weight: number }> = {
   must: { label: "必ず行く", short: "必須", weight: 0 },
@@ -28,9 +28,27 @@ export function effectiveStayMin(entry: PlanEntry): number {
   return DEFAULT_STAY_MIN[entry.mode] ?? 45;
 }
 
-/** ジオコーディング等に使う地点テキスト（住所優先、無ければ行き先名）。 */
+/** ジオコーディング等に使う地点テキスト（移動系は到着地、その他は住所優先→行き先名）。 */
 export function entryPlaceText(entry: PlanEntry): string {
+  if (isTransitMode(entry.mode) && entry.placeTo) return entry.placeTo.trim();
   return (entry.place && entry.place.trim()) || entry.title.trim();
+}
+
+/** その予定の所要時間（分）。移動=出発→到着、宿泊=チェックイン→アウト、その他=滞在時間。 */
+export function entryDurationMin(entry: PlanEntry): number {
+  if (isTransitMode(entry.mode) && entry.departAt && entry.arriveBy) {
+    return Math.max(0, Math.round((new Date(entry.arriveBy).getTime() - new Date(entry.departAt).getTime()) / 60000));
+  }
+  if (entry.mode === "stay" && entry.arriveBy && entry.checkOut) {
+    return Math.max(0, Math.round((new Date(entry.checkOut).getTime() - new Date(entry.arriveBy).getTime()) / 60000));
+  }
+  return effectiveStayMin(entry);
+}
+
+/** スケジュールの基準になる固定時刻（移動=出発、その他=到着/チェックイン）。無ければ null。 */
+export function entryAnchorTime(entry: PlanEntry): string | null {
+  if (isTransitMode(entry.mode)) return entry.departAt ?? entry.arriveBy ?? null;
+  return entry.arriveBy ?? null;
 }
 
 function priorityWeight(p: Priority): number {
@@ -47,47 +65,119 @@ function priorityWeight(p: Priority): number {
 export function localSchedule(entries: PlanEntry[], referenceDate: Date): ScheduleSlot[] {
   if (entries.length === 0) return [];
 
-  // arriveBy を持つものを時刻順、持たないものを重要度順に。両者を安定した並びに統合する。
-  const withTime = entries
-    .filter((e) => e.arriveBy)
-    .sort((a, b) => new Date(a.arriveBy!).getTime() - new Date(b.arriveBy!).getTime());
-  const withoutTime = entries
-    .filter((e) => !e.arriveBy)
+  const anchored = entries
+    .map((e) => ({ e, t: entryAnchorTime(e) }))
+    .filter((x): x is { e: PlanEntry; t: string } => x.t !== null)
+    .sort((a, b) => new Date(a.t).getTime() - new Date(b.t).getTime());
+
+  const loose = entries
+    .filter((e) => entryAnchorTime(e) === null)
     .sort((a, b) => priorityWeight(a.priority) - priorityWeight(b.priority));
 
-  // 目安時刻が無い予定は、最初のアンカー以降に順番に差し込む（アンカーが無ければ全て後段）。
-  const ordered: PlanEntry[] = [];
-  const anchorQueue = [...withTime];
-  const looseQueue = [...withoutTime];
-  if (anchorQueue.length === 0) {
-    ordered.push(...looseQueue);
-  } else {
-    ordered.push(anchorQueue.shift()!);
-    while (anchorQueue.length > 0) {
-      // アンカー間に loose を1つずつ挟む（時間に余裕がある想定の素朴な配分）
-      if (looseQueue.length > 0) ordered.push(looseQueue.shift()!);
-      ordered.push(anchorQueue.shift()!);
+  const bufferMs = TRAVEL_BUFFER_MIN * 60000;
+  type Placed = { entry: PlanEntry; start: number };
+  const placed: Placed[] = anchored.map(({ e, t }) => ({ entry: e, start: new Date(t).getTime() }));
+
+  const endOf = (p: Placed) => p.start + entryDurationMin(p.entry) * 60000;
+
+  if (placed.length === 0) {
+    // 固定が無ければ referenceDate から順に前詰め
+    let cursor = referenceDate.getTime();
+    for (const e of loose) {
+      placed.push({ entry: e, start: cursor });
+      cursor += (entryDurationMin(e) + TRAVEL_BUFFER_MIN) * 60000;
     }
-    ordered.push(...looseQueue);
+  } else {
+    // loose を「空いている一番早い隙間」に差し込む（＝一番最後にしない）
+    for (const e of loose) {
+      const durMs = entryDurationMin(e) * 60000;
+      placed.sort((a, b) => a.start - b.start);
+      let insertAt: number | null = null;
+      for (let i = 0; i < placed.length; i++) {
+        const gapStart = endOf(placed[i]) + bufferMs;
+        const nextStart = i + 1 < placed.length ? placed[i + 1].start : Infinity;
+        const gapEnd = nextStart === Infinity ? Infinity : nextStart - bufferMs;
+        if (gapEnd - gapStart >= durMs) {
+          insertAt = gapStart;
+          break;
+        }
+      }
+      if (insertAt === null) {
+        const last = placed.reduce((m, p) => (p.start > m.start ? p : m), placed[0]);
+        insertAt = endOf(last) + bufferMs;
+      }
+      placed.push({ entry: e, start: insertAt });
+    }
   }
 
-  const startBase = withTime[0] ? new Date(withTime[0].arriveBy!) : referenceDate;
-  let cursor = startBase.getTime();
-  const slots: ScheduleSlot[] = [];
-  for (const entry of ordered) {
-    const anchor = entry.arriveBy ? new Date(entry.arriveBy).getTime() : null;
-    const arrive = anchor !== null ? Math.max(cursor, anchor) : cursor;
-    const stay = effectiveStayMin(entry);
-    slots.push({ entryId: entry.id, arriveAt: new Date(arrive).toISOString(), stayMin: stay });
-    cursor = arrive + (stay + TRAVEL_BUFFER_MIN) * 60000;
+  placed.sort((a, b) => a.start - b.start);
+  return placed.map((p) => ({
+    entryId: p.entry.id,
+    arriveAt: new Date(p.start).toISOString(),
+    stayMin: entryDurationMin(p.entry),
+  }));
+}
+
+/** 1件の PlanEntry を、種別に応じた ParsedEvent へ変換する。 */
+function entryToEvent(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent | null {
+  const base = {
+    id: `evt-${entry.id}`,
+    mode: entry.mode,
+    title: entry.title,
+    detail: entry.detail,
+    price: entry.cost,
+    source: entry.source,
+    fields: [] as ParsedField[],
+    confidence: 1,
+  };
+
+  // 移動系（出発地・到着地あり）→ 出発〜到着の区間イベント
+  if (isTransitMode(entry.mode) && entry.placeFrom && entry.placeTo) {
+    const startMs = new Date(entry.departAt ?? slot.arriveAt).getTime();
+    if (Number.isNaN(startMs)) return null;
+    const arriveMs = entry.arriveBy ? new Date(entry.arriveBy).getTime() : NaN;
+    const endIso = !Number.isNaN(arriveMs) && arriveMs > startMs ? new Date(arriveMs).toISOString() : new Date(startMs + 30 * 60000).toISOString();
+    return {
+      ...base,
+      placeFrom: entry.placeFrom,
+      placeTo: entry.placeTo,
+      placeFromGeo: entry.placeFromGeo,
+      placeToGeo: entry.placeToGeo,
+      startAt: new Date(startMs).toISOString(),
+      endAt: endIso,
+    };
   }
-  return slots;
+
+  // 宿泊 → チェックイン〜チェックアウト
+  if (entry.mode === "stay") {
+    const startMs = new Date(entry.arriveBy ?? slot.arriveAt).getTime();
+    if (Number.isNaN(startMs)) return null;
+    const outMs = entry.checkOut ? new Date(entry.checkOut).getTime() : NaN;
+    return {
+      ...base,
+      placeTo: entryPlaceText(entry),
+      placeToGeo: entry.placeGeo,
+      startAt: new Date(startMs).toISOString(),
+      endAt: !Number.isNaN(outMs) && outMs > startMs ? new Date(outMs).toISOString() : undefined,
+    };
+  }
+
+  // 観光・食事など → 地点イベント
+  const startMs = new Date(entry.arriveBy ?? slot.arriveAt).getTime();
+  if (Number.isNaN(startMs)) return null;
+  const stay = slot.stayMin > 0 ? slot.stayMin : effectiveStayMin(entry);
+  return {
+    ...base,
+    placeTo: entryPlaceText(entry),
+    placeToGeo: entry.placeGeo,
+    startAt: new Date(startMs).toISOString(),
+    endAt: stay > 0 ? new Date(startMs + stay * 60000).toISOString() : undefined,
+  };
 }
 
 /**
  * スケジュール（ローカル or AI 由来）と行き先リストから、路線図パイプライン（buildRail）が
- * 受け取る ParsedEvent 列を生成する。各予定は1つの地点イベントになり、移動辺・空き時間は
- * buildRail が前後関係から自動生成する。座標は entry から引き継ぐ（再ジオコーディング不要）。
+ * 受け取る ParsedEvent 列を生成する。種別ごとに地点/区間/宿泊のイベントへ変換する。
  */
 export function buildEventsFromSchedule(entries: PlanEntry[], slots: ScheduleSlot[]): ParsedEvent[] {
   const byId = new Map(entries.map((e) => [e.id, e]));
@@ -95,24 +185,8 @@ export function buildEventsFromSchedule(entries: PlanEntry[], slots: ScheduleSlo
   for (const slot of slots) {
     const entry = byId.get(slot.entryId);
     if (!entry) continue;
-    const start = new Date(slot.arriveAt);
-    if (Number.isNaN(start.getTime())) continue;
-    const stay = slot.stayMin > 0 ? slot.stayMin : effectiveStayMin(entry);
-    const end = new Date(start.getTime() + stay * 60000);
-    events.push({
-      id: `evt-${entry.id}`,
-      mode: entry.mode,
-      title: entry.title,
-      startAt: start.toISOString(),
-      endAt: stay > 0 ? end.toISOString() : undefined,
-      placeTo: entryPlaceText(entry),
-      placeToGeo: entry.placeGeo,
-      detail: entry.detail,
-      price: entry.cost,
-      source: entry.source,
-      fields: [],
-      confidence: 1,
-    });
+    const ev = entryToEvent(entry, slot);
+    if (ev) events.push(ev);
   }
   return events.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 }
@@ -151,11 +225,19 @@ export interface PlanEntryInput {
   mode: TransportMode;
   priority: Priority;
   stayMin?: number;
-  /** ISO8601 */
+  /** ISO8601。観光/食事=到着、宿泊=チェックイン、移動=到着 */
   arriveBy?: string;
   fixedTime?: boolean;
   cost?: number;
   detail?: string;
+  /** 何日目か（1始まり） */
+  day?: number;
+  /** 移動系: 出発地・到着地・出発時刻(ISO) */
+  placeFrom?: string;
+  placeTo?: string;
+  departAt?: string;
+  /** 宿泊: チェックアウト時刻(ISO) */
+  checkOut?: string;
 }
 
 export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | null {
@@ -172,6 +254,11 @@ export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | nul
     cost: typeof input.cost === "number" && input.cost > 0 ? input.cost : undefined,
     detail: input.detail?.trim() || undefined,
     source: "手入力",
+    day: input.day && input.day > 0 ? input.day : undefined,
+    placeFrom: input.placeFrom?.trim() || undefined,
+    placeTo: input.placeTo?.trim() || undefined,
+    departAt: input.departAt || undefined,
+    checkOut: input.checkOut || undefined,
   };
 }
 
@@ -195,7 +282,10 @@ export function suggestionToEntry(id: string, s: SpotSuggestion): PlanEntry {
  */
 export function scheduleSignature(entries: PlanEntry[]): string {
   return entries
-    .map((e) => `${e.id}|${e.arriveBy ?? ""}|${e.stayMin ?? ""}|${e.priority}|${e.mode}|${e.fixedTime ? 1 : 0}`)
+    .map(
+      (e) =>
+        `${e.id}|${e.arriveBy ?? ""}|${e.departAt ?? ""}|${e.checkOut ?? ""}|${e.stayMin ?? ""}|${e.priority}|${e.mode}|${e.day ?? ""}|${e.fixedTime ? 1 : 0}|${e.placeFrom ?? ""}|${e.placeTo ?? ""}`
+    )
     .join(";");
 }
 

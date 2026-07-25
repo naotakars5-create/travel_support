@@ -83,6 +83,25 @@ export function timeStrFromIso(iso: string | undefined): string {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
+/** ISO日時が開始日から見て何日目か（1始まり）を返す。 */
+export function dayOfIso(startDate: string, iso: string | undefined): number {
+  if (!iso) return 1;
+  const start = new Date(`${startDate}T00:00`);
+  const d = new Date(iso);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(d.getTime())) return 1;
+  const day0 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const s0 = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  return Math.max(1, Math.round((day0.getTime() - s0.getTime()) / 86400000) + 1);
+}
+
+/** 開始日（YYYY-MM-DD）から day 日目（1始まり）の日付（YYYY-MM-DD）を求める。 */
+export function dateForDay(startDate: string, day: number): string {
+  const d = new Date(`${startDate}T00:00`);
+  if (Number.isNaN(d.getTime())) return startDate;
+  d.setDate(d.getDate() + (Math.max(1, day) - 1));
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 /** YYYY-MM-DD を「M月D日(曜)」表記にする（ローカル）。 */
 export function formatDateStrJa(dateStr: string): string {
   const d = new Date(`${dateStr}T00:00`);

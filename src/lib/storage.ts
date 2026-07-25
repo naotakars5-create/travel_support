@@ -14,8 +14,10 @@ export interface PersistedState {
   currentNodeKey: string | null;
   /** 持ち物チェックリスト */
   packing: PackingItem[];
-  /** 旅行日（YYYY-MM-DD） */
+  /** 旅行の開始日（YYYY-MM-DD） */
   tripDate?: string;
+  /** 旅行の日数 */
+  tripDayCount?: number;
   /** 基本の移動手段 */
   baseMode?: BaseMode;
   savedAt: string;

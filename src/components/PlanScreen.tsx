@@ -29,6 +29,8 @@ export function PlanScreen({
   readOnly,
   tripDate,
   onSetTripDate,
+  tripDayCount,
+  onSetTripDayCount,
   baseMode,
   onSetBaseMode,
   profile,
@@ -52,6 +54,8 @@ export function PlanScreen({
   readOnly: boolean;
   tripDate: string;
   onSetTripDate: (v: string) => void;
+  tripDayCount: number;
+  onSetTripDayCount: (n: number) => void;
   baseMode: BaseMode;
   onSetBaseMode: (m: BaseMode) => void;
   profile: Profile;
@@ -115,8 +119,27 @@ export function PlanScreen({
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 12, paddingBottom: 90 }}>
         {!readOnly && (
-          <View className="mb-4 flex-row flex-wrap items-end justify-between gap-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
-            <DateOnlyField label="旅行日" value={tripDate} onChange={onSetTripDate} />
+          <View className="mb-4 gap-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
+            <View className="flex-row flex-wrap items-end justify-between gap-3">
+              <DateOnlyField label="開始日" value={tripDate} onChange={onSetTripDate} />
+              <View className="gap-1">
+                <Text className="font-gothic-400 text-[10px] text-muted">日数</Text>
+                <View className="flex-row gap-2">
+                  {[1, 2, 3, 4, 5].map((n) => {
+                    const active = tripDayCount === n;
+                    return (
+                      <Pressable
+                        key={n}
+                        onPress={() => onSetTripDayCount(n)}
+                        className={`rounded-full border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.12] bg-white/50"}`}
+                      >
+                        <Text className={`font-gothic-400 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>{n}日</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
             <View className="gap-1">
               <Text className="font-gothic-400 text-[10px] text-muted">基本の移動手段</Text>
               <View className="flex-row gap-2">
