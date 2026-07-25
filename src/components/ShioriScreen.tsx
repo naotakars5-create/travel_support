@@ -258,6 +258,7 @@ function ShioriDetail({
 }) {
   const insets = useSafeAreaInsets();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const photos = trip.photos ?? [];
 
   // 日別に行き先をまとめる
@@ -366,10 +367,21 @@ function ShioriDetail({
             </ScrollView>
 
             {/* 操作 */}
+            {confirmOpen && (
+              <Text className="px-6 pb-1 text-center font-gothic-400 text-[10px] leading-[15px] text-accent">
+                今の「行き先リスト」はこのしおりの内容に置き換わります。先に計画を保存していなければ戻せません。
+              </Text>
+            )}
             <View className="flex-row items-center gap-2 px-6 pt-2">
-              <Pressable onPress={onOpen} className="flex-1 rounded-[12px] bg-ink py-3">
-                <Text className="text-center font-gothic-500 text-[12px] text-kinari">このしおりを開いて編集</Text>
-              </Pressable>
+              {confirmOpen ? (
+                <Pressable onPress={onOpen} className="flex-1 rounded-[12px] bg-accent py-3">
+                  <Text className="text-center font-gothic-500 text-[12px] text-kinari">今の計画を置き換えて開く</Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={() => setConfirmOpen(true)} className="flex-1 rounded-[12px] bg-ink py-3">
+                  <Text className="text-center font-gothic-500 text-[12px] text-kinari">このしおりを開いて編集</Text>
+                </Pressable>
+              )}
               <PhotoPicker onPicked={onSetCover} maxSize={800} label="表紙" />
               {confirmDelete ? (
                 <Pressable onPress={onDelete} className="rounded-[12px] border border-accent px-3 py-3">

@@ -22,7 +22,7 @@ import { DEFAULT_PROFILE, loadProfile, Profile, saveProfile } from "@/lib/profil
 import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM } from "@/lib/share";
 import { BaseMode, EdgeTravel, createPrecomputedEstimator, guessMode } from "@/lib/transit";
 import { createSpotProvider, Spot } from "@/lib/spots";
-import { dayOfIso, todayDateStr } from "@/lib/date";
+import { combineDateAndTime, dateForDay, dayOfIso, timeStrFromIso, todayDateStr } from "@/lib/date";
 import { apiUrl } from "@/lib/apiBase";
 import { haversineMeters } from "@/lib/geo";
 import { useLiveLocation } from "./useLiveLocation";
@@ -60,7 +60,7 @@ export function useAppState() {
   const [readOnly, setReadOnly] = useState(false);
   // 旅行日（YYYY-MM-DD）と基本の移動手段
   const [tripDate, setTripDate] = useState<string>(() => todayDateStr());
-  const [tripDayCount, setTripDayCount] = useState<number>(1);
+  const [tripDayCount, setTripDayCountState] = useState<number>(1);
   const [baseMode, setBaseMode] = useState<BaseMode>("car");
   const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
   // 保存した旅の履歴（後から呼び出せる）
@@ -110,7 +110,7 @@ export function useAppState() {
         setPacking(persisted.packing);
         setCurrentNodeKey(persisted.currentNodeKey);
         if (persisted.tripDate) setTripDate(persisted.tripDate);
-        if (persisted.tripDayCount) setTripDayCount(persisted.tripDayCount);
+        if (persisted.tripDayCount) setTripDayCountState(persisted.tripDayCount);
         if (persisted.baseMode) setBaseMode(persisted.baseMode);
         scheduleSigRef.current = scheduleSignature(ordered);
       } else {
@@ -291,13 +291,16 @@ export function useAppState() {
   }, [entries]);
   const areaRefKey = areaRefGeo ? `${areaRefGeo.lat.toFixed(3)},${areaRefGeo.lng.toFixed(3)}` : null;
   const [rawAreaSpots, setRawAreaSpots] = useState<Spot[]>([]);
+  const [areaSuggestionsLoading, setAreaSuggestionsLoading] = useState(false);
   /* eslint-disable react-hooks/set-state-in-effect -- 外部API（周辺スポット）取得と基点消失時のクリアのため意図的 */
   useEffect(() => {
     if (!areaRefGeo || readOnly) {
       setRawAreaSpots([]);
+      setAreaSuggestionsLoading(false);
       return;
     }
     let cancelled = false;
+    setAreaSuggestionsLoading(true);
     createSpotProvider(true)
       .nearby(areaRefGeo.lat, areaRefGeo.lng, 120, false)
       .then((s) => {
@@ -305,6 +308,9 @@ export function useAppState() {
       })
       .catch(() => {
         if (!cancelled) setRawAreaSpots([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAreaSuggestionsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -416,6 +422,27 @@ export function useAppState() {
       if (swapIdx < 0) return prev;
       const next = [...prev];
       [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      return next;
+    });
+  }, []);
+
+  /** 行き先を同じ日の先頭（dir<0）／末尾（dir>0）へ一気に動かす（長押し操作用）。 */
+  const moveEntryToEdge = useCallback((id: string, dir: -1 | 1) => {
+    setEntries((prev) => {
+      if (!prev) return prev;
+      const idx = prev.findIndex((e) => e.id === id);
+      if (idx < 0) return prev;
+      const target = prev[idx];
+      const day = target.day ?? 1;
+      const rest = prev.filter((_, i) => i !== idx);
+      const sameDayPositions = rest
+        .map((e, i) => ({ e, i }))
+        .filter((o) => (o.e.day ?? 1) === day && o.e.mode !== "stay")
+        .map((o) => o.i);
+      if (sameDayPositions.length === 0) return prev;
+      const insertAt = dir < 0 ? sameDayPositions[0] : sameDayPositions[sameDayPositions.length - 1] + 1;
+      const next = [...rest];
+      next.splice(insertAt, 0, target);
       return next;
     });
   }, []);
@@ -583,6 +610,41 @@ export function useAppState() {
     void saveProfile(p);
   }, []);
 
+  /**
+   * 旅行日数を変更する。減らした場合、消えた日（day > n）の予定は最終日へ寄せ、
+   * 自宅の帰宅時刻は常に最終日へ合わせる（「幽霊予定」が残らないように）。
+   */
+  const setTripDayCount = useCallback((n: number) => {
+    const days = Math.max(1, Math.floor(n));
+    setTripDayCountState(days);
+    setEntries((prev) => {
+      if (!prev) return prev;
+      const start = tripDateRef.current;
+      return prev.map((e) => {
+        // 自宅の帰宅は常に最終日へ
+        if (e.mode === "home" && e.arriveBy) {
+          const iso = combineDateAndTime(dateForDay(start, days), timeStrFromIso(e.arriveBy))?.toISOString();
+          return iso ? { ...e, arriveBy: iso } : e;
+        }
+        const d = e.day ?? 1;
+        if (d <= days) return e;
+        const deltaDays = days - d;
+        const shift = (iso?: string) => (iso ? new Date(new Date(iso).getTime() + deltaDays * 86400000).toISOString() : iso);
+        return { ...e, day: days, arriveBy: shift(e.arriveBy), departAt: shift(e.departAt), checkOut: shift(e.checkOut) };
+      });
+    });
+  }, []);
+
+  // しおりの保存を実行し、失敗（容量オーバー等）したらユーザーに知らせる。
+  const persistTrips = useCallback((next: SavedTrip[]) => {
+    void saveTrips(next).then((ok) => {
+      if (!ok) {
+        setFlash({ visible: true, text: "保存に失敗しました\n端末の空き容量をご確認ください" });
+        setTimeout(() => setFlash({ visible: false, text: "" }), 2600);
+      }
+    });
+  }, []);
+
   /** 現在の旅程を名前（＋表紙写真）を付けてしおり／履歴に保存する。 */
   const saveCurrentTrip = useCallback(
     (name: string, coverPhoto?: string) => {
@@ -602,23 +664,23 @@ export function useAppState() {
       };
       setSavedTrips((prev) => {
         const next = [trip, ...prev];
-        void saveTrips(next);
+        persistTrips(next);
         return next;
       });
       setFlash({ visible: true, text: `「${trip.name}」をしおりに保存しました` });
       setTimeout(() => setFlash({ visible: false, text: "" }), 1900);
     },
-    [entries, slots, packing, tripDate, tripDayCount, baseMode]
+    [entries, slots, packing, tripDate, tripDayCount, baseMode, persistTrips]
   );
 
   /** しおりの表紙写真を更新する。 */
   const setTripCover = useCallback((id: string, coverPhoto?: string) => {
     setSavedTrips((prev) => {
       const next = prev.map((t) => (t.id === id ? { ...t, coverPhoto } : t));
-      void saveTrips(next);
+      persistTrips(next);
       return next;
     });
-  }, []);
+  }, [persistTrips]);
 
   /** しおりに思い出写真を追加する（最大30枚）。 */
   const addTripPhotos = useCallback((id: string, photos: string[]) => {
@@ -629,10 +691,10 @@ export function useAppState() {
         const merged = [...current, ...photos].slice(0, MAX_TRIP_PHOTOS);
         return { ...t, photos: merged };
       });
-      void saveTrips(next);
+      persistTrips(next);
       return next;
     });
-  }, []);
+  }, [persistTrips]);
 
   /** しおりの思い出写真を1枚削除する。 */
   const removeTripPhoto = useCallback((id: string, index: number) => {
@@ -642,10 +704,10 @@ export function useAppState() {
         const photos = (t.photos ?? []).filter((_, i) => i !== index);
         return { ...t, photos };
       });
-      void saveTrips(next);
+      persistTrips(next);
       return next;
     });
-  }, []);
+  }, [persistTrips]);
 
   /** 保存した旅を現在の旅程として読み込む（今の内容は上書きされる）。 */
   const loadTrip = useCallback((id: string) => {
@@ -658,7 +720,7 @@ export function useAppState() {
       setPacking(trip.packing);
       setCurrentNodeKey(null);
       setTripDate(trip.tripDate);
-      setTripDayCount(trip.tripDayCount);
+      setTripDayCountState(trip.tripDayCount);
       setBaseMode(trip.baseMode);
       setSuggestions([]);
       setPlanNotes(null);
@@ -674,10 +736,10 @@ export function useAppState() {
   const deleteTrip = useCallback((id: string) => {
     setSavedTrips((prev) => {
       const next = prev.filter((t) => t.id !== id);
-      void saveTrips(next);
+      persistTrips(next);
       return next;
     });
-  }, []);
+  }, [persistTrips]);
 
   const recordArrival = useCallback((nodeKey: string, place: string) => {
     setCurrentNodeKey(nodeKey);
@@ -734,6 +796,8 @@ export function useAppState() {
     deleteTrip,
     suggestions,
     areaSuggestions,
+    areaSuggestionsLoading,
+    hasGeoReference: Boolean(areaRefGeo),
     planNotes,
     composing,
     composeError,
@@ -747,6 +811,7 @@ export function useAppState() {
     removeEntry,
     setEntryDay,
     moveEntry,
+    moveEntryToEdge,
     importFromMail,
     composeWithAi,
     togglePacking,

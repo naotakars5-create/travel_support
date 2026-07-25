@@ -388,7 +388,7 @@ export function PlanEntryForm({
       {/* 重要度は宿泊/移動/自宅以外で表示（宿泊・移動・自宅は必ず組み込む想定） */}
       {!transit && !stay && !home && (
         <View className="gap-1.5">
-          <Text className="font-gothic-400 text-[10px] text-muted">重要度</Text>
+          <Text className="font-gothic-400 text-[10px] text-muted">重要度（AIのおすすめ順の参考。手動並び替えには影響しません）</Text>
           <View className="flex-row gap-2">
             {PRIORITY_OPTIONS.map((o) => (
               <Chip key={o.value} active={o.value === priority} label={o.label} onPress={() => setPriority(o.value)} />
