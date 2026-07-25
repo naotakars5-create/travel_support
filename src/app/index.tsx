@@ -67,12 +67,14 @@ export default function Home() {
       {app.tab === "itin" && (
         <ItineraryScreen
           rail={app.rail}
+          unplaced={app.unplacedEntries}
           currentNodeKey={app.currentNodeKey}
           justAddedEventId={app.justAddedEventId}
           liveLocation={app.liveLocation}
           now={app.now}
           tripDate={app.tripDate}
           onNavigatePlan={() => app.setTab("plan")}
+          onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
         />
       )}
       {app.tab === "today" && (

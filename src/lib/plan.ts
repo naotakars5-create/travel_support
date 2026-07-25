@@ -204,7 +204,7 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
       events.push({
         ...base,
         id: `evt-${entry.id}-return`,
-        title: `${entry.title || "自宅"}へ帰宅`,
+        title: `${entry.title || "自宅"}に帰着`,
         placeTo: placeText,
         placeToGeo: entry.placeGeo,
         startAt: new Date(returnMs).toISOString(),
@@ -232,20 +232,34 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
     ];
   }
 
-  // 宿泊 → チェックイン〜チェックアウト
+  // 宿泊 → 「チェックイン（夜）」と「翌朝ホテルを出発（チェックアウト）」の2つの地点イベント。
+  // 翌朝の出発イベントがあることで、2日目がホテル起点で始まり、ホテル→最初の施設の移動も計算される。
   if (entry.mode === "stay") {
     const startMs = new Date(entry.arriveBy ?? slot.arriveAt).getTime();
     if (Number.isNaN(startMs)) return [];
     const outMs = entry.checkOut ? new Date(entry.checkOut).getTime() : NaN;
-    return [
+    const events: ParsedEvent[] = [
       {
         ...base,
+        id: `evt-${entry.id}-in`,
         placeTo: entryPlaceText(entry),
         placeToGeo: entry.placeGeo,
         startAt: new Date(startMs).toISOString(),
-        endAt: !Number.isNaN(outMs) && outMs > startMs ? new Date(outMs).toISOString() : undefined,
+        detail: entry.detail ? `チェックイン · ${entry.detail}` : "チェックイン",
       },
     ];
+    if (!Number.isNaN(outMs) && outMs > startMs) {
+      events.push({
+        ...base,
+        id: `evt-${entry.id}-out`,
+        placeTo: entryPlaceText(entry),
+        placeToGeo: entry.placeGeo,
+        startAt: new Date(outMs).toISOString(),
+        detail: "チェックアウト · ここから出発",
+        price: undefined, // 費用はチェックイン側にのみ載せる（二重表示防止）
+      });
+    }
+    return events;
   }
 
   // 観光・食事など → 地点イベント

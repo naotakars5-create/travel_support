@@ -35,6 +35,11 @@ export interface RailGap {
   durationMin: number;
   /** free ギャップ算出の基点になる直前ノードindex（周辺スポット検索などに使用） */
   afterNodeIndex: number;
+  /** conflict 用：実際に必要な移動時間の見積もり（分）。「足りない」表示に添える */
+  requiredMin?: number;
+  /** conflict 用：車・徒歩の実測/見積もり（分） */
+  driving?: number;
+  walking?: number;
 }
 
 export type RailItem = RailNode | RailEdge | RailGap;
@@ -155,7 +160,15 @@ export function buildRail(
 
     // 前の予定の終了が次の開始を超えている、または見積もり移動時間が空き時間を超える＝間に合わない
     if (intervalMin < 0 || est.durationMin > intervalMin) {
-      rail.push({ type: "gap", kind: "conflict", durationMin: intervalMin, afterNodeIndex: prevNodeIndex });
+      rail.push({
+        type: "gap",
+        kind: "conflict",
+        durationMin: intervalMin,
+        afterNodeIndex: prevNodeIndex,
+        requiredMin: est.durationMin,
+        driving: est.driving,
+        walking: est.walking,
+      });
       return;
     }
 
