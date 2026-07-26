@@ -42,11 +42,51 @@ function itemsBetween(rail: RailItem[], fromNodeIndex: number, toNodeIndex: numb
 }
 
 /**
- * @param currentNodeKey 到着記録済みの直近ノードのキー。まだ何も記録していない場合は null（先頭ノードより前）。
+ * 到着記録と現在時刻から「実効的な現在地」を決める。
+ * - 到着記録が無くても、予定時刻を過ぎたノードは「通過済み」とみなして自動で進める
+ *   （到着ボタンの押し忘れで一日中「9:00の予定へ」と表示され続けるのを防ぐ）。
+ * - ただし「予定より遅れている状態で」ユーザーが手動で現在地を記録した場合は、
+ *   本人の申告を信じて自動進行しない（実際に遅れているケース）。
  */
-export function getDayOfState(rail: RailItem[], currentNodeKey: string | null): DayOfState {
+function effectiveCurrentPos(
+  nodes: RailNode[],
+  currentNodeKey: string | null,
+  now?: Date,
+  currentNodeSetAt?: string | null
+): number {
+  const recordedPos = currentNodeKey ? nodes.findIndex((n) => n.key === currentNodeKey) : -1;
+  if (!now) return recordedPos;
+
+  // 現在時刻までに開始しているはずの最後のノード
+  const nowMs = now.getTime();
+  let autoPos = -1;
+  for (let i = 0; i < nodes.length; i++) {
+    const t = new Date(nodes[i].time).getTime();
+    if (!Number.isNaN(t) && t <= nowMs) autoPos = i;
+    else break;
+  }
+
+  // 手動/GPS記録が「次のノードの予定時刻を過ぎてから」行われた＝遅れの自己申告 → 記録を優先
+  if (recordedPos >= 0 && currentNodeSetAt) {
+    const setAtMs = new Date(currentNodeSetAt).getTime();
+    const nextPlanned = nodes[recordedPos + 1] ? new Date(nodes[recordedPos + 1].time).getTime() : Infinity;
+    if (!Number.isNaN(setAtMs) && setAtMs >= nextPlanned) return recordedPos;
+  }
+  return Math.max(recordedPos, autoPos);
+}
+
+/**
+ * @param currentNodeKey 到着記録済みの直近ノードのキー。まだ何も記録していない場合は null（先頭ノードより前）。
+ * @param opts.now 現在時刻。渡すと、予定時刻を過ぎたノードを自動で通過扱いにする。
+ * @param opts.currentNodeSetAt 到着記録を行った時刻（ISO）。遅れの自己申告を尊重するために使う。
+ */
+export function getDayOfState(
+  rail: RailItem[],
+  currentNodeKey: string | null,
+  opts?: { now?: Date; currentNodeSetAt?: string | null }
+): DayOfState {
   const nodes = railNodes(rail);
-  const currentPos = currentNodeKey ? nodes.findIndex((n) => n.key === currentNodeKey) : -1;
+  const currentPos = effectiveCurrentPos(nodes, currentNodeKey, opts?.now, opts?.currentNodeSetAt);
   const currentNode = currentPos >= 0 ? nodes[currentPos] : null;
   const nextNode = nodes[currentPos + 1] ?? null;
 

@@ -97,9 +97,73 @@ function weatherGeoFor(state: DayOfState, liveLocation: GeoPoint | null): GeoPoi
   return state.currentNode?.geo ?? null;
 }
 
+/**
+ * 「現在地を直す」：旅程の地点一覧から今いる場所を選び直せる。
+ * 到着ボタンの押し忘れ・順番変更・スキップで状態がずれた時の復帰手段。
+ */
+function CurrentNodePicker({
+  nodes,
+  now,
+  currentNodeKey,
+  onRecordArrival,
+}: {
+  nodes: RailNode[];
+  now: Date;
+  currentNodeKey: string | null;
+  onRecordArrival: (nodeKey: string, place: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (nodes.length === 0) return null;
+  // 今日の地点を優先表示（無ければ全地点）
+  const todayKey = now.toDateString();
+  const todays = nodes.filter((n) => new Date(n.time).toDateString() === todayKey);
+  const list = todays.length > 0 ? todays : nodes;
+  return (
+    <View className="mt-6 w-full">
+      <Pressable
+        onPress={() => setOpen((v) => !v)}
+        accessibilityRole="button"
+        accessibilityLabel="現在地を選び直す"
+        className="self-center rounded-full border border-day-text/25 px-4 py-1.5"
+      >
+        <Text className="font-gothic-400 text-[11px] text-day-text2">{open ? "閉じる" : "いまいる場所を選び直す"}</Text>
+      </Pressable>
+      {open && (
+        <View className="mt-2 rounded-[16px] border border-day-text/10">
+          {list.map((n, i) => {
+            const active = n.key === currentNodeKey;
+            return (
+              <Pressable
+                key={n.key}
+                onPress={() => {
+                  onRecordArrival(n.key, nodeName(n));
+                  setOpen(false);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`${nodeName(n)}にいる`}
+                className={`flex-row items-center gap-3 px-4 py-2 ${i > 0 ? "border-t border-day-text/10" : ""}`}
+              >
+                <Text className="w-11 font-gothic-400 text-[11px] text-day-text3" style={TNUM}>
+                  {formatJstTime(new Date(n.time))}
+                </Text>
+                <Text className={`flex-1 font-mincho-400 text-[13px] ${active ? "text-day-text" : "text-day-text2"}`}>
+                  {nodeName(n)}
+                </Text>
+                {active && <Text className="font-gothic-500 text-[10px] text-day-text2">✓ いまここ</Text>}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export function DayOfScreen({
   state,
   now,
+  nodes,
+  currentNodeKey,
   liveLocation,
   locationPermission,
   onNavigatePlan,
@@ -107,6 +171,9 @@ export function DayOfScreen({
 }: {
   state: DayOfState;
   now: Date;
+  /** 旅程の全地点（現在地の選び直しに使う） */
+  nodes: RailNode[];
+  currentNodeKey: string | null;
   liveLocation: GeoPoint | null;
   locationPermission: LocationPermissionState;
   onNavigatePlan: () => void;
@@ -152,6 +219,7 @@ export function DayOfScreen({
           <FreeHero state={state} liveLocation={liveLocation} gpsActive={gpsActive} weather={weather} onRecordArrival={onRecordArrival} />
         )}
         {state.mode === "done" && <DoneHero totalReservations={state.totalReservations} />}
+        <CurrentNodePicker nodes={nodes} now={now} currentNodeKey={currentNodeKey} onRecordArrival={onRecordArrival} />
       </ScrollView>
     </View>
   );

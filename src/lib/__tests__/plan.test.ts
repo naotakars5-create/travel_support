@@ -1,4 +1,4 @@
-import { sequentialSchedule, computePlanTotals, costCategoryOf, fillIntoGaps, buildEventsFromSchedule } from "../plan";
+import { sequentialSchedule, computePlanTotals, costCategoryOf, fillIntoGaps, buildEventsFromSchedule, isClosedOn, closedDaysLabel } from "../plan";
 import { PlanEntry } from "../types";
 
 const REF = new Date("2026-07-25T09:00:00.000Z"); // 各日の起点（テストは差分で検証しTZ非依存）
@@ -195,6 +195,36 @@ describe("レンタカー（期間の登録）は旅程に並べない", () => {
     const totals = computePlanTotals([entry({ id: "a" }), entry({ id: "car", mode: "rental", cost: 12000 })]);
     expect(totals.entryCount).toBe(1);
     expect(totals.byCategory.transit).toBe(12000);
+  });
+});
+
+describe("定休日", () => {
+  it("isClosedOn は定休日の曜日だけ true", () => {
+    const e = { closedDays: [1] }; // 月曜定休
+    expect(isClosedOn(e, new Date("2026-07-27T10:00:00"))).toBe(true); // 月
+    expect(isClosedOn(e, new Date("2026-07-28T10:00:00"))).toBe(false); // 火
+    expect(isClosedOn({ closedDays: undefined }, new Date("2026-07-27T10:00:00"))).toBe(false);
+  });
+
+  it("closedDaysLabel は「月曜定休」形式", () => {
+    expect(closedDaysLabel({ closedDays: [1] })).toBe("月曜定休");
+    expect(closedDaysLabel({ closedDays: [3, 6] })).toBe("水・土曜定休");
+    expect(closedDaysLabel({ closedDays: [] })).toBeNull();
+  });
+
+  it("fillIntoGaps は定休日の日に予定を置かない", () => {
+    // 基準日 2026-07-27（月）。月曜定休の行き先は2日目（火）に入る。
+    const ref = new Date("2026-07-27T09:00:00");
+    const closedMonday = entry({ id: "museum", stayMin: 60, closedDays: [1] });
+    const added = fillIntoGaps([closedMonday], [], ref, 2);
+    expect(added).toHaveLength(1);
+    expect(new Date(added[0].arriveAt).getDay()).toBe(2); // 火曜
+  });
+
+  it("旅行期間が全部定休日なら配置しない（＝入らなかった予定になる）", () => {
+    const ref = new Date("2026-07-27T09:00:00"); // 月曜のみの1日旅程
+    const closedMonday = entry({ id: "museum", stayMin: 60, closedDays: [1] });
+    expect(fillIntoGaps([closedMonday], [], ref, 1)).toHaveLength(0);
   });
 });
 

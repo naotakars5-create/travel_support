@@ -1,8 +1,12 @@
+import { guardRequest, LruCache } from "@/lib/apiGuard";
 import { geocodeAddress, hasGoogleMapsKey } from "@/lib/googleMaps";
 
-const cache = new Map<string, { lat: number; lng: number } | null>();
+const cache = new LruCache<{ lat: number; lng: number } | null>(1000);
 
 export async function POST(request: Request): Promise<Response> {
+  const denied = guardRequest(request, 60);
+  if (denied) return denied;
+
   let payload: { query?: string };
   try {
     payload = await request.json();

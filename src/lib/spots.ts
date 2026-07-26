@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./http";
 import { apiUrl } from "./apiBase";
 
 export interface Spot {
@@ -43,7 +44,7 @@ export const fixedSpotProvider: SpotProvider = {
 /** Google Places API（/api/nearby-spots 経由）で実際の周辺観光スポットを取得する実装。 */
 export const googlePlacesSpotProvider: SpotProvider = {
   async nearby(lat, lng, freeMinutes, preferIndoor) {
-    const res = await fetch(apiUrl("/api/nearby-spots"), {
+    const res = await fetchWithTimeout(apiUrl("/api/nearby-spots"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ lat, lng, freeMinutes, preferIndoor: Boolean(preferIndoor) }),

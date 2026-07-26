@@ -1,3 +1,4 @@
+import { guardRequest } from "@/lib/apiGuard";
 import { GeoPoint } from "@/lib/types";
 import { hasGoogleMapsKey, staticRouteMapUrl } from "@/lib/googleMaps";
 
@@ -7,6 +8,9 @@ import { hasGoogleMapsKey, staticRouteMapUrl } from "@/lib/googleMaps";
  * points はクエリ `pts=lat,lng;lat,lng;...` で受け取る（<Image> から GET できるようにするため）。
  */
 export async function GET(request: Request): Promise<Response> {
+  const denied = guardRequest(request, 60);
+  if (denied) return denied;
+
   const url = new URL(request.url);
   const ptsParam = url.searchParams.get("pts") ?? "";
   const width = clampInt(url.searchParams.get("w"), 640, 100, 640);

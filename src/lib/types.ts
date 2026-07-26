@@ -43,6 +43,8 @@ export interface ParsedEvent {
   placeToGeo?: GeoPoint;
   /** この地点からの（またはこの地点への）移動手段の指定。出発地で使う */
   travelMode?: "car" | "walk" | "rail";
+  /** 定休日（0=日 … 6=土）。旅程で「定休日と重なっている」警告に使う */
+  closedDays?: number[];
 }
 
 /** 行き先の重要度（時間が足りない時にAIが取捨選択する優先度）。 */
@@ -82,6 +84,8 @@ export interface PlanEntry {
   openFrom?: string;
   /** 営業・開館時間（終了, "HH:MM"）。閉店までに滞在が収まるように配置する。 */
   openTo?: string;
+  /** 定休日（0=日 … 6=土）。この曜日には配置しない・警告を出す。不明なら undefined */
+  closedDays?: number[];
 
   // --- 移動系（鉄道・バス・飛行機・車）専用 ---
   /** 出発地 */

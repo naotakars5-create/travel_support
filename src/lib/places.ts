@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./http";
 import { apiUrl } from "./apiBase";
 
 export interface PlacePrediction {
@@ -10,7 +11,7 @@ export interface PlacePrediction {
 /** 場所の予測候補を取得する（/api/place-autocomplete 経由）。失敗時は空配列。 */
 export async function fetchPlacePredictions(input: string): Promise<PlacePrediction[]> {
   try {
-    const res = await fetch(apiUrl("/api/place-autocomplete"), {
+    const res = await fetchWithTimeout(apiUrl("/api/place-autocomplete"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ input }),
@@ -29,12 +30,14 @@ export interface PlaceDetails {
   openFrom?: string;
   openTo?: string;
   weekdayText?: string[];
+  /** 定休日（0=日 … 6=土）。不明なら undefined */
+  closedDays?: number[];
 }
 
 /** place_id から詳細（番地までの住所・営業時間）を取得する（/api/place-details 経由）。失敗時は null。 */
 export async function fetchPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
   try {
-    const res = await fetch(apiUrl("/api/place-details"), {
+    const res = await fetchWithTimeout(apiUrl("/api/place-details"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ placeId }),

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { GeoPoint, Priority, TransportMode } from "@/lib/types";
-import { PlanEntryInput } from "@/lib/plan";
+import { closedDaysLabel, PlanEntryInput } from "@/lib/plan";
 import { combineDateAndTime, dateForDay, dayOfIso, timeStrFromIso } from "@/lib/date";
 import { fetchPlacePredictions, fetchPlaceDetails, PlacePrediction } from "@/lib/places";
 import { TimeField } from "./PlainFields";
@@ -29,15 +29,27 @@ const MUTED = "#6E675C";
 const TRANSIT_MODES: TransportMode[] = ["air", "rail", "bus", "car"];
 const isTransit = (m: TransportMode) => TRANSIT_MODES.includes(m);
 
-/** 自動取得した営業時間の表示（読み取り専用）。取得中は「取得中…」。 */
-function OpenHoursNote({ loading, openFrom, openTo }: { loading: boolean; openFrom?: string; openTo?: string }) {
+/** 自動取得した営業時間・定休日の表示（読み取り専用）。取得中は「取得中…」。 */
+function OpenHoursNote({
+  loading,
+  openFrom,
+  openTo,
+  closedDays,
+}: {
+  loading: boolean;
+  openFrom?: string;
+  openTo?: string;
+  closedDays?: number[];
+}) {
   if (loading) {
     return <Text className="font-gothic-400 text-[10px] text-muted-light">営業時間を取得中…</Text>;
   }
   if (openFrom || openTo) {
+    const closed = closedDaysLabel({ closedDays });
     return (
       <Text className="font-gothic-400 text-[10px] text-muted">
-        営業時間 {openFrom ?? "?"}〜{openTo ?? "?"}（自動取得・AIがこの時間内に組みます）
+        営業時間 {openFrom ?? "?"}〜{openTo ?? "?"}
+        {closed ? `・${closed}` : ""}（自動取得・AIがこの時間内に組みます）
       </Text>
     );
   }
@@ -70,6 +82,7 @@ export interface PlanEntryFormInitial {
   checkOut?: string;
   openFrom?: string;
   openTo?: string;
+  closedDays?: number[];
   travelMode?: "car" | "walk" | "rail";
 }
 
@@ -121,6 +134,7 @@ export function PlanEntryForm({
   const [openFrom, setOpenFrom] = useState<string | undefined>(initial?.openFrom);
   const [openTo, setOpenTo] = useState<string | undefined>(initial?.openTo);
   const [placeGeo, setPlaceGeo] = useState<GeoPoint | undefined>(initial?.placeGeo);
+  const [closedDays, setClosedDays] = useState<number[] | undefined>(initial?.closedDays);
   const [travelMode, setTravelMode] = useState<"car" | "walk" | "rail">(initial?.travelMode ?? "car");
   // レンタカーを返す日（借りる日と別日になりうる）
   const [returnDay, setReturnDay] = useState<number>(() => {
@@ -164,6 +178,7 @@ export function PlanEntryForm({
         if (details.geo) setPlaceGeo(details.geo); // Places由来の正確な座標
         setOpenFrom(details.openFrom);
         setOpenTo(details.openTo);
+        setClosedDays(details.closedDays);
       }
       setLoadingDetails(false);
     })();
@@ -171,8 +186,9 @@ export function PlanEntryForm({
 
   const onPlaceChange = (v: string) => {
     setPlace(v);
-    // 住所を手で変えたら、自動取得した座標・営業時間はいったんクリア（別の場所になり得るため）。
+    // 住所を手で変えたら、自動取得した座標・営業時間・定休日はいったんクリア（別の場所になり得るため）。
     setPlaceGeo(undefined);
+    setClosedDays(undefined);
     setOpenFrom(undefined);
     setOpenTo(undefined);
   };
@@ -221,6 +237,7 @@ export function PlanEntryForm({
       input.fixedTime = true;
       input.openFrom = openFrom;
       input.openTo = openTo;
+      input.closedDays = closedDays;
     } else {
       input.place = place || undefined;
       input.placeGeo = placeGeo;
@@ -229,6 +246,7 @@ export function PlanEntryForm({
       input.fixedTime = arriveTime ? fixedTime : false;
       input.openFrom = openFrom;
       input.openTo = openTo;
+      input.closedDays = closedDays;
     }
     onSubmit(input);
     if (!resetAfterSubmit) return;
@@ -247,6 +265,7 @@ export function PlanEntryForm({
     setPredictions([]);
     setOpenFrom(undefined);
     setOpenTo(undefined);
+    setClosedDays(undefined);
     setPlaceGeo(undefined);
     setTravelMode("car");
   };
@@ -419,7 +438,7 @@ export function PlanEntryForm({
               placeholderTextColor={MUTED}
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
             />
-            <OpenHoursNote loading={loadingDetails} openFrom={openFrom} openTo={openTo} />
+            <OpenHoursNote loading={loadingDetails} openFrom={openFrom} openTo={openTo} closedDays={closedDays} />
           </View>
           <View className="gap-1.5">
             <Text className="font-gothic-400 text-[10px] text-muted">泊数（同じ宿に連泊する場合）</Text>
@@ -445,7 +464,7 @@ export function PlanEntryForm({
               placeholderTextColor={MUTED}
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
             />
-            <OpenHoursNote loading={loadingDetails} openFrom={openFrom} openTo={openTo} />
+            <OpenHoursNote loading={loadingDetails} openFrom={openFrom} openTo={openTo} closedDays={closedDays} />
           </View>
           <View className="gap-1.5">
             <Text className="font-gothic-400 text-[10px] text-muted">滞在時間の目安</Text>

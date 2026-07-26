@@ -68,6 +68,8 @@ export function ProfileScreen({ profile, onEditProfile }: { profile: Profile; on
         <Text className="font-mincho-600 text-[26px] text-ink">マイページ</Text>
         <Pressable
           onPress={() => setNotifOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="通知を開く"
           className="h-10 w-10 items-center justify-center rounded-full border border-black/[.08] bg-white/70"
         >
           <BellIcon color="#23201D" size={18} />

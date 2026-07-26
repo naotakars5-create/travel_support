@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PackingItem, PlanEntry, ScheduleSlot } from "./types";
-import { BaseMode } from "./transit";
+import { BaseMode, EdgeTravel } from "./transit";
 
 const STORAGE_KEY = "tabinavi.state.v2";
 
@@ -12,6 +12,8 @@ export interface PersistedState {
   slots: ScheduleSlot[];
   /** 当日画面の到着記録済みノードキー */
   currentNodeKey: string | null;
+  /** 到着記録を行った時刻（ISO）。遅れの自己申告を時刻ベースの自動進行より優先するために使う */
+  currentNodeSetAt?: string | null;
   /** 持ち物チェックリスト */
   packing: PackingItem[];
   /** 旅行の開始日（YYYY-MM-DD） */
@@ -20,6 +22,8 @@ export interface PersistedState {
   tripDayCount?: number;
   /** 基本の移動手段 */
   baseMode?: BaseMode;
+  /** 実測の移動時間キャッシュ（edgeKey → 分）。リロード時のDirections API再取得を減らす */
+  transitCache?: Record<string, EdgeTravel>;
   savedAt: string;
 }
 
@@ -35,11 +39,13 @@ export async function loadState(): Promise<PersistedState | null> {
   }
 }
 
-export async function saveState(state: PersistedState): Promise<void> {
+/** 保存の成否を返す（true=成功）。容量不足等の失敗は呼び出し側でユーザーに知らせる。 */
+export async function saveState(state: PersistedState): Promise<boolean> {
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
   } catch {
-    // ストレージ書き込み失敗は無視
+    return false;
   }
 }
 

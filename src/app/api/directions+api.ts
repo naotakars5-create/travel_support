@@ -1,3 +1,4 @@
+import { guardRequest, LruCache } from "@/lib/apiGuard";
 import { getDirections, hasGoogleMapsKey } from "@/lib/googleMaps";
 import { TransportMode } from "@/lib/types";
 
@@ -7,9 +8,12 @@ interface DirectionsRequest {
   mode?: TransportMode;
 }
 
-const cache = new Map<string, { durationMin: number; distanceMeters: number } | null>();
+const cache = new LruCache<{ durationMin: number; distanceMeters: number } | null>(500);
 
 export async function POST(request: Request): Promise<Response> {
+  const denied = guardRequest(request, 120);
+  if (denied) return denied;
+
   let payload: DirectionsRequest;
   try {
     payload = await request.json();

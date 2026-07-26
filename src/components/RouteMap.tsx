@@ -27,7 +27,11 @@ export function RouteMap({ points, me, labels }: { points: GeoPoint[]; me?: GeoP
   };
 
   return (
-    <Pressable onPress={openInteractive} className="mb-2 overflow-hidden rounded-[16px] border border-black/[.08] bg-black/[.03]">
+    <Pressable
+      onPress={openInteractive}
+      accessibilityRole="button"
+      accessibilityLabel="経路をGoogleマップで開く"
+      className="mb-2 overflow-hidden rounded-[16px] border border-black/[.08] bg-black/[.03]">
       <Image
         source={{ uri }}
         onError={() => setFailed(true)}

@@ -5,7 +5,7 @@ import { RailItem, computeStats, formatDurationMin } from "@/lib/itinerary";
 import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
 import { dayOfIso, formatJstHeadingJa, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { GeoPoint, PlanEntry } from "@/lib/types";
-import { PRIORITY_META } from "@/lib/plan";
+import { isClosedOn, closedDaysLabel, PRIORITY_META } from "@/lib/plan";
 import { pickBenchIllustration } from "@/lib/illustrations";
 import { directionsUrl } from "@/lib/mapsLink";
 import { Illustration } from "./Illustration";
@@ -90,6 +90,8 @@ export function ItineraryScreen({
   liveLocation,
   now,
   tripDate,
+  canUndoCompose,
+  onUndoCompose,
   onNavigatePlan,
   onBumpPriority,
 }: {
@@ -101,6 +103,9 @@ export function ItineraryScreen({
   liveLocation: GeoPoint | null;
   now: Date;
   tripDate: string;
+  /** 直前のAI組み直しを取り消せるか（スナップショットがあるか） */
+  canUndoCompose: boolean;
+  onUndoCompose: () => void;
   onNavigatePlan: () => void;
   onBumpPriority: (id: string) => void;
 }) {
@@ -174,11 +179,23 @@ export function ItineraryScreen({
         </View>
         <View className="mt-1 flex-row items-center justify-between">
           <Text className="font-mincho-600 text-[26px] text-ink">本日の旅程</Text>
-          {rail.length > 0 && (
-            <Pressable onPress={onNavigatePlan} className="rounded-full border border-ink/25 px-3 py-1">
-              <Text className="font-gothic-500 text-[11px] text-ink">計画を編集</Text>
-            </Pressable>
-          )}
+          <View className="flex-row items-center gap-2">
+            {canUndoCompose && (
+              <Pressable
+                onPress={onUndoCompose}
+                accessibilityRole="button"
+                accessibilityLabel="AIで組む前の旅程に戻す"
+                className="rounded-full border border-ink/25 px-3 py-1"
+              >
+                <Text className="font-gothic-500 text-[11px] text-ink">元に戻す</Text>
+              </Pressable>
+            )}
+            {rail.length > 0 && (
+              <Pressable onPress={onNavigatePlan} className="rounded-full border border-ink/25 px-3 py-1">
+                <Text className="font-gothic-500 text-[11px] text-ink">計画を編集</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
         <Text className="mt-1 font-gothic-400 text-[11px] text-muted" style={TNUM}>
           {subLine}
@@ -379,6 +396,8 @@ function NodeRow({
   const meta = [item.place && item.place !== item.event.title ? item.place : null, item.sub ?? null]
     .filter(Boolean)
     .join(" · ");
+  // 定休日と重なっていないか（Place Details 由来の定休日がある場合のみ判定できる）
+  const closedConflict = isClosedOn(item.event, start);
 
   return (
     <Animated.View style={nodeInStyle} className="flex-row">
@@ -417,8 +436,15 @@ function NodeRow({
               </Blinker>
             )}
           </View>
-          {(meta || item.confidence < 0.5) && (
+          {(meta || item.confidence < 0.5 || closedConflict) && (
             <View className="mt-0.5 flex-row items-center gap-1.5" style={{ paddingLeft: 30 }}>
+              {closedConflict && (
+                <View className="rounded-full border border-ink bg-surface px-1.5">
+                  <Text className="font-gothic-500 text-[9px] text-ink">
+                    {closedDaysLabel(item.event) ?? "定休日"}・この日は休み
+                  </Text>
+                </View>
+              )}
               {item.confidence < 0.5 && (
                 <View className="rounded-full border border-muted px-1.5">
                   <Text className="font-gothic-400 text-[9px] text-muted">要確認</Text>

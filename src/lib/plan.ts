@@ -37,6 +37,20 @@ function parseHm(s: string | undefined): { h: number; min: number } | null {
   return { h, min };
 }
 
+/** その日付が行き先の定休日に当たるか（closedDays 未設定なら常に false）。 */
+export function isClosedOn(entry: Pick<PlanEntry, "closedDays">, date: Date): boolean {
+  if (!entry.closedDays || entry.closedDays.length === 0) return false;
+  return entry.closedDays.includes(date.getDay());
+}
+
+export const WEEKDAY_JA = ["日", "月", "火", "水", "木", "金", "土"] as const;
+
+/** 定休日の表示用ラベル（例: "月曜定休"）。無ければ null。 */
+export function closedDaysLabel(entry: Pick<PlanEntry, "closedDays">): string | null {
+  if (!entry.closedDays || entry.closedDays.length === 0) return null;
+  return `${entry.closedDays.map((d) => WEEKDAY_JA[d] ?? "?").join("・")}曜定休`;
+}
+
 /**
  * 開始時刻を施設の営業時間内へ寄せる。
  * - 開店前なら開店時刻へ繰り下げ
@@ -204,6 +218,8 @@ export function fillIntoGaps(
     for (let d = 1; d <= Math.max(1, dayCount) && placedAt === null; d++) {
       const dayStart = new Date(referenceDate.getTime() + (d - 1) * 86400000);
       dayStart.setHours(DAY_START_HOUR, 0, 0, 0);
+      // 定休日には置かない（別の日を探す）
+      if (isClosedOn(e, dayStart)) continue;
       const winStart = Math.max(dayStart.getTime(), notBeforeMs);
       const dayEnd = new Date(referenceDate.getTime() + (d - 1) * 86400000);
       dayEnd.setHours(DAY_END_HOUR, 0, 0, 0);
@@ -274,6 +290,7 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot, ctx?: { reference: 
     source: entry.source,
     fields: [] as ParsedField[],
     confidence: 1,
+    closedDays: entry.closedDays,
   };
 
   // レンタカーは「借りている期間」であって地点ではないため、旅程には出さない
@@ -464,6 +481,8 @@ export interface PlanEntryInput {
   /** 営業・開館時間 "HH:MM" */
   openFrom?: string;
   openTo?: string;
+  /** 定休日（0=日 … 6=土） */
+  closedDays?: number[];
   /** 出発地: 最初のスポットへの移動手段 */
   travelMode?: "car" | "walk" | "rail";
 }
@@ -490,6 +509,7 @@ export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | nul
     checkOut: input.checkOut || undefined,
     openFrom: input.openFrom || undefined,
     openTo: input.openTo || undefined,
+    closedDays: input.closedDays && input.closedDays.length > 0 ? input.closedDays : undefined,
     travelMode: input.travelMode,
   };
 }
@@ -516,7 +536,7 @@ export function scheduleSignature(entries: PlanEntry[]): string {
   return entries
     .map(
       (e) =>
-        `${e.id}|${e.arriveBy ?? ""}|${e.departAt ?? ""}|${e.checkOut ?? ""}|${e.stayMin ?? ""}|${e.priority}|${e.mode}|${e.day ?? ""}|${e.fixedTime ? 1 : 0}|${e.placeFrom ?? ""}|${e.placeTo ?? ""}|${e.openFrom ?? ""}|${e.openTo ?? ""}`
+        `${e.id}|${e.arriveBy ?? ""}|${e.departAt ?? ""}|${e.checkOut ?? ""}|${e.stayMin ?? ""}|${e.priority}|${e.mode}|${e.day ?? ""}|${e.fixedTime ? 1 : 0}|${e.placeFrom ?? ""}|${e.placeTo ?? ""}|${e.openFrom ?? ""}|${e.openTo ?? ""}|${e.closedDays?.join(",") ?? ""}`
     )
     .join(";");
 }

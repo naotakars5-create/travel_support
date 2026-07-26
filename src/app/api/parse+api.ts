@@ -1,3 +1,4 @@
+import { guardRequest, LruCache } from "@/lib/apiGuard";
 import { createHash, randomUUID } from "crypto";
 import { ParsedEvent, ParseApiResponse, TransportMode } from "@/lib/types";
 import { PARSE_SYSTEM_PROMPT, buildParseUserMessage, stripJsonFence } from "@/lib/parsePrompt";
@@ -6,7 +7,7 @@ import { getLlmProvider } from "@/lib/llmProvider";
 const VALID_MODES: TransportMode[] = ["air", "rail", "bus", "walk", "car", "stay", "dining", "activity"];
 
 // 同一メール本文の再解析を避けるためのプロセスローカルキャッシュ（APIコスト対策）。
-const parseCache = new Map<string, ParseApiResponse>();
+const parseCache = new LruCache<ParseApiResponse>(200);
 
 function cacheKey(body: string, sourceHint?: string): string {
   return createHash("sha256").update(`${sourceHint ?? ""} ${body}`).digest("hex");
@@ -57,6 +58,9 @@ function normalizeEvent(raw: RawEvent, fallbackSource: string | undefined): Pars
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const denied = guardRequest(request, 6);
+  if (denied) return denied;
+
   let payload: { body?: string; source?: string; referenceDate?: string };
   try {
     payload = await request.json();

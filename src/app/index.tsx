@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useAppState } from "@/hooks/useAppState";
+import { railNodes } from "@/lib/itinerary";
 import { BottomNav } from "@/components/BottomNav";
 import { PlanScreen } from "@/components/PlanScreen";
 import { ItineraryScreen } from "@/components/ItineraryScreen";
@@ -33,6 +34,15 @@ export default function Home() {
     <View className={`flex-1 ${dark ? "bg-day-bg" : "bg-kinari"}`}>
       <StatusBar style={dark ? "light" : "dark"} />
 
+      {/* オフライン表示（地図・AI・住所検索が使えないことを黙らせない） */}
+      {!app.isOnline && (
+        <View className="bg-ink px-4 py-1.5">
+          <Text className="text-center font-gothic-500 text-[10px] text-kinari">
+            オフラインです · 地図・AI・住所検索は再接続後に使えます
+          </Text>
+        </View>
+      )}
+
       {app.tab === "plan" && (
         <PlanScreen
           entries={app.entries}
@@ -46,6 +56,7 @@ export default function Home() {
           composing={app.composing}
           composeError={app.composeError}
           readOnly={app.readOnly}
+          tripEnded={app.tripEnded}
           tripDate={app.tripDate}
           onSetTripDate={app.setTripDate}
           tripDayCount={app.tripDayCount}
@@ -57,6 +68,7 @@ export default function Home() {
           onOpenAddLodging={() => setAddLodgingOpen(true)}
           onOpenAddStart={() => setAddStartOpen(true)}
           onOpenAddRental={() => setAddRentalOpen(true)}
+          onGoShiori={() => app.setTab("shiori")}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
@@ -78,6 +90,8 @@ export default function Home() {
           liveLocation={app.liveLocation}
           now={app.now}
           tripDate={app.tripDate}
+          canUndoCompose={app.canUndoCompose}
+          onUndoCompose={app.undoCompose}
           onNavigatePlan={() => app.setTab("plan")}
           onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
         />
@@ -86,6 +100,8 @@ export default function Home() {
         <DayOfScreen
           state={app.dayOfState}
           now={app.now}
+          nodes={railNodes(app.rail)}
+          currentNodeKey={app.currentNodeKey}
           liveLocation={app.liveLocation}
           locationPermission={app.locationPermission}
           onNavigatePlan={() => app.setTab("plan")}
