@@ -95,6 +95,7 @@ npx eas deploy --prod
 | `OPENAI_MODEL` | - | OpenAI 利用時のモデル名（未指定なら `gpt-4.1`）。 |
 | `GOOGLE_MAPS_API_KEY` | - | Google Maps Platform キー（**Geocoding API・Directions API・Places API（レガシー版、"Places API (New)" ではない）・Maps Static API** を有効化したもの）。未設定でもアプリは動作する（ヒューリスティック推定・固定スポットにフォールバックし、全行程マップは非表示）。設定すると住所→座標変換・地点間の実測移動時間・周辺観光スポット提案・全行程マップが実データになる。 |
 | `EXPO_PUBLIC_API_BASE_URL` | - | API呼び出しの起点URLを固定したい場合に指定（本番ビルド向け）。未指定時は開発中は Expo の dev server ホストを自動解決する（`src/lib/apiBase.ts`）。 |
+| `UNSPLASH_ACCESS_KEY` | - | しおりの表紙にする地域の風景写真（Unsplash）。未設定なら表紙は既定のイラストのまま。<https://unsplash.com/developers> で無料アプリを登録して Access Key を取得する。 |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | - | 共有リンクを短くするための保存先（Upstash Redis の REST 認証情報。Vercel KV の `KV_REST_API_URL` / `KV_REST_API_TOKEN` でも可）。未設定でも共有はできるが、旅程をURLに埋め込むため1,000〜1,700文字の長いURLになる。設定すると `?s=a7Bx9K2mQd`（全体で約40文字）になる。保持期間90日。 |
 
 `ANTHROPIC_API_KEY`・`OPENAI_API_KEY` のどちらか一方があれば AI 機能が動きます。両方とも未設定でも起動でき、その場合はローカル・ヒューリスティックで旅程を組み、メール解析は手入力フォームへフォールバックします。

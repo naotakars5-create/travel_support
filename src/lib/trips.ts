@@ -24,6 +24,10 @@ export interface SavedTrip {
   baseMode: BaseMode;
   /** AIへのお願い（自由文）。旅を読み込んだときに一緒に戻す */
   planRequest?: string;
+  /** 地域から自動取得した表紙写真（手動設定の coverPhoto が無いときに使う） */
+  autoCover?: { url: string; credit: string; creditUrl: string };
+  /** 自動表紙を探した地域名（同じ地域を何度も問い合わせないための目印） */
+  autoCoverRegion?: string;
 }
 
 /** 思い出写真の上限枚数。 */

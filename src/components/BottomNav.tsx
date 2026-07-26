@@ -2,12 +2,13 @@ import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Tab } from "@/hooks/useAppState";
 
+// 下タブは毎日の導線だけに絞る。しおり・持ち物は旅の前後にしか使わないので
+// マイページの中から開く（タブが多すぎて押し間違えるのを防ぐ）。
 const ITEMS: { id: Tab; label: string }[] = [
-  { id: "shiori", label: "しおり" },
   { id: "plan", label: "計画" },
   { id: "itin", label: "旅程" },
+  { id: "map", label: "地図" },
   { id: "today", label: "当日" },
-  { id: "packing", label: "持ち物" },
   { id: "profile", label: "マイページ" },
 ];
 

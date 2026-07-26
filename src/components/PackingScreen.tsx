@@ -12,11 +12,14 @@ export function PackingScreen({
   onToggle,
   onAdd,
   onRemove,
+  onBack,
 }: {
   items: PackingItem[];
   onToggle: (id: string) => void;
   onAdd: (label: string) => void;
   onRemove: (id: string) => void;
+  /** 下タブから外したので、マイページへ戻る導線を置く */
+  onBack: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const [input, setInput] = useState("");
@@ -31,7 +34,9 @@ export function PackingScreen({
   return (
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
       <View className="px-[26px] pb-3 pt-4">
-        <Text className="font-gothic-400 text-[10px] tracking-[.2em] text-muted">TABI-NAVI</Text>
+        <Pressable onPress={onBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="マイページへ戻る" className="self-start">
+          <Text className="font-gothic-400 text-[12px] text-muted">‹ マイページ</Text>
+        </Pressable>
         <Text className="mt-1 font-mincho-600 text-[26px] text-ink">持ち物</Text>
         <Text className="mt-1 font-gothic-400 text-[11px] text-muted" style={{ fontVariant: ["tabular-nums"] }}>
           {done} / {total} 準備済み

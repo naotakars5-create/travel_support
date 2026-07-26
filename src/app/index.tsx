@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useAppState } from "@/hooks/useAppState";
@@ -13,20 +13,42 @@ import { EditEntrySheet } from "@/components/EditEntrySheet";
 import { ProfileScreen } from "@/components/ProfileScreen";
 import { ProfileSheet } from "@/components/ProfileSheet";
 import { ShioriScreen } from "@/components/ShioriScreen";
+import { MapScreen } from "@/components/MapScreen";
+import { GeneratePlanSheet } from "@/components/GeneratePlanSheet";
 import { FlashOverlay } from "@/components/FlashOverlay";
+import { OnboardingScreen } from "@/components/OnboardingScreen";
+import { hasSeenOnboarding, markOnboardingSeen } from "@/lib/onboarding";
 
 export default function Home() {
   const app = useAppState();
   const [addOpen, setAddOpen] = useState(false);
   const [addLodgingOpen, setAddLodgingOpen] = useState(false);
   const [addRentalOpen, setAddRentalOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const dark = app.tab === "today";
   const editingEntry = editId ? app.entries?.find((e) => e.id === editId) ?? null : null;
 
-  if (!app.entries) {
+  // 初回だけ紹介カードを出す（null = 判定中で、ちらつかせないため何も描かない）
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+  useEffect(() => {
+    void hasSeenOnboarding().then((seen) => setShowOnboarding(!seen));
+  }, []);
+
+  if (!app.entries || showOnboarding === null) {
     return <View className="flex-1 bg-kinari" />;
+  }
+
+  if (showOnboarding) {
+    return (
+      <OnboardingScreen
+        onDone={() => {
+          void markOnboardingSeen();
+          setShowOnboarding(false);
+        }}
+      />
+    );
   }
 
   return (
@@ -66,6 +88,7 @@ export default function Home() {
           onOpenAddLodging={() => setAddLodgingOpen(true)}
           onOpenAddRental={() => setAddRentalOpen(true)}
           onGoShiori={() => app.setTab("shiori")}
+          onOpenGenerate={() => setGenerateOpen(true)}
           planRequest={app.planRequest}
           onSetPlanRequest={app.setPlanRequest}
           onCompose={app.composeWithAi}
@@ -111,7 +134,13 @@ export default function Home() {
         />
       )}
       {app.tab === "packing" && (
-        <PackingScreen items={app.packing} onToggle={app.togglePacking} onAdd={app.addPacking} onRemove={app.removePacking} />
+        <PackingScreen
+          items={app.packing}
+          onToggle={app.togglePacking}
+          onAdd={app.addPacking}
+          onRemove={app.removePacking}
+          onBack={() => app.setTab("profile")}
+        />
       )}
       {app.tab === "shiori" && (
         <ShioriScreen
@@ -119,6 +148,7 @@ export default function Home() {
           canCreate={(app.entries?.length ?? 0) > 0}
           onCreate={app.saveCurrentTrip}
           onNavigatePlan={() => app.setTab("plan")}
+          onBack={() => app.setTab("profile")}
           onOpen={(id) => {
             app.loadTrip(id);
           }}
@@ -128,8 +158,22 @@ export default function Home() {
           onRemovePhoto={app.removeTripPhoto}
         />
       )}
+      {app.tab === "map" && (
+        <MapScreen
+          center={app.areaRefGeo}
+          liveLocation={app.liveLocation}
+          existingTitles={new Set((app.entries ?? []).map((e) => e.title))}
+          onAddSpot={app.addSpot}
+          onNavigatePlan={() => app.setTab("plan")}
+        />
+      )}
       {app.tab === "profile" && (
-        <ProfileScreen profile={app.profile} onEditProfile={() => setProfileOpen(true)} />
+        <ProfileScreen
+          profile={app.profile}
+          onEditProfile={() => setProfileOpen(true)}
+          onOpenShiori={() => app.setTab("shiori")}
+          onOpenPacking={() => app.setTab("packing")}
+        />
       )}
 
       <BottomNav tab={app.tab} onChange={app.setTab} dark={dark} />
@@ -182,6 +226,14 @@ export default function Home() {
             app.setTab("plan");
           }}
           onImportMail={app.importFromMail}
+        />
+      )}
+
+      {generateOpen && (
+        <GeneratePlanSheet
+          initialDayCount={app.tripDayCount}
+          onClose={() => setGenerateOpen(false)}
+          onGenerate={app.generatePlanFromBrief}
         />
       )}
 
