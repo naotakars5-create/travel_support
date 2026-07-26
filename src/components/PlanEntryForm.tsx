@@ -6,7 +6,7 @@ import { combineDateAndTime, dateForDay, dayOfIso, timeStrFromIso } from "@/lib/
 import { fetchPlacePredictions, fetchPlaceDetails, PlacePrediction } from "@/lib/places";
 import { TimeField } from "./PlainFields";
 
-// 宿泊・出発地は計画画面の「固定枠」から専用入力するため、通常の追加からは除外。
+// 宿泊・レンタカーは計画画面の「固定枠」から専用入力するため、通常の追加からは除外。
 const MODE_OPTIONS: { value: TransportMode; label: string }[] = [
   { value: "activity", label: "観光" },
   { value: "dining", label: "食事" },
@@ -83,7 +83,6 @@ export interface PlanEntryFormInitial {
   openFrom?: string;
   openTo?: string;
   closedDays?: number[];
-  travelMode?: "car" | "walk" | "rail";
 }
 
 /** 行き先を入力するフォーム。種別で入力欄が変わり、複数日程では「何日目」を選べる。 */
@@ -135,7 +134,6 @@ export function PlanEntryForm({
   const [openTo, setOpenTo] = useState<string | undefined>(initial?.openTo);
   const [placeGeo, setPlaceGeo] = useState<GeoPoint | undefined>(initial?.placeGeo);
   const [closedDays, setClosedDays] = useState<number[] | undefined>(initial?.closedDays);
-  const [travelMode, setTravelMode] = useState<"car" | "walk" | "rail">(initial?.travelMode ?? "car");
   // レンタカーを返す日（借りる日と別日になりうる）
   const [returnDay, setReturnDay] = useState<number>(() => {
     if (initial?.mode === "rental" && initial.arriveBy) {
@@ -149,9 +147,8 @@ export function PlanEntryForm({
 
   const transit = isTransit(mode);
   const stay = mode === "stay";
-  const home = mode === "home";
   const rental = mode === "rental";
-  const canSubmit = home || rental ? true : title.trim().length > 0;
+  const canSubmit = rental ? true : title.trim().length > 0;
 
   const onTitleChange = (v: string) => {
     setTitle(v);
@@ -198,7 +195,7 @@ export function PlanEntryForm({
   const submit = () => {
     if (!canSubmit) return;
     const input: PlanEntryInput = {
-      title: home ? title.trim() || "自宅" : title,
+      title,
       mode,
       priority,
       day,
@@ -214,15 +211,6 @@ export function PlanEntryForm({
       input.departAt = iso(day, departTime); // 借りる
       input.arriveBy = iso(returnDay, arriveTime); // 返す
       input.fixedTime = true;
-    } else if (home) {
-      input.place = place || undefined;
-      input.placeGeo = placeGeo;
-      input.priority = "must";
-      input.day = 1;
-      input.departAt = iso(1, departTime); // 初日に出発
-      input.arriveBy = iso(tripDayCount, arriveTime); // 最終日に帰宅
-      input.fixedTime = true;
-      input.travelMode = travelMode;
     } else if (transit) {
       input.placeFrom = placeFrom || undefined;
       input.placeTo = placeTo || undefined;
@@ -267,41 +255,36 @@ export function PlanEntryForm({
     setOpenTo(undefined);
     setClosedDays(undefined);
     setPlaceGeo(undefined);
-    setTravelMode("car");
   };
 
   return (
     <View className="gap-3">
       <View className="gap-1">
         <Text className="font-gothic-400 text-[10px] text-muted">
-          {home
-            ? "スタート地点の名称（任意・例: 自宅 / 東京駅集合）"
-            : rental
-              ? "レンタカー会社・営業所（任意）"
-              : stay
-                ? "宿の名前 *（名前を入れると住所候補が出ます）"
-                : transit
-                  ? "名称 *（例: JL105便）"
-                  : "行き先 *（名前を入れると住所候補が出ます）"}
+          {rental
+            ? "レンタカー会社・営業所（任意）"
+            : stay
+              ? "宿の名前 *（名前を入れると住所候補が出ます）"
+              : transit
+                ? "名称 *（例: JL105便）"
+                : "行き先 *（名前を入れると住所候補が出ます）"}
         </Text>
         <TextInput
           value={title}
           onChangeText={onTitleChange}
           placeholder={
-            home
-              ? "自宅"
-              : rental
-                ? "例: トヨタレンタカー 高松空港店"
-                : stay
-                  ? "例: ホテルグランヴィア大阪"
-                  : transit
-                    ? "例: のぞみ / JL105"
-                    : "例: 大阪城天守閣"
+            rental
+              ? "例: トヨタレンタカー 高松空港店"
+              : stay
+                ? "例: ホテルグランヴィア大阪"
+                : transit
+                  ? "例: のぞみ / JL105"
+                  : "例: 大阪城天守閣"
           }
           placeholderTextColor={MUTED}
           className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
         />
-        {predictions.length > 0 && !transit && !home && (
+        {predictions.length > 0 && !transit && (
           <View className="mt-1 overflow-hidden rounded-[10px] border border-black/[.1] bg-white/90">
             {predictions.map((p, i) => (
               <Pressable key={p.placeId} onPress={() => selectPrediction(p)} className={`px-3 py-2 ${i > 0 ? "border-t border-black/[.06]" : ""}`}>
@@ -324,7 +307,7 @@ export function PlanEntryForm({
         </View>
       )}
 
-      {tripDayCount > 1 && !home && !rental && (
+      {tripDayCount > 1 && !rental && (
         <View className="gap-1.5">
           <Text className="font-gothic-400 text-[10px] text-muted">何日目</Text>
           <View className="flex-row flex-wrap gap-2">
@@ -374,40 +357,6 @@ export function PlanEntryForm({
           </View>
           <Text className="font-gothic-400 text-[10px] leading-[15px] text-muted">
             この期間の移動は「車」で計算します。期間外は近ければ徒歩、離れていれば電車・バスとして計算します。
-          </Text>
-        </>
-      ) : home ? (
-        <>
-          <View className="gap-1">
-            <Text className="font-gothic-400 text-[10px] text-muted">住所（任意・入れると地図/移動時間の精度UP）</Text>
-            <TextInput
-              value={place}
-              onChangeText={setPlace}
-              placeholder="例: 東京都新宿区…"
-              placeholderTextColor={MUTED}
-              className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
-            />
-          </View>
-          <View className="flex-row gap-3">
-            <TimeField label="出発時刻（初日）" value={departTime} onChange={setDepartTime} />
-            <TimeField label={tripDayCount > 1 ? `帰着時刻（${tripDayCount}日目）` : "帰着時刻"} value={arriveTime} onChange={setArriveTime} />
-          </View>
-          <View className="gap-1.5">
-            <Text className="font-gothic-400 text-[10px] text-muted">最初のスポットへの移動手段（帰りも同じ）</Text>
-            <View className="flex-row gap-2">
-              {(
-                [
-                  { value: "car", label: "車" },
-                  { value: "rail", label: "電車・バス" },
-                  { value: "walk", label: "徒歩" },
-                ] as const
-              ).map((o) => (
-                <Chip key={o.value} active={travelMode === o.value} label={o.label} onPress={() => setTravelMode(o.value)} />
-              ))}
-            </View>
-          </View>
-          <Text className="font-gothic-400 text-[10px] text-muted">
-            旅の起点・終点になります（自宅・集合場所など）。最初の行き先への移動時間もここから計算します。
           </Text>
         </>
       ) : transit ? (
@@ -513,8 +462,8 @@ export function PlanEntryForm({
         </>
       )}
 
-      {/* 重要度は宿泊/移動/自宅/レンタカー以外で表示（これらは必ず組み込む・並べない想定） */}
-      {!transit && !stay && !home && !rental && (
+      {/* 重要度は宿泊/移動/レンタカー以外で表示（これらは必ず組み込む・並べない想定） */}
+      {!transit && !stay && !rental && (
         <View className="gap-1.5">
           <Text className="font-gothic-400 text-[10px] text-muted">重要度（時間が足りない時、AIが優先度の低い予定から外します）</Text>
           <View className="flex-row gap-2">

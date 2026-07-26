@@ -24,9 +24,9 @@ import { DEFAULT_PROFILE, loadProfile, Profile, saveProfile } from "@/lib/profil
 import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM, SHORT_PARAM } from "@/lib/share";
 import { BaseMode, CarWindow, EdgeTravel, createPrecomputedEstimator, edgeKey, guessMode } from "@/lib/transit";
 import { createSpotProvider, Spot } from "@/lib/spots";
-import { combineDateAndTime, dateForDay, dayOfIso, timeStrFromIso, todayDateStr } from "@/lib/date";
+import { dateForDay, dayOfIso, todayDateStr } from "@/lib/date";
 import { apiUrl } from "@/lib/apiBase";
-import { haversineMeters } from "@/lib/geo";
+import { geoSpread, haversineMeters } from "@/lib/geo";
 import { useLiveLocation } from "./useLiveLocation";
 
 /** この距離（メートル）以内に近づいたら、GPSで到着を自動記録する。 */
@@ -113,7 +113,7 @@ export function useAppState() {
       // 共有リンクで開かれた場合は、URLのプランを「閲覧のみ」で読み込む（保存済みは上書きしない）
       const shared = await readSharedPlanFromUrl();
       if (shared) {
-        setEntries(shared.entries);
+        setEntries(shared.entries.filter((e) => (e.mode as string) !== "home"));
         setSlots(shared.slots);
         setPacking([]);
         setReadOnly(true);
@@ -122,8 +122,10 @@ export function useAppState() {
       }
       const persisted = await loadState();
       if (persisted) {
+        // 自宅（出発地）機能は廃止したので、保存済みの自宅エントリは読み込み時に取り除く
+        const migrated = persisted.entries.filter((e) => (e.mode as string) !== "home");
         // 保存済みの時刻順を「並び順」として引き継ぐ（手動並び替えの初期状態にする）
-        const ordered = orderEntriesBySchedule(persisted.entries, persisted.slots);
+        const ordered = orderEntriesBySchedule(migrated, persisted.slots);
         setEntries(ordered);
         setSlots(persisted.slots);
         setPacking(persisted.packing);
@@ -216,12 +218,7 @@ export function useAppState() {
   }, [entries]);
 
   // 旅程イベントは entries + slots から都度導出する（座標も entry から引き継ぐ）。
-  const events = useMemo(() => {
-    // 出発地の日付を旅程（初日/最終日）へ合わせるための基準。state から直接作る。
-    const parsed = new Date(`${tripDate}T09:00:00`);
-    const reference = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
-    return buildEventsFromSchedule(entries ?? [], slots, { reference, dayCount: tripDayCount });
-  }, [entries, slots, tripDate, tripDayCount]);
+  const events = useMemo(() => buildEventsFromSchedule(entries ?? [], slots), [entries, slots]);
 
   // AIが「時間内に収まらない」と外した予定（スロットが無い行き先）。旅程画面の下部に表示する。
   const unplacedEntries = useMemo(() => {
@@ -317,38 +314,33 @@ export function useAppState() {
 
     async function run() {
       const sorted = sortedGroupEvents(events);
-      const pending: { key: string; origin: GeoPoint; destination: GeoPoint; needTransit: boolean }[] = [];
+      const pending: { key: string; origin: GeoPoint; destination: GeoPoint }[] = [];
       for (let i = 0; i < sorted.length - 1; i++) {
         const prev = sorted[i];
         const next = sorted[i + 1];
         const key = edgeKey(prev, next);
-        // 出発地の移動手段が「電車・バス」の区間は、公共交通の実測時間も必要
-        const needTransit =
-          (prev.mode === "home" && prev.travelMode === "rail") || (next.mode === "home" && next.travelMode === "rail");
         const cached = transitCacheRef.current[key];
-        if (cached && (!needTransit || cached.transit != null)) continue;
+        if (cached) continue;
         const origin = lastSeedGeo(prev);
         const destination = firstSeedGeo(next);
         if (!origin || !destination) continue;
         const mode = guessMode(prev.placeTo ?? prev.title, next.placeFrom ?? next.title);
         if (mode === "air") continue; // Directions APIでは空路は扱わない
-        pending.push({ key, origin, destination, needTransit });
+        pending.push({ key, origin, destination });
       }
       if (pending.length === 0) return;
 
       // 各区間について車・徒歩（必要なら公共交通）の実測時間を取得する。
       const results = await Promise.all(
         pending.map(async (p) => {
-          const [driving, walking, transitMin] = await Promise.all([
+          const [driving, walking] = await Promise.all([
             fetchDir(p.origin, p.destination, "car"),
             fetchDir(p.origin, p.destination, "walk"),
-            p.needTransit ? fetchDir(p.origin, p.destination, "rail") : Promise.resolve(null),
           ]);
           const travel: EdgeTravel = {};
           if (driving != null) travel.driving = driving;
           if (walking != null) travel.walking = walking;
-          if (transitMin != null) travel.transit = transitMin;
-          if (travel.driving == null && travel.walking == null && travel.transit == null) return null;
+          if (travel.driving == null && travel.walking == null) return null;
           return [p.key, travel] as const;
         })
       );
@@ -390,16 +382,17 @@ export function useAppState() {
   );
   const totals = useMemo(() => computePlanTotals(entries ?? []), [entries]);
 
-  // 計画中の「この辺のおすすめ」：宿泊先を最優先の基点にする。
-  // 出発地（自宅・集合場所）は旅先ではないので基点から必ず除外する。
-  const areaRefGeo = useMemo(() => {
+  // 計画中の「この辺のおすすめ」：単一の基点ではなく、登録した行き先ぜんぶの重心から探す。
+  // 1箇所の周りだけを見ると、旅の反対側にある行き先とは無関係な提案になってしまうため。
+  const areaSpread = useMemo(() => {
     const list = entries ?? [];
-    const lodging = list.find((e) => e.mode === "stay" && e.placeGeo);
-    if (lodging) return lodging.placeGeo ?? null;
-    const spot = list.find((e) => e.mode !== "home" && e.mode !== "rental" && e.placeGeo);
-    return spot?.placeGeo ?? null;
+    const points = list.filter((e) => e.mode !== "rental" && e.placeGeo).map((e) => e.placeGeo!);
+    return geoSpread(points);
   }, [entries]);
-  const areaRefKey = areaRefGeo ? `${areaRefGeo.lat.toFixed(3)},${areaRefGeo.lng.toFixed(3)}` : null;
+  const areaRefGeo = areaSpread?.center ?? null;
+  // 検索半径：行き先の広がりに合わせる（狭くても2km、広くても15kmまで）。
+  const areaRadius = areaSpread ? Math.round(Math.min(15000, Math.max(2000, areaSpread.radiusMeters * 1.2))) : 2000;
+  const areaRefKey = areaRefGeo ? `${areaRefGeo.lat.toFixed(3)},${areaRefGeo.lng.toFixed(3)}|${areaRadius}` : null;
   const [rawAreaSpots, setRawAreaSpots] = useState<Spot[]>([]);
   const [areaSuggestionsLoading, setAreaSuggestionsLoading] = useState(false);
   /* eslint-disable react-hooks/set-state-in-effect -- 外部API（周辺スポット）取得と基点消失時のクリアのため意図的 */
@@ -412,7 +405,7 @@ export function useAppState() {
     let cancelled = false;
     setAreaSuggestionsLoading(true);
     createSpotProvider(true)
-      .nearby(areaRefGeo.lat, areaRefGeo.lng, 120, false)
+      .nearby(areaRefGeo.lat, areaRefGeo.lng, 120, false, areaRadius)
       .then((s) => {
         if (!cancelled) setRawAreaSpots(s);
       })
@@ -430,12 +423,26 @@ export function useAppState() {
   }, [areaRefKey, readOnly]);
   /* eslint-enable react-hooks/set-state-in-effect */
   const areaSuggestions = useMemo<SpotSuggestion[]>(() => {
-    const existing = new Set((entries ?? []).map((e) => e.title));
+    const list = entries ?? [];
+    const existing = new Set(list.map((e) => e.title));
+    const existingGeo = list.filter((e) => e.placeGeo).map((e) => e.placeGeo!);
     return rawAreaSpots
       .filter((s) => !existing.has(s.name))
+      // 既に登録した行き先とほぼ同じ場所（150m以内）は「別のおすすめ」にならないので外す
+      .filter((s) => {
+        if (s.lat == null || s.lng == null || existingGeo.length === 0) return true;
+        const here = { lat: s.lat, lng: s.lng };
+        return existingGeo.every((g) => haversineMeters(g, here) > 150);
+      })
+      // 旅の中心（全行き先の重心）に近い順＝どの行き先からも寄りやすい順に並べる
+      .sort((a, b) => {
+        if (!areaRefGeo) return 0;
+        const d = (s: Spot) => (s.lat != null && s.lng != null ? haversineMeters(areaRefGeo, { lat: s.lat, lng: s.lng }) : Infinity);
+        return d(a) - d(b);
+      })
       .slice(0, 6)
       .map((s) => ({ title: s.name, area: s.address, note: s.category ?? s.note, mode: "activity" as const, stayMin: 60 }));
-  }, [rawAreaSpots, entries]);
+  }, [rawAreaSpots, entries, areaRefGeo]);
 
   // 組み上げた各行き先の到着予定時刻（entryId → ISO）。計画画面で「自動」の予定にも時刻を表示するため。
   const scheduleByEntry = useMemo(() => {
@@ -562,7 +569,7 @@ export function useAppState() {
       if (idx < 0) return prev;
       const day = prev[idx].day ?? 1;
       // 同じ日の隣（指定方向・宿泊は除外）を探して入れ替える
-      const sameDayReorderable = (e: PlanEntry) => (e.day ?? 1) === day && e.mode !== "stay" && e.mode !== "home" && e.mode !== "rental";
+      const sameDayReorderable = (e: PlanEntry) => (e.day ?? 1) === day && e.mode !== "stay" && e.mode !== "rental";
       let swapIdx = -1;
       if (dir < 0) {
         for (let i = idx - 1; i >= 0; i--) {
@@ -614,7 +621,7 @@ export function useAppState() {
       const rest = prev.filter((_, i) => i !== idx);
       const sameDayPositions = rest
         .map((e, i) => ({ e, i }))
-        .filter((o) => (o.e.day ?? 1) === day && o.e.mode !== "stay" && o.e.mode !== "home" && o.e.mode !== "rental")
+        .filter((o) => (o.e.day ?? 1) === day && o.e.mode !== "stay" && o.e.mode !== "rental")
         .map((o) => o.i);
       if (sameDayPositions.length === 0) return prev;
       const insertAt = dir < 0 ? sameDayPositions[0] : sameDayPositions[sameDayPositions.length - 1] + 1;
@@ -722,15 +729,16 @@ export function useAppState() {
             referenceDate: `${tripStart}T09:00:00+09:00`,
             dayCount: tripDayCount,
             request: planRequest.trim() || undefined,
+            baseMode,
           }),
         },
         90000 // AIの旅程作成は時間がかかる（永久に回り続けるよりは打ち切って伝える）
       );
       const data = (await res.json()) as PlanApiResponse;
       if (data.kind === "plan") {
-        // AIが時刻を付けた予定はその時刻をアンカーに採用。宿泊・出発地・時刻固定は必ず残す。
+        // AIが時刻を付けた予定はその時刻をアンカーに採用。宿泊・時刻固定は必ず残す。
         const anchors = new Map(data.schedule.map((s) => [s.entryId, s.arriveAt]));
-        const mustKeep = (e: PlanEntry) => e.mode === "stay" || e.mode === "home" || Boolean(e.fixedTime);
+        const mustKeep = (e: PlanEntry) => e.mode === "stay" || Boolean(e.fixedTime);
         const orderedByAi = orderEntriesBySchedule(list, data.schedule);
         const included = orderedByAi.filter((e) => anchors.has(e.id) || mustKeep(e));
         const filledSlots = sequentialSchedule(included, localReferenceDate(), anchors);
@@ -739,11 +747,7 @@ export function useAppState() {
         // それでも入らなかったものだけ「旅程に入らなかった予定」になる。
         // レンタカーは期間の登録なので、空き時間へ詰める対象にはしない。
         const leftovers = orderedByAi.filter((e) => e.mode !== "rental" && !anchors.has(e.id) && !mustKeep(e));
-        const home = list.find((e) => e.mode === "home");
-        const extra = fillIntoGaps(leftovers, filledSlots, localReferenceDate(), tripDayCount, {
-          notBefore: home?.departAt,
-          notAfter: home?.arriveBy,
-        });
+        const extra = fillIntoGaps(leftovers, filledSlots, localReferenceDate(), tripDayCount);
         const allSlots = [...filledSlots, ...extra].sort(
           (a, b) => new Date(a.arriveAt).getTime() - new Date(b.arriveAt).getTime()
         );
@@ -785,7 +789,7 @@ export function useAppState() {
     } finally {
       setComposing(false);
     }
-  }, [entries, slots, suggestions, planNotes, tripDayCount, planRequest]);
+  }, [entries, slots, suggestions, planNotes, tripDayCount, planRequest, baseMode]);
 
   const togglePacking = useCallback((id: string) => {
     setPacking((prev) => prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p)));
@@ -839,7 +843,7 @@ export function useAppState() {
   /**
    * 旅行の開始日を変更する。
    * 予定は絶対時刻（ISO）で保持しているため、開始日だけ変えると
-   * 出発地・宿泊・時刻固定の予定が「古い日付」に取り残される。
+   * 宿泊・時刻固定の予定が「古い日付」に取り残される。
    * ここで差分の日数ぶん全予定をまとめてスライドさせ、日付を必ず追従させる。
    */
   const setTripDate = useCallback((next: string) => {
@@ -867,21 +871,15 @@ export function useAppState() {
   }, []);
 
   /**
-   * 旅行日数を変更する。減らした場合、消えた日（day > n）の予定は最終日へ寄せ、
-   * 自宅の帰宅時刻は常に最終日へ合わせる（「幽霊予定」が残らないように）。
+   * 旅行日数を変更する。減らした場合、消えた日（day > n）の予定は最終日へ寄せる
+   * （「幽霊予定」が残らないように）。
    */
   const setTripDayCount = useCallback((n: number) => {
     const days = Math.max(1, Math.floor(n));
     setTripDayCountState(days);
     setEntries((prev) => {
       if (!prev) return prev;
-      const start = tripDateRef.current;
       return prev.map((e) => {
-        // 自宅の帰宅は常に最終日へ
-        if (e.mode === "home" && e.arriveBy) {
-          const iso = combineDateAndTime(dateForDay(start, days), timeStrFromIso(e.arriveBy))?.toISOString();
-          return iso ? { ...e, arriveBy: iso } : e;
-        }
         const d = e.day ?? 1;
         if (d <= days) return e;
         const deltaDays = days - d;
@@ -979,7 +977,7 @@ export function useAppState() {
       const trip = prev.find((t) => t.id === id);
       if (!trip) return prev;
       setReadOnly(false);
-      setEntries(trip.entries);
+      setEntries(trip.entries.filter((e) => (e.mode as string) !== "home"));
       setSlots(trip.slots);
       setPacking(trip.packing);
       setCurrentNodeKey(null);
@@ -1036,7 +1034,7 @@ export function useAppState() {
   // 行き先の構造が最後のAI最適化から変わっていて、最適化する価値があるか（旅程画面のチップに使う）。
   const suggestOptimize = useMemo(() => {
     if (!entries || readOnly || composing) return false;
-    const spots = entries.filter((e) => e.mode !== "stay" && e.mode !== "home" && e.mode !== "rental");
+    const spots = entries.filter((e) => e.mode !== "stay" && e.mode !== "rental");
     if (spots.length < 3) return false; // 少ないうちは並び替えで十分
     return composedSig !== scheduleSignature(entries);
   }, [entries, readOnly, composing, composedSig]);

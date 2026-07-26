@@ -7,6 +7,8 @@ interface NearbyRequest {
   freeMinutes?: number;
   /** 雨天時は屋内スポットを優先する */
   preferIndoor?: boolean;
+  /** 明示的な検索半径（メートル）。計画画面では「行き先全体の広がり」から渡す */
+  radiusMeters?: number;
 }
 
 const cache = new LruCache<Awaited<ReturnType<typeof nearbyTouristSpots>>>(300);
@@ -28,7 +30,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "リクエストの形式が不正です" }, { status: 400 });
   }
 
-  const { lat, lng, freeMinutes, preferIndoor } = payload;
+  const { lat, lng, freeMinutes, preferIndoor, radiusMeters } = payload;
   if (typeof lat !== "number" || typeof lng !== "number") {
     return Response.json({ error: "lat / lng が必要です" }, { status: 400 });
   }
@@ -37,7 +39,11 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "サーバーに GOOGLE_MAPS_API_KEY が設定されていません" }, { status: 500 });
   }
 
-  const radius = radiusForFreeMinutes(freeMinutes ?? 60);
+  // 明示指定があればそれを使う（旅全体の広がりに合わせた検索）。無ければ空き時間から算出。
+  const radius =
+    typeof radiusMeters === "number" && radiusMeters > 0
+      ? Math.round(Math.min(50000, Math.max(200, radiusMeters)))
+      : radiusForFreeMinutes(freeMinutes ?? 60);
   const key = `${lat.toFixed(4)},${lng.toFixed(4)}|${radius}|${preferIndoor ? "in" : "out"}`;
   if (cache.has(key)) {
     return Response.json({ spots: cache.get(key) });

@@ -105,13 +105,7 @@ export function AddEntrySheet({
                   initial={fixedMode ? { title: "", mode: fixedMode, priority: "must" } : undefined}
                   lockMode={Boolean(fixedMode)}
                   submitLabel={
-                    fixedMode === "stay"
-                      ? "宿泊先を追加"
-                      : fixedMode === "home"
-                        ? "出発地を設定"
-                        : fixedMode === "rental"
-                          ? "レンタカーを登録"
-                          : "行き先を追加"
+                    fixedMode === "stay" ? "宿泊先を追加" : fixedMode === "rental" ? "レンタカーを登録" : "行き先を追加"
                   }
                 />
               ) : mode === "bulk" ? (

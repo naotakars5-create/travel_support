@@ -142,7 +142,7 @@ export function ItineraryScreen({
     const groups: DayGroup[] = [];
     let current: DayGroup | null = null;
     let prevDate: string | null = null;
-    let spotSeq = 0; // その日のスポット番号（出発地点は0、スポットは1から）
+    let spotSeq = 0; // その日のスポット番号（宿の出発は0、回るスポットは1から）
     for (const item of rail) {
       if (item.type === "node") {
         const dk = new Date(item.time).toDateString();
@@ -164,23 +164,17 @@ export function ItineraryScreen({
       if (!current) continue; // 先頭にnode以外は来ない想定の保険
       current.items.push(item);
       if (item.type === "node") {
-        const isHome = item.event.mode === "home";
-        // その日の起点（ホテルのチェックアウト・出発地の出発）は「0」。回るスポットは1から数える。
-        // 帰着（自宅・集合場所へ戻る）は番号を振らず「着」。
-        const isDeparturePoint = /-(out|depart)$/.test(item.event.id) && current.numberOf.size === 0;
-        const isReturnPoint = isHome && /-return$/.test(item.event.id);
-        const num = isReturnPoint ? -1 : isDeparturePoint ? 0 : ++spotSeq;
+        // その日の起点（ホテルのチェックアウト）は「0」。回るスポットは1から数える。
+        const isDeparturePoint = /-(out|stay\d+)$/.test(item.event.id) && current.numberOf.size === 0;
+        const num = isDeparturePoint ? 0 : ++spotSeq;
         current.numberOf.set(item.key, num);
-        // 自宅（出発地）はプライバシーのため地図には載せない
-        if (!isHome) {
-          if (item.geo) {
-            current.mapPoints.push(item.geo);
-            current.mapLabels.push(String(num));
-          }
-          // 座標が無くてもGoogleマップは開けるよう、地点名を控えておく
-          const placeText = (item.place || item.event.title || "").trim();
-          if (placeText) current.mapPlaces.push(placeText);
+        if (item.geo) {
+          current.mapPoints.push(item.geo);
+          current.mapLabels.push(String(num));
         }
+        // 座標が無くてもGoogleマップは開けるよう、地点名を控えておく
+        const placeText = (item.place || item.event.title || "").trim();
+        if (placeText) current.mapPlaces.push(placeText);
       }
     }
     return groups;
@@ -258,10 +252,17 @@ export function ItineraryScreen({
                 <Text className="font-gothic-400 text-[11px] text-kinari/80">{g.dateLabel}</Text>
               </View>
             )}
-            {/* その日の全行程マップ（番号はその日の1,2,3…と一致）。
-                座標がまだ無い日も、地点名でGoogleマップを開くボタンとして必ず出す。 */}
+            {/* その日の動線マップ。日の見出しのすぐ下＝各日の一番頭に必ず置く。
+                番号はその日の 1,2,3… と一致。座標がまだ無い日も、地点名で
+                Googleマップを開くボタンとして必ず出す。 */}
             {(g.mapPoints.length > 0 || g.mapPlaces.length > 0 || (gi === 0 && liveLocation)) && (
-              <RouteMap points={g.mapPoints} places={g.mapPlaces} me={liveLocation} labels={g.mapLabels} />
+              <RouteMap
+                points={g.mapPoints}
+                places={g.mapPlaces}
+                me={gi === 0 ? liveLocation : null}
+                labels={g.mapLabels}
+                caption={`${dayGroups.length > 1 ? `${g.day}日目の` : ""}動線 · ${g.mapPlaces.length}箇所`}
+              />
             )}
             {g.items.map((item, i) => {
               if (item.type === "node") {
@@ -288,12 +289,7 @@ export function ItineraryScreen({
                     </View>
                     {/* 移動時間と経路リンクは1行に並べる（改行を減らして間延びを防ぐ） */}
                     <View className="flex-1 flex-row flex-wrap items-center gap-x-2 py-0.5 pl-1">
-                      {item.explicit ? (
-                        // 出発地→最初のスポット等、移動手段が指定された区間は指定手段のみ表示
-                        <Text className="font-gothic-500 text-[11px]" style={[{ color: style?.color }, TNUM]}>
-                          {item.mode === "rail" ? "電車・バス" : MODE_LABEL[item.mode]} {formatDurationMin(item.durationMin)}
-                        </Text>
-                      ) : item.driving != null || item.walking != null ? (
+                      {item.driving != null || item.walking != null ? (
                         <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
                           {[
                             item.driving != null ? `車 ${formatDurationMin(item.driving)}` : null,
@@ -453,7 +449,7 @@ function NodeRow({
               {isCurrent && <PulseRing size={22} color="rgba(217,111,76,.45)" />}
               <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: markerBg, alignItems: "center", justifyContent: "center" }}>
                 <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>
-                  {stopNumber === -1 ? "着" : stopNumber ?? ""}
+                  {stopNumber ?? ""}
                 </Text>
               </View>
             </View>

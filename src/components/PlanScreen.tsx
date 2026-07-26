@@ -56,7 +56,6 @@ export function PlanScreen({
   onSetBaseMode,
   onOpenAdd,
   onOpenAddLodging,
-  onOpenAddStart,
   onOpenAddRental,
   onGoShiori,
   planRequest,
@@ -93,7 +92,6 @@ export function PlanScreen({
   onSetBaseMode: (m: BaseMode) => void;
   onOpenAdd: () => void;
   onOpenAddLodging: () => void;
-  onOpenAddStart: () => void;
   onOpenAddRental: () => void;
   /** 旅行終了後の「しおりへ」導線 */
   onGoShiori: () => void;
@@ -132,14 +130,13 @@ export function PlanScreen({
   // 表示時刻：固定予定は目安到着を厳守、それ以外は組み上げ結果（自動計算）の時刻を優先
   const timeOf = (e: PlanEntry): string | null =>
     (e.fixedTime && e.arriveBy ? e.arriveBy : scheduleByEntry.get(e.id) ?? e.arriveBy) ?? null;
-  // 宿泊・出発地・レンタカーは「固定枠」として別枠。並び替えの対象外。
+  // 宿泊・レンタカーは「固定枠」として別枠。並び替えの対象外。
   const lodging = entries.filter((e) => e.mode === "stay");
-  const startPoint = entries.find((e) => e.mode === "home") ?? null;
   const rentals = entries.filter((e) => e.mode === "rental");
   // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番（固定枠は除外）
   const indexOf = new Map(entries.map((e, i) => [e.id, i]));
   const ordered = entries
-    .filter((e) => e.mode !== "stay" && e.mode !== "home" && e.mode !== "rental")
+    .filter((e) => e.mode !== "stay" && e.mode !== "rental")
     .sort((a, b) => (a.day ?? 1) - (b.day ?? 1) || (indexOf.get(a.id) ?? 0) - (indexOf.get(b.id) ?? 0));
   // 日ごとの通し番号（1,2,3…）
   const numberOf = new Map<string, number>();
@@ -288,49 +285,6 @@ export function PlanScreen({
             </View>
           </View>
         )}
-        {/* 出発地（固定・旅の起点/終点。ここから1件目のスポットへの移動も計算） */}
-        {!readOnly && (
-          <View className="mb-2.5 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
-            <View className="flex-row items-center justify-between">
-              <Text className="font-gothic-500 text-[11px] text-ink">出発地（固定）</Text>
-              {!startPoint && (
-                <Pressable onPress={onOpenAddStart} className="rounded-full border border-ink/25 px-3 py-1">
-                  <Text className="font-gothic-500 text-[10px] text-ink">＋ 出発地</Text>
-                </Pressable>
-              )}
-            </View>
-            {!startPoint ? (
-              <View className="mt-1 flex-row items-center gap-3">
-                <Image source={{ uri: illustrationUri("icon-home") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
-                <Text className="flex-1 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
-                  自宅・集合場所（例: 東京駅）を設定すると、旅の起点・終点になり、最初のスポットまでの移動時間も計算します。
-                </Text>
-              </View>
-            ) : (
-              <View className="mt-2 flex-row items-center gap-3">
-                {/* 登録済みでもアイコンは残す（登録した瞬間に絵が消えて「表示されない」と見えるのを防ぐ） */}
-                <Image source={{ uri: illustrationUri("icon-home") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
-                <Pressable onPress={() => onEditEntry(startPoint.id)} className="flex-1">
-                  <Text className="font-mincho-600 text-[13px] text-ink">{startPoint.title || "自宅"}</Text>
-                  <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
-                    {startPoint.departAt ? `出発 ${formatJstTime(new Date(startPoint.departAt))}（初日）` : ""}
-                    {startPoint.arriveBy ? ` → 帰着 ${formatJstTime(new Date(startPoint.arriveBy))}${tripDayCount > 1 ? `（${tripDayCount}日目）` : ""}` : ""}
-                    {` · 移動 ${startPoint.travelMode === "walk" ? "徒歩" : startPoint.travelMode === "rail" ? "電車・バス" : "車"}`}
-                  </Text>
-                  {startPoint.place && (
-                    <Text numberOfLines={1} className="font-gothic-400 text-[10px] text-muted-light">
-                      {startPoint.place}
-                    </Text>
-                  )}
-                </Pressable>
-                <Pressable onPress={() => onRemoveEntry(startPoint.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="出発地を削除">
-                  <Text className="font-gothic-400 text-[15px] text-muted-light">×</Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-        )}
-
         {/* 宿泊先（固定・並び替え対象外） */}
         {!readOnly && (
           <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">

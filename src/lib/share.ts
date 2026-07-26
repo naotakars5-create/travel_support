@@ -51,7 +51,6 @@ interface CompactEntry {
   tg?: [number, number]; // placeToGeo
   dp?: string; // departAt
   co?: string; // checkOut
-  tm?: string; // travelMode
 }
 
 interface CompactPlan {
@@ -90,7 +89,6 @@ function toCompact(entries: PlanEntry[], slots: ScheduleSlot[]): CompactPlan {
       if (tg) c.tg = tg;
       if (e.departAt) c.dp = e.departAt;
       if (e.checkOut) c.co = e.checkOut;
-      if (e.travelMode) c.tm = e.travelMode;
       return c;
     }),
     s: slots.map((s) => [s.entryId, s.arriveAt, s.stayMin]),
@@ -122,7 +120,6 @@ function fromCompact(c: CompactPlan): SharedPlan {
       placeToGeo: toGeo(e.tg),
       departAt: e.dp,
       checkOut: e.co,
-      travelMode: e.tm as PlanEntry["travelMode"],
     })),
     slots: c.s.map(([entryId, arriveAt, stayMin]) => ({ entryId, arriveAt, stayMin })),
   };

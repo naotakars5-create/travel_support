@@ -46,7 +46,7 @@ export function EditEntrySheet({
                 tripDayCount={tripDayCount}
                 submitLabel="保存"
                 resetAfterSubmit={false}
-                lockMode={entry.mode === "stay" || entry.mode === "home" || entry.mode === "rental"}
+                lockMode={entry.mode === "stay" || entry.mode === "rental"}
                 onSubmit={(input) => {
                   onSave(input);
                   onClose();
