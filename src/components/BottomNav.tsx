@@ -22,7 +22,14 @@ export function BottomNav({ tab, onChange, dark }: { tab: Tab; onChange: (t: Tab
         {ITEMS.map((item) => {
           const active = item.id === tab;
           return (
-            <Pressable key={item.id} onPress={() => onChange(item.id)} className="flex-1 items-center justify-center gap-1.5">
+            <Pressable
+              key={item.id}
+              onPress={() => onChange(item.id)}
+              accessibilityRole="tab"
+              accessibilityLabel={item.label}
+              accessibilityState={{ selected: active }}
+              className="flex-1 items-center justify-center gap-1.5"
+            >
               <View className={`h-[2px] w-[18px] rounded-full ${active ? (dark ? "bg-day-text" : "bg-ink") : "bg-transparent"}`} />
               <Text
                 className={`font-gothic-400 text-[11px] ${

@@ -119,6 +119,8 @@ export function ShioriScreen({
       {/* ＋ しおりを作る */}
       <Pressable
         onPress={() => setCreateOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel="しおりを作る"
         className="absolute right-6 h-14 w-14 items-center justify-center rounded-full bg-ink shadow"
         style={{ bottom: insets.bottom + 20 }}
       >
@@ -360,6 +362,8 @@ function ShioriDetail({
                         <Pressable
                           onPress={() => onRemovePhoto(i)}
                           hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel={`写真${i + 1}を削除`}
                           className="absolute right-1 top-1 h-5 w-5 items-center justify-center rounded-full bg-black/55"
                         >
                           <Text className="text-[12px] text-white">×</Text>

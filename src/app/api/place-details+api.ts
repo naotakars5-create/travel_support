@@ -1,3 +1,4 @@
+import { guardRequest } from "@/lib/apiGuard";
 import { getPlaceDetails, hasGoogleMapsKey } from "@/lib/googleMaps";
 
 /**
@@ -5,6 +6,9 @@ import { getPlaceDetails, hasGoogleMapsKey } from "@/lib/googleMaps";
  * キー未設定・エラー時は details:null を返し、フォームは手入力にフォールバックできる。
  */
 export async function POST(request: Request): Promise<Response> {
+  const denied = guardRequest(request, 30);
+  if (denied) return denied;
+
   let payload: { placeId?: string };
   try {
     payload = await request.json();

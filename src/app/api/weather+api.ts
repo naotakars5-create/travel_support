@@ -1,3 +1,4 @@
+import { guardRequest } from "@/lib/apiGuard";
 import { WeatherInfo, weatherCodeToJa } from "@/lib/weather";
 
 /**
@@ -5,6 +6,9 @@ import { WeatherInfo, weatherCodeToJa } from "@/lib/weather";
  * 緯度経度から直近の降水確率・気温・天気コードを読み、屋内/屋外提案の出し分けに使う。
  */
 export async function POST(request: Request): Promise<Response> {
+  const denied = guardRequest(request, 30);
+  if (denied) return denied;
+
   let payload: { lat?: number; lng?: number };
   try {
     payload = await request.json();

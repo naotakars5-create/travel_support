@@ -1,4 +1,4 @@
-import { createPrecomputedEstimator, isWithinCarWindow, CarWindow } from "../transit";
+import { createPrecomputedEstimator, edgeKey, isWithinCarWindow, CarWindow } from "../transit";
 import { directionsUrl } from "../mapsLink";
 import { ParsedEvent } from "../types";
 
@@ -29,7 +29,12 @@ describe("isWithinCarWindow", () => {
 });
 
 describe("createPrecomputedEstimator with rental car windows", () => {
-  const cache = { "a:b": { driving: 20, walking: 90 } };
+  // キャッシュキーは edgeKey（イベントID＋丸め座標）。座標なしイベント同士のキーを使う。
+  const KEY = edgeKey(
+    { id: "a", mode: "activity", title: "a", startAt: "", source: "", fields: [], confidence: 1 },
+    { id: "b", mode: "activity", title: "b", startAt: "", source: "", fields: [], confidence: 1 }
+  );
+  const cache = { [KEY]: { driving: 20, walking: 90 } };
 
   it("uses the car while the rental car is held", () => {
     const est = createPrecomputedEstimator(cache, "walk", WINDOWS);
@@ -46,7 +51,7 @@ describe("createPrecomputedEstimator with rental car windows", () => {
   });
 
   it("walks short legs outside the rental period", () => {
-    const est = createPrecomputedEstimator({ "a:b": { driving: 5, walking: 12 } }, "walk", WINDOWS);
+    const est = createPrecomputedEstimator({ [KEY]: { driving: 5, walking: 12 } }, "walk", WINDOWS);
     const from = ev({ id: "a", startAt: "2026-07-25T19:00:00+09:00", endAt: "2026-07-25T19:30:00+09:00" });
     const to = ev({ id: "b" });
     expect(est.estimate(from, to)).toMatchObject({ mode: "walk", durationMin: 12 });

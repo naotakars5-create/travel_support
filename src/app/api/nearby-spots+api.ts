@@ -1,3 +1,4 @@
+import { guardRequest, LruCache } from "@/lib/apiGuard";
 import { nearbyTouristSpots, hasGoogleMapsKey } from "@/lib/googleMaps";
 
 interface NearbyRequest {
@@ -8,7 +9,7 @@ interface NearbyRequest {
   preferIndoor?: boolean;
 }
 
-const cache = new Map<string, Awaited<ReturnType<typeof nearbyTouristSpots>>>();
+const cache = new LruCache<Awaited<ReturnType<typeof nearbyTouristSpots>>>(300);
 
 // 空き時間の半分程度で往復できる範囲を検索半径の目安にする（徒歩 80m/分）。
 function radiusForFreeMinutes(freeMinutes: number): number {
@@ -17,6 +18,9 @@ function radiusForFreeMinutes(freeMinutes: number): number {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const denied = guardRequest(request, 30);
+  if (denied) return denied;
+
   let payload: NearbyRequest;
   try {
     payload = await request.json();

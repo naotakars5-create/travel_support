@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./http";
 import Anthropic from "@anthropic-ai/sdk";
 
 export interface LlmCallParams {
@@ -43,21 +44,25 @@ export const openaiProvider: LlmProvider = {
   async complete({ system, user }) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
+    const res = await fetchWithTimeout(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: OPENAI_MODEL,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          temperature: 0,
+        }),
       },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        temperature: 0,
-      }),
-    });
+      80000 // 応答しないモデルを待ち続けない
+    );
     if (!res.ok) {
       const errText = await res.text();
       throw new Error(`OpenAI API error ${res.status}: ${errText}`);

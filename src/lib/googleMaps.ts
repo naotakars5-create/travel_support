@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./http";
 import { GeoPoint, TransportMode } from "./types";
 import { haversineMeters } from "./geo";
 
@@ -19,7 +20,7 @@ export async function geocodeAddress(query: string): Promise<GeoPoint | null> {
   url.searchParams.set("region", "jp");
   url.searchParams.set("key", apiKey());
 
-  const res = await fetch(url.toString());
+  const res = await fetchWithTimeout(url.toString(), undefined, 8000);
   if (!res.ok) throw new Error(`Geocoding API error ${res.status}`);
   const data = await res.json();
   if (data.status !== "OK" || !data.results?.length) return null;
@@ -53,7 +54,7 @@ export async function getDirections(origin: GeoPoint, destination: GeoPoint, mod
   url.searchParams.set("region", "jp");
   url.searchParams.set("key", apiKey());
 
-  const res = await fetch(url.toString());
+  const res = await fetchWithTimeout(url.toString(), undefined, 8000);
   if (!res.ok) throw new Error(`Directions API error ${res.status}`);
   const data = await res.json();
   if (data.status !== "OK" || !data.routes?.length) return null;
@@ -126,7 +127,7 @@ export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number,
   url.searchParams.set("language", "ja");
   url.searchParams.set("key", apiKey());
 
-  const res = await fetch(url.toString());
+  const res = await fetchWithTimeout(url.toString(), undefined, 8000);
   if (!res.ok) throw new Error(`Places API error ${res.status}`);
   const data = await res.json();
   if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
@@ -170,6 +171,22 @@ export interface PlaceDetails {
   openTo?: string;
   /** 曜日別の営業時間テキスト（日本語） */
   weekdayText?: string[];
+  /** 定休日（0=日 … 6=土）。営業時間データが無い場合は undefined（不明） */
+  closedDays?: number[];
+}
+
+/**
+ * opening_hours.periods から定休日（曜日）を導出する。
+ * periods の open.day に一度も現れない曜日＝その曜日は営業しない＝定休日。
+ * データが無い場合は「不明」として undefined を返す（休み扱いにしない）。
+ */
+export function closedDaysFromPeriods(periods: { open?: { day?: number; time?: string } }[]): number[] | undefined {
+  if (periods.length === 0) return undefined;
+  const openDays = new Set(periods.map((p) => p.open?.day).filter((d): d is number => typeof d === "number"));
+  if (openDays.size === 0) return undefined;
+  // 「24時間営業」は open.day=0, time="0000", close なしの1件だけ → 全曜日営業として扱う
+  if (periods.length === 1 && periods[0].open?.time === "0000") return [];
+  return [0, 1, 2, 3, 4, 5, 6].filter((d) => !openDays.has(d));
 }
 
 /** "0930" → "09:30" */
@@ -190,14 +207,14 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | n
   url.searchParams.set("region", "jp");
   url.searchParams.set("key", apiKey());
 
-  const res = await fetch(url.toString());
+  const res = await fetchWithTimeout(url.toString(), undefined, 8000);
   if (!res.ok) throw new Error(`Place Details API error ${res.status}`);
   const data = await res.json();
   if (data.status !== "OK" || !data.result) return null;
   const r = data.result as {
     formatted_address?: string;
     geometry?: { location?: { lat: number; lng: number } };
-    opening_hours?: { periods?: { open?: { time?: string }; close?: { time?: string } }[]; weekday_text?: string[] };
+    opening_hours?: { periods?: { open?: { day?: number; time?: string }; close?: { time?: string } }[]; weekday_text?: string[] };
   };
 
   const details: PlaceDetails = {
@@ -218,6 +235,7 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | n
   };
   details.openFrom = hhmm(mostCommon(opens));
   details.openTo = hhmm(mostCommon(closes));
+  details.closedDays = closedDaysFromPeriods(periods);
 
   return details;
 }
@@ -237,7 +255,7 @@ export async function placeAutocomplete(input: string): Promise<PlacePrediction[
   url.searchParams.set("components", "country:jp");
   url.searchParams.set("key", apiKey());
 
-  const res = await fetch(url.toString());
+  const res = await fetchWithTimeout(url.toString(), undefined, 8000);
   if (!res.ok) throw new Error(`Places Autocomplete API error ${res.status}`);
   const data = await res.json();
   if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {

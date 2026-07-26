@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/http";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GeoPoint, isTransitMode, PackingItem, ParseApiResponse, PlanApiResponse, PlanEntry, ScheduleSlot, SpotSuggestion } from "@/lib/types";
 import { buildSeedEntries } from "@/lib/seedEntries";
@@ -21,7 +22,7 @@ import {
 import { buildDefaultPacking } from "@/lib/packing";
 import { DEFAULT_PROFILE, loadProfile, Profile, saveProfile } from "@/lib/profile";
 import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM } from "@/lib/share";
-import { BaseMode, CarWindow, EdgeTravel, createPrecomputedEstimator, guessMode } from "@/lib/transit";
+import { BaseMode, CarWindow, EdgeTravel, createPrecomputedEstimator, edgeKey, guessMode } from "@/lib/transit";
 import { createSpotProvider, Spot } from "@/lib/spots";
 import { combineDateAndTime, dateForDay, dayOfIso, timeStrFromIso, todayDateStr } from "@/lib/date";
 import { apiUrl } from "@/lib/apiBase";
@@ -48,12 +49,21 @@ export function useAppState() {
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
   const [packing, setPacking] = useState<PackingItem[]>([]);
   const [currentNodeKey, setCurrentNodeKey] = useState<string | null>(null);
+  // 到着記録を行った時刻。予定時刻ベースの自動進行と手動記録の優先順位付けに使う。
+  const [currentNodeSetAt, setCurrentNodeSetAt] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("plan");
   const [flash, setFlash] = useState<FlashState>({ visible: false, text: "" });
   const [justAddedEventId, setJustAddedEventId] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(new Date());
 
   const [suggestions, setSuggestions] = useState<SpotSuggestion[]>([]);
+  // AIで組み直す直前のスナップショット。「元に戻す」で復元する（次の組み直しで上書き）。
+  const [composeBackup, setComposeBackup] = useState<{
+    entries: PlanEntry[];
+    slots: ScheduleSlot[];
+    suggestions: SpotSuggestion[];
+    planNotes: string | null;
+  } | null>(null);
   const [planNotes, setPlanNotes] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const [composeError, setComposeError] = useState<string | null>(null);
@@ -66,6 +76,10 @@ export function useAppState() {
   const [profile, setProfileState] = useState<Profile>(DEFAULT_PROFILE);
   // 保存した旅の履歴（後から呼び出せる）
   const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
+  // しおりから読み込んだ（＝編集中の）旅のID。保存時は新規追加ではなくこの旅を更新する。
+  const [activeTripId, setActiveTripId] = useState<string | null>(null);
+  // 実測の移動時間キャッシュ（`edgeKey` → 車/徒歩/公共交通の分数）。永続化して再取得を減らす。
+  const [transitCache, setTransitCache] = useState<Record<string, EdgeTravel>>({});
 
   const initializedRef = useRef(false);
   // 「構造」が既にスケジュール済みかを追跡し、座標だけ埋まった時の不要な再ローカル化を防ぐ。
@@ -93,7 +107,7 @@ export function useAppState() {
       setSavedTrips(await loadTrips());
 
       // 共有リンクで開かれた場合は、URLのプランを「閲覧のみ」で読み込む（保存済みは上書きしない）
-      const shared = readSharedPlanFromUrl();
+      const shared = await readSharedPlanFromUrl();
       if (shared) {
         setEntries(shared.entries);
         setSlots(shared.slots);
@@ -110,6 +124,9 @@ export function useAppState() {
         setSlots(persisted.slots);
         setPacking(persisted.packing);
         setCurrentNodeKey(persisted.currentNodeKey);
+        setCurrentNodeSetAt(persisted.currentNodeSetAt ?? null);
+        // 実測の移動時間キャッシュを復元（リロードのたびにDirections APIを叩き直さない）
+        if (persisted.transitCache) setTransitCache(persisted.transitCache);
         if (persisted.tripDate) setTripDateState(persisted.tripDate);
         if (persisted.tripDayCount) setTripDayCountState(persisted.tripDayCount);
         if (persisted.baseMode) setBaseMode(persisted.baseMode);
@@ -124,16 +141,61 @@ export function useAppState() {
     })();
   }, []);
 
+  // 保存失敗（容量不足・プライベートモード等）を一度だけユーザーに知らせるためのフラグ
+  const saveFailureNotifiedRef = useRef(false);
+
   // 永続化（共有リンクの閲覧中は保存しない＝受け取った人の自分のプランを壊さない）
   useEffect(() => {
     if (!entries || readOnly) return;
-    void saveState({ version: 2, entries, slots, currentNodeKey, packing, tripDate, tripDayCount, baseMode, savedAt: new Date().toISOString() });
-  }, [entries, slots, currentNodeKey, packing, tripDate, tripDayCount, baseMode, readOnly]);
+    // 移動時間キャッシュは肥大しないよう新しい方から一定数だけ保存する
+    const cacheEntries = Object.entries(transitCache);
+    const trimmedCache = cacheEntries.length > 400 ? Object.fromEntries(cacheEntries.slice(-400)) : transitCache;
+    const persistPromise = saveState({
+      version: 2,
+      entries,
+      slots,
+      currentNodeKey,
+      currentNodeSetAt,
+      packing,
+      tripDate,
+      tripDayCount,
+      baseMode,
+      transitCache: trimmedCache,
+      savedAt: new Date().toISOString(),
+    });
+    void persistPromise.then((ok) => {
+      if (ok) {
+        saveFailureNotifiedRef.current = false;
+        return;
+      }
+      // 黙って消えるのが最悪なので、失敗は一度だけ知らせる（成功が挟まればまた知らせる）
+      if (saveFailureNotifiedRef.current) return;
+      saveFailureNotifiedRef.current = true;
+      setFlash({ visible: true, text: "端末への保存に失敗しました\n空き容量を確認してください（このままだと閉じた時に消えます）" });
+      setTimeout(() => setFlash({ visible: false, text: "" }), 3200);
+    });
+  }, [entries, slots, currentNodeKey, currentNodeSetAt, packing, tripDate, tripDayCount, baseMode, transitCache, readOnly]);
 
   // 現在時刻の更新（当日画面のカウントダウン用）
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // オンライン状態（Webのみ）。圏外・機内モードで地図やAIが黙って失敗しないよう、バナーで知らせる。
+  const [isOnline, setIsOnline] = useState(true);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof navigator === "undefined" || !("onLine" in navigator)) return;
+    /* eslint-disable-next-line react-hooks/set-state-in-effect -- 外部状態（ブラウザのオンライン状態）の初期同期 */
+    setIsOnline(navigator.onLine);
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
   }, []);
 
   // 行き先の「構造」が変わったら（追加・削除・時刻/滞在/重要度/種別の変更）、ローカルで即座に再スケジュール。
@@ -185,7 +247,7 @@ export function useAppState() {
       const results = await Promise.all(
         targets.map(async (t) => {
           try {
-            const res = await fetch(apiUrl("/api/geocode"), {
+            const res = await fetchWithTimeout(apiUrl("/api/geocode"), {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ query: t.text }),
@@ -223,8 +285,7 @@ export function useAppState() {
     };
   }, [entries]);
 
-  // ジオコーディング済みの隣接イベント間について、Google Directions API で実測の移動時間を取得しキャッシュする。
-  const [transitCache, setTransitCache] = useState<Record<string, EdgeTravel>>({});
+  // ジオコーディング済みの隣接イベント間の実測移動時間キャッシュ（下の effect が取得・追記する）。
   const transitCacheRef = useRef(transitCache);
   useEffect(() => {
     transitCacheRef.current = transitCache;
@@ -235,7 +296,7 @@ export function useAppState() {
 
     async function fetchDir(origin: GeoPoint, destination: GeoPoint, mode: "car" | "walk" | "rail"): Promise<number | null> {
       try {
-        const res = await fetch(apiUrl("/api/directions"), {
+        const res = await fetchWithTimeout(apiUrl("/api/directions"), {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ origin, destination, mode }),
@@ -254,7 +315,7 @@ export function useAppState() {
       for (let i = 0; i < sorted.length - 1; i++) {
         const prev = sorted[i];
         const next = sorted[i + 1];
-        const key = `${prev.id}:${next.id}`;
+        const key = edgeKey(prev, next);
         // 出発地の移動手段が「電車・バス」の区間は、公共交通の実測時間も必要
         const needTransit =
           (prev.mode === "home" && prev.travelMode === "rail") || (next.mode === "home" && next.travelMode === "rail");
@@ -311,7 +372,16 @@ export function useAppState() {
     [transitCache, baseMode, carWindows]
   );
   const rail: RailItem[] = useMemo(() => buildRail(events, false, transitEstimator), [events, transitEstimator]);
-  const dayOfState: DayOfState = useMemo(() => getDayOfState(rail, currentNodeKey), [rail, currentNodeKey]);
+  // 「分」単位の現在時刻。秒ごとの再計算を避けつつ、予定時刻を過ぎたノードを自動で通過扱いにする。
+  const nowMinuteIso = useMemo(() => {
+    const d = new Date(now);
+    d.setSeconds(0, 0);
+    return d.toISOString();
+  }, [now]);
+  const dayOfState: DayOfState = useMemo(
+    () => getDayOfState(rail, currentNodeKey, { now: new Date(nowMinuteIso), currentNodeSetAt }),
+    [rail, currentNodeKey, nowMinuteIso, currentNodeSetAt]
+  );
   const totals = useMemo(() => computePlanTotals(entries ?? []), [entries]);
 
   // 計画中の「この辺のおすすめ」：宿泊先を最優先の基点にする。
@@ -539,7 +609,7 @@ export function useAppState() {
   const importFromMail = useCallback(async (body: string, source: string): Promise<{ ok: boolean; message?: string }> => {
     let result: ParseApiResponse;
     try {
-      const res = await fetch(apiUrl("/api/parse"), {
+      const res = await fetchWithTimeout(apiUrl("/api/parse"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ body, source, referenceDate: new Date().toISOString() }),
@@ -561,6 +631,21 @@ export function useAppState() {
     return { ok: false, message: result.message };
   }, [flashNewEvent]);
 
+  /** 直前のAI組み直しを取り消し、組み直す前の旅程へ戻す。 */
+  const undoCompose = useCallback(() => {
+    setComposeBackup((backup) => {
+      if (!backup) return null;
+      setEntries(backup.entries);
+      setSlots(backup.slots);
+      setSuggestions(backup.suggestions);
+      setPlanNotes(backup.planNotes);
+      scheduleSigRef.current = scheduleSignature(backup.entries);
+      setFlash({ visible: true, text: "AIで組む前の旅程に戻しました" });
+      setTimeout(() => setFlash({ visible: false, text: "" }), 1700);
+      return null;
+    });
+  }, []);
+
   /** AIに旅程を組み直してもらう（並べ替え＋時刻割り当て＋おすすめ提案）。 */
   const composeWithAi = useCallback(async () => {
     const list = entries ?? [];
@@ -569,15 +654,19 @@ export function useAppState() {
     setComposeError(null);
     try {
       const tripStart = tripDateRef.current;
-      const res = await fetch(apiUrl("/api/plan"), {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          entries: list,
-          referenceDate: `${tripStart}T09:00:00+09:00`,
-          dayCount: tripDayCount,
-        }),
-      });
+      const res = await fetchWithTimeout(
+        apiUrl("/api/plan"),
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            entries: list,
+            referenceDate: `${tripStart}T09:00:00+09:00`,
+            dayCount: tripDayCount,
+          }),
+        },
+        90000 // AIの旅程作成は時間がかかる（永久に回り続けるよりは打ち切って伝える）
+      );
       const data = (await res.json()) as PlanApiResponse;
       if (data.kind === "plan") {
         // AIが時刻を付けた予定はその時刻をアンカーに採用。宿泊・出発地・時刻固定は必ず残す。
@@ -610,6 +699,8 @@ export function useAppState() {
           return { ...e, day };
         });
         const droppedCount = leftovers.length - extra.length;
+        // 適用前の状態を残しておく（手で並べた旅程をボタン1つで失わないため）
+        setComposeBackup({ entries: list, slots, suggestions, planNotes });
         setEntries(reordered);
         setSlots(allSlots);
         // AIの順路を採用したので、この構造は「スケジュール済み」として記録し、ローカル再計算で上書きしない。
@@ -634,7 +725,7 @@ export function useAppState() {
     } finally {
       setComposing(false);
     }
-  }, [entries, tripDayCount]);
+  }, [entries, slots, suggestions, planNotes, tripDayCount]);
 
   const togglePacking = useCallback((id: string) => {
     setPacking((prev) => prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p)));
@@ -654,7 +745,7 @@ export function useAppState() {
   const shareCurrentPlan = useCallback(async () => {
     const list = entries ?? [];
     if (list.length === 0) return;
-    const url = buildShareUrl(list, slots);
+    const url = await buildShareUrl(list, slots);
     const result = await sharePlanLink(url);
     if (result === "copied") {
       setFlash({ visible: true, text: "共有リンクをコピーしました\nLINEなどに貼り付けて送れます" });
@@ -749,32 +840,39 @@ export function useAppState() {
     });
   }, []);
 
-  /** 現在の旅程を名前（＋表紙写真）を付けてしおり／履歴に保存する。 */
+  /**
+   * 現在の旅程を名前（＋表紙写真）を付けてしおり／履歴に保存する。
+   * しおりから読み込んで編集中の旅（activeTripId）は「同じ旅の更新」として上書きし、
+   * 写真・表紙を引き継ぐ（保存のたびに同じ旅が増殖しない）。
+   */
   const saveCurrentTrip = useCallback(
     (name: string, coverPhoto?: string) => {
       const list = entries ?? [];
       if (list.length === 0) return;
-      const trip: SavedTrip = {
-        id: genId("trip"),
-        name: name.trim() || `${tripDate} の旅`,
-        coverPhoto,
-        savedAt: new Date().toISOString(),
-        entries: list,
-        slots,
-        packing,
-        tripDate,
-        tripDayCount,
-        baseMode,
-      };
       setSavedTrips((prev) => {
-        const next = [trip, ...prev];
+        const existing = activeTripId ? prev.find((t) => t.id === activeTripId) : undefined;
+        const trip: SavedTrip = {
+          id: existing?.id ?? genId("trip"),
+          name: name.trim() || existing?.name || `${tripDate} の旅`,
+          coverPhoto: coverPhoto ?? existing?.coverPhoto,
+          photos: existing?.photos,
+          savedAt: new Date().toISOString(),
+          entries: list,
+          slots,
+          packing,
+          tripDate,
+          tripDayCount,
+          baseMode,
+        };
+        const next = existing ? prev.map((t) => (t.id === existing.id ? trip : t)) : [trip, ...prev];
         persistTrips(next);
+        setActiveTripId(trip.id);
+        setFlash({ visible: true, text: existing ? `「${trip.name}」を更新しました` : `「${trip.name}」をしおりに保存しました` });
+        setTimeout(() => setFlash({ visible: false, text: "" }), 1900);
         return next;
       });
-      setFlash({ visible: true, text: `「${trip.name}」をしおりに保存しました` });
-      setTimeout(() => setFlash({ visible: false, text: "" }), 1900);
     },
-    [entries, slots, packing, tripDate, tripDayCount, baseMode, persistTrips]
+    [entries, slots, packing, tripDate, tripDayCount, baseMode, activeTripId, persistTrips]
   );
 
   /** しおりの表紙写真を更新する。 */
@@ -828,6 +926,7 @@ export function useAppState() {
       setBaseMode(trip.baseMode);
       setSuggestions([]);
       setPlanNotes(null);
+      setActiveTripId(trip.id);
       scheduleSigRef.current = scheduleSignature(trip.entries);
       setTab("plan");
       setFlash({ visible: true, text: `「${trip.name}」を読み込みました` });
@@ -838,6 +937,7 @@ export function useAppState() {
 
   /** 保存した旅を履歴から削除する。 */
   const deleteTrip = useCallback((id: string) => {
+    setActiveTripId((cur) => (cur === id ? null : cur));
     setSavedTrips((prev) => {
       const next = prev.filter((t) => t.id !== id);
       persistTrips(next);
@@ -847,6 +947,7 @@ export function useAppState() {
 
   const recordArrival = useCallback((nodeKey: string, place: string) => {
     setCurrentNodeKey(nodeKey);
+    setCurrentNodeSetAt(new Date().toISOString());
     setFlash({ visible: true, text: `${place} に到着\n到着を記録しました` });
     setTimeout(() => setFlash({ visible: false, text: "" }), 1700);
   }, []);
@@ -868,6 +969,15 @@ export function useAppState() {
     }
   }, [liveLocation, dayOfState, recordArrival]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // 旅行が終わったか（最終日の翌日以降）。しおりへの保存を促すバナーに使う。
+  const tripEnded = useMemo(() => {
+    if (!entries || entries.length === 0 || readOnly) return false;
+    const lastDay = new Date(`${dateForDay(tripDate, tripDayCount)}T23:59:59`);
+    if (Number.isNaN(lastDay.getTime())) return false;
+    return now.getTime() > lastDay.getTime();
+    // now は毎秒更新だが、日付をまたぐ瞬間以外は値が変わらないので再計算コストは無視できる
+  }, [entries, readOnly, tripDate, tripDayCount, now]);
 
   return {
     entries,
@@ -920,6 +1030,11 @@ export function useAppState() {
     moveEntryToEdge,
     importFromMail,
     composeWithAi,
+    undoCompose,
+    canUndoCompose: composeBackup !== null,
+    tripEnded,
+    activeTripId,
+    isOnline,
     togglePacking,
     addPacking,
     removePacking,

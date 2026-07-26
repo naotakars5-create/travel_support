@@ -2,7 +2,16 @@ import { useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PlanEntry, Priority, SpotSuggestion } from "@/lib/types";
-import { PlanTotals, PRIORITY_META, effectiveStayMin, entryDurationMin, COST_CATEGORY_LABEL, COST_CATEGORY_ORDER } from "@/lib/plan";
+import {
+  PlanTotals,
+  PRIORITY_META,
+  closedDaysLabel,
+  effectiveStayMin,
+  entryDurationMin,
+  isClosedOn,
+  COST_CATEGORY_LABEL,
+  COST_CATEGORY_ORDER,
+} from "@/lib/plan";
 import { Profile } from "@/lib/profile";
 import { BaseMode } from "@/lib/transit";
 import { MODE_LABEL } from "@/lib/modeMeta";
@@ -38,6 +47,7 @@ export function PlanScreen({
   composing,
   composeError,
   readOnly,
+  tripEnded,
   tripDate,
   onSetTripDate,
   tripDayCount,
@@ -49,6 +59,7 @@ export function PlanScreen({
   onOpenAddLodging,
   onOpenAddStart,
   onOpenAddRental,
+  onGoShiori,
   onCompose,
   onRemoveEntry,
   onEditEntry,
@@ -71,6 +82,8 @@ export function PlanScreen({
   composing: boolean;
   composeError: string | null;
   readOnly: boolean;
+  /** 旅行日程が終了しているか（しおり保存の提案を出す） */
+  tripEnded: boolean;
   tripDate: string;
   onSetTripDate: (v: string) => void;
   tripDayCount: number;
@@ -82,6 +95,8 @@ export function PlanScreen({
   onOpenAddLodging: () => void;
   onOpenAddStart: () => void;
   onOpenAddRental: () => void;
+  /** 旅行終了後の「しおりへ」導線 */
+  onGoShiori: () => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
@@ -162,10 +177,15 @@ export function PlanScreen({
           </View>
           {!readOnly && (
             <View className="mt-1 flex-row items-center gap-2">
-              <Pressable onPress={onShare} className="h-7 items-center justify-center rounded-[8px] border border-ink/25 px-3">
+              <Pressable onPress={onShare} accessibilityRole="button" className="h-7 items-center justify-center rounded-[8px] border border-ink/25 px-3">
                 <Text className="font-gothic-500 text-[11px] text-ink">共有</Text>
               </Pressable>
-              <Pressable onPress={onOpenAdd} className="h-7 w-7 items-center justify-center rounded-[8px] border border-ink/25">
+              <Pressable
+                onPress={onOpenAdd}
+                accessibilityRole="button"
+                accessibilityLabel="行き先を追加"
+                className="h-7 w-7 items-center justify-center rounded-[8px] border border-ink/25"
+              >
                 <View className="relative h-[10px] w-[10px]">
                   <View className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-ink" />
                   <View className="absolute left-0 top-1/2 h-[1.5px] w-full -translate-y-1/2 bg-ink" />
@@ -181,6 +201,25 @@ export function PlanScreen({
       <View className="h-px w-full bg-black/[.08]" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 90 }}>
+        {/* 旅行が終わったら、しおりに残す導線を出す（作った思い出機能へ辿り着けるように） */}
+        {tripEnded && (
+          <View className="mb-3 flex-row items-center gap-3 rounded-[12px] border border-ink/15 bg-surface/60 px-4 py-2.5">
+            <View className="flex-1">
+              <Text className="font-gothic-500 text-[12px] text-ink">旅はいかがでしたか？</Text>
+              <Text className="mt-0.5 font-gothic-400 text-[10px] leading-[15px] text-muted">
+                この旅程をしおりに保存して、写真と一緒に残せます。
+              </Text>
+            </View>
+            <Pressable
+              onPress={onGoShiori}
+              accessibilityRole="button"
+              accessibilityLabel="しおりに保存する"
+              className="rounded-full bg-ink px-3 py-1.5"
+            >
+              <Text className="font-gothic-500 text-[11px] text-kinari">しおりへ</Text>
+            </Pressable>
+          </View>
+        )}
         {!readOnly && (
           <View className="mb-3 gap-2 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
             <View className="flex-row flex-wrap items-end justify-between gap-2">
@@ -276,7 +315,7 @@ export function PlanScreen({
                     </Text>
                   )}
                 </Pressable>
-                <Pressable onPress={() => onRemoveEntry(startPoint.id)} hitSlop={8}>
+                <Pressable onPress={() => onRemoveEntry(startPoint.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel="出発地を削除">
                   <Text className="font-gothic-400 text-[15px] text-muted-light">×</Text>
                 </Pressable>
               </View>
@@ -317,7 +356,7 @@ export function PlanScreen({
                         </Text>
                       )}
                     </Pressable>
-                    <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8}>
+                    <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`${e.title || "この項目"}を削除`}>
                       <Text className="font-gothic-400 text-[15px] text-muted-light">×</Text>
                     </Pressable>
                   </View>
@@ -378,7 +417,7 @@ export function PlanScreen({
                         </Text>
                       )}
                     </Pressable>
-                    <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8}>
+                    <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`${e.title || "この項目"}を削除`}>
                       <Text className="font-gothic-400 text-[15px] text-muted-light">×</Text>
                     </Pressable>
                   </View>
@@ -503,6 +542,11 @@ export function PlanScreen({
                           · 営業{e.openFrom ?? "?"}〜{e.openTo ?? "?"}
                         </Text>
                       )}
+                      {isClosedOn(e, new Date(`${dateForDay(tripDate, day)}T00:00`)) && (
+                        <View className="rounded-full border border-ink bg-surface px-1.5 py-[1px]">
+                          <Text className="font-gothic-500 text-[9px] text-ink">{closedDaysLabel(e)}・この日は休み</Text>
+                        </View>
+                      )}
                     </View>
                   </Pressable>
                 </View>
@@ -514,6 +558,8 @@ export function PlanScreen({
                       onPress={() => onMoveEntry(e.id, -1)}
                       onLongPress={() => onMoveEntryToEdge(e.id, -1)}
                       hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${e.title}を上へ移動（長押しで先頭へ）`}
                       className={`h-9 w-9 items-center justify-center rounded-[8px] border ${isFirstInDay(e) ? "border-black/[.08]" : "border-ink/30"}`}
                     >
                       <Text className={`text-[15px] ${isFirstInDay(e) ? "text-muted-light" : "text-ink"}`}>▲</Text>
@@ -523,6 +569,8 @@ export function PlanScreen({
                       onPress={() => onMoveEntry(e.id, 1)}
                       onLongPress={() => onMoveEntryToEdge(e.id, 1)}
                       hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${e.title}を下へ移動（長押しで末尾へ）`}
                       className={`h-9 w-9 items-center justify-center rounded-[8px] border ${isLastInDay(e) ? "border-black/[.08]" : "border-ink/30"}`}
                     >
                       <Text className={`text-[15px] ${isLastInDay(e) ? "text-muted-light" : "text-ink"}`}>▼</Text>
@@ -530,7 +578,13 @@ export function PlanScreen({
                   </View>
                 )}
                 {!readOnly && (
-                  <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8} className="pt-0.5">
+                  <Pressable
+                    onPress={() => onRemoveEntry(e.id)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${e.title}を削除`}
+                    className="pt-0.5"
+                  >
                     <Text className="font-gothic-400 text-[16px] text-muted-light">×</Text>
                   </Pressable>
                 )}

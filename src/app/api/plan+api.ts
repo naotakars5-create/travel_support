@@ -1,3 +1,4 @@
+import { guardRequest } from "@/lib/apiGuard";
 import { PlanApiResponse, PlanEntry, ScheduleSlot, SpotSuggestion, TransportMode } from "@/lib/types";
 import { PLAN_SYSTEM_PROMPT, buildPlanUserMessage } from "@/lib/planPrompt";
 import { stripJsonFence } from "@/lib/parsePrompt";
@@ -65,6 +66,9 @@ function normalizeSuggestions(raw: RawSuggestion[] | undefined): SpotSuggestion[
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const denied = guardRequest(request, 6);
+  if (denied) return denied;
+
   let payload: { entries?: PlanEntry[]; referenceDate?: string; dayCount?: number };
   try {
     payload = await request.json();

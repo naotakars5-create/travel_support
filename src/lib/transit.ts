@@ -112,6 +112,15 @@ function distanceEstimate(from: ParsedEvent, to: ParsedEvent): { driving?: numbe
   };
 }
 
+/**
+ * 区間キャッシュのキー。イベントIDに加えて丸めた座標を含める。
+ * 住所を直して座標が変わったら別キーになり、古い移動時間を返し続けない。
+ */
+export function edgeKey(from: ParsedEvent, to: ParsedEvent): string {
+  const g = (p: GeoPoint | undefined) => (p ? `${p.lat.toFixed(4)},${p.lng.toFixed(4)}` : "?");
+  return `${from.id}@${g(endGeoOf(from))}:${to.id}@${g(startGeoOf(to))}`;
+}
+
 /** 正の値を優先して返す（実測が0や欠損なら距離ベースにフォールバック）。 */
 function pickPositive(measured: number | undefined, fallback: number | undefined): number | undefined {
   if (typeof measured === "number" && measured > 0) return measured;
@@ -132,7 +141,7 @@ export function createPrecomputedEstimator(
 ): TransitEstimator {
   return {
     estimate(from, to) {
-      const t = cache[`${from.id}:${to.id}`];
+      const t = cache[edgeKey(from, to)];
       const dist = distanceEstimate(from, to);
       // 実測（Directions）を優先し、0や欠損なら距離ベースへフォールバック（0分表示を防ぐ）。
       const driving = pickPositive(t?.driving, dist.driving);
