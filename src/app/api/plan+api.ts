@@ -69,7 +69,7 @@ export async function POST(request: Request): Promise<Response> {
   const denied = guardRequest(request, 6);
   if (denied) return denied;
 
-  let payload: { entries?: PlanEntry[]; referenceDate?: string; dayCount?: number; request?: string };
+  let payload: { entries?: PlanEntry[]; referenceDate?: string; dayCount?: number; request?: string; baseMode?: string };
   try {
     payload = await request.json();
   } catch {
@@ -81,6 +81,7 @@ export async function POST(request: Request): Promise<Response> {
   const dayCount = typeof payload.dayCount === "number" && payload.dayCount > 0 ? Math.floor(payload.dayCount) : 1;
   // ユーザーの自由文の要望。長すぎる入力はプロンプトを壊すので切り詰める。
   const planRequest = typeof payload.request === "string" ? payload.request.slice(0, 1000) : undefined;
+  const baseMode = payload.baseMode === "car" ? "car" : "walk";
 
   if (entries.filter((e) => e.mode !== "rental").length === 0) {
     return Response.json({ kind: "error", message: "行き先がありません" } satisfies PlanApiResponse, { status: 400 });
@@ -93,7 +94,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const responseText = await provider.complete({
       system: PLAN_SYSTEM_PROMPT,
-      user: buildPlanUserMessage({ entries, referenceDateIso, dayCount, request: planRequest }),
+      user: buildPlanUserMessage({ entries, referenceDateIso, dayCount, request: planRequest, baseMode }),
     });
 
     let parsed: { schedule?: RawSlot[]; suggestions?: RawSuggestion[]; notes?: string };

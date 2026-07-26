@@ -7,7 +7,6 @@ export type TransportMode =
   | "stay"
   | "dining"
   | "activity"
-  | "home"
   | "rental";
 
 export interface ParsedField {
@@ -41,8 +40,6 @@ export interface ParsedEvent {
   placeFromGeo?: GeoPoint;
   /** placeTo の座標（ジオコーディング済みの場合） */
   placeToGeo?: GeoPoint;
-  /** この地点からの（またはこの地点への）移動手段の指定。出発地で使う */
-  travelMode?: "car" | "walk" | "rail";
   /** 定休日（0=日 … 6=土）。旅程で「定休日と重なっている」警告に使う */
   closedDays?: number[];
 }
@@ -101,9 +98,6 @@ export interface PlanEntry {
   /** チェックアウト時刻（ISO8601）。宿泊で使う（arriveBy はチェックイン） */
   checkOut?: string;
 
-  // --- 出発地専用 ---
-  /** 出発地→最初のスポット／最後のスポット→帰着 の移動手段（車・電車バス・徒歩） */
-  travelMode?: "car" | "walk" | "rail";
 }
 
 /** AIが返す1件の時刻割り当て（どの行き先に、何時に着いて、何分居るか）。 */

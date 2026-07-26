@@ -18,7 +18,8 @@ export interface Spot {
  * 空き時間に寄れる周辺スポットを取得するインターフェース。
  */
 export interface SpotProvider {
-  nearby(lat: number, lng: number, freeMinutes: number, preferIndoor?: boolean): Promise<Spot[]>;
+  /** @param radiusMeters 明示的な検索半径。未指定なら freeMinutes から算出する。 */
+  nearby(lat: number, lng: number, freeMinutes: number, preferIndoor?: boolean, radiusMeters?: number): Promise<Spot[]>;
 }
 
 const FIXED_SPOTS: Spot[] = [
@@ -43,11 +44,11 @@ export const fixedSpotProvider: SpotProvider = {
 
 /** Google Places API（/api/nearby-spots 経由）で実際の周辺観光スポットを取得する実装。 */
 export const googlePlacesSpotProvider: SpotProvider = {
-  async nearby(lat, lng, freeMinutes, preferIndoor) {
+  async nearby(lat, lng, freeMinutes, preferIndoor, radiusMeters) {
     const res = await fetchWithTimeout(apiUrl("/api/nearby-spots"), {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lat, lng, freeMinutes, preferIndoor: Boolean(preferIndoor) }),
+      body: JSON.stringify({ lat, lng, freeMinutes, preferIndoor: Boolean(preferIndoor), radiusMeters }),
     });
     if (!res.ok) throw new Error(`nearby-spots API error ${res.status}`);
     const data = await res.json();

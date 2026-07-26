@@ -20,7 +20,7 @@ const ENTRIES: PlanEntry[] = [
     openTo: "17:00",
     closedDays: [1],
   },
-  { id: "e2", title: "自宅", mode: "home", priority: "must", source: "手入力", departAt: "2026-07-25T00:00:00.000Z", travelMode: "rail" },
+  { id: "e2", title: "ホテルグランヴィア大阪", mode: "stay", priority: "must", source: "手入力", arriveBy: "2026-07-25T09:00:00.000Z", checkOut: "2026-07-26T01:00:00.000Z" },
 ];
 
 const SLOTS: ScheduleSlot[] = [{ entryId: "e1", arriveAt: "2026-07-25T01:30:00.000Z", stayMin: 90 }];
@@ -41,8 +41,8 @@ describe("share: 圧縮表現の往復", () => {
     expect(e1.placeGeo!.lat).toBeCloseTo(34.69123, 4);
     expect(e1.source).toBe("共有");
     const e2 = decoded!.entries.find((e) => e.id === "e2")!;
-    expect(e2.mode).toBe("home");
-    expect(e2.travelMode).toBe("rail");
+    expect(e2.mode).toBe("stay");
+    expect(e2.checkOut).toBe("2026-07-26T01:00:00.000Z");
     expect(decoded!.slots).toEqual(SLOTS);
   });
 

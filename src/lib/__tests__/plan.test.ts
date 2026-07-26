@@ -1,4 +1,4 @@
-import { sequentialSchedule, computePlanTotals, costCategoryOf, fillIntoGaps, buildEventsFromSchedule, isClosedOn, closedDaysLabel } from "../plan";
+import { sequentialSchedule, computePlanTotals, costCategoryOf, fillIntoGaps, isClosedOn, closedDaysLabel } from "../plan";
 import { PlanEntry } from "../types";
 
 const REF = new Date("2026-07-25T09:00:00.000Z"); // 各日の起点（テストは差分で検証しTZ非依存）
@@ -136,39 +136,6 @@ describe("fillIntoGaps", () => {
     const extra = fillIntoGaps([entry({ id: "x", stayMin: 120 })], slots, refLocal, 2);
     expect(extra).toHaveLength(1);
     expect(new Date(extra[0].arriveAt).getDate()).toBe(26);
-  });
-});
-
-describe("buildEventsFromSchedule: 出発地の日付合わせ", () => {
-  const ref = new Date(2026, 6, 25, 9, 0, 0, 0); // 旅行初日の朝
-
-  const homeEntry = entry({
-    id: "home",
-    mode: "home",
-    title: "自宅",
-    fixedTime: true,
-    // 古い開始日（7/10）のまま取り残された状態を再現
-    departAt: new Date(2026, 6, 10, 8, 0).toISOString(),
-    arriveBy: new Date(2026, 6, 11, 20, 0).toISOString(),
-  });
-  const slot = { entryId: "home", arriveAt: ref.toISOString(), stayMin: 0 };
-
-  it("古い日付の出発地を、旅行の初日と最終日へ合わせ直す", () => {
-    const events = buildEventsFromSchedule([homeEntry], [slot], { reference: ref, dayCount: 2 });
-    const depart = events.find((e) => e.id.endsWith("-depart"))!;
-    const ret = events.find((e) => e.id.endsWith("-return"))!;
-    const d = new Date(depart.startAt);
-    const r = new Date(ret.startAt);
-    expect(d.getDate()).toBe(25); // 初日
-    expect(d.getHours()).toBe(8); // 時刻は保持
-    expect(r.getDate()).toBe(26); // 最終日（2日間なので翌日）
-    expect(r.getHours()).toBe(20);
-  });
-
-  it("日数が増えれば帰着も最終日へ追従する", () => {
-    const events = buildEventsFromSchedule([homeEntry], [slot], { reference: ref, dayCount: 3 });
-    const ret = events.find((e) => e.id.endsWith("-return"))!;
-    expect(new Date(ret.startAt).getDate()).toBe(27);
   });
 });
 

@@ -16,7 +16,6 @@ const DEFAULT_STAY_MIN: Record<TransportMode, number> = {
   stay: 30,
   dining: 60,
   activity: 60,
-  home: 0,
   rental: 0,
 };
 
@@ -98,8 +97,6 @@ export function entryPlaceText(entry: PlanEntry): string {
 
 /** その予定の所要時間（分）。移動=出発→到着、宿泊=チェックイン→アウト、その他=滞在時間。 */
 export function entryDurationMin(entry: PlanEntry): number {
-  // 自宅（出発・帰宅の地点イベント）は滞在時間を持たない
-  if (entry.mode === "home") return 0;
   if (isTransitMode(entry.mode) && entry.departAt && entry.arriveBy) {
     return Math.max(0, Math.round((new Date(entry.arriveBy).getTime() - new Date(entry.departAt).getTime()) / 60000));
   }
@@ -111,8 +108,6 @@ export function entryDurationMin(entry: PlanEntry): number {
 
 /** スケジュールの基準になる固定時刻（移動=出発、その他=到着/チェックイン）。無ければ null。 */
 export function entryAnchorTime(entry: PlanEntry): string | null {
-  // 自宅は出発時刻をアンカーにする（帰宅時刻は別イベントとして扱う）
-  if (entry.mode === "home") return entry.departAt ?? entry.arriveBy ?? null;
   if (isTransitMode(entry.mode)) return entry.departAt ?? entry.arriveBy ?? null;
   return entry.arriveBy ?? null;
 }
@@ -270,17 +265,8 @@ export function orderEntriesBySchedule(entries: PlanEntry[], slots: ScheduleSlot
   });
 }
 
-/** ISO時刻の「時刻」はそのままに、日付だけを基準日から days 日後へ合わせる。 */
-function alignToDay(iso: string, reference: Date, days: number): string {
-  const src = new Date(iso);
-  if (Number.isNaN(src.getTime())) return iso;
-  const d = new Date(reference.getTime() + Math.max(0, days) * 86400000);
-  d.setHours(src.getHours(), src.getMinutes(), 0, 0);
-  return d.toISOString();
-}
-
 /** 1件の PlanEntry を、種別に応じた ParsedEvent（複数になる場合あり）へ変換する。 */
-function entryToEvents(entry: PlanEntry, slot: ScheduleSlot, ctx?: { reference: Date; dayCount: number }): ParsedEvent[] {
+function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
   const base = {
     id: `evt-${entry.id}`,
     mode: entry.mode,
@@ -296,41 +282,6 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot, ctx?: { reference: 
   // レンタカーは「借りている期間」であって地点ではないため、旅程には出さない
   // （区間の移動手段を車として計算するためだけに使う）。
   if (entry.mode === "rental") return [];
-
-  // 出発地 → 「出発（初日）」と「帰着（最終日）」の2つの地点イベント。
-  // 開始日を変更した場合などに古い日付へ取り残されないよう、
-  // 時刻はそのままに日付だけを旅行日程（初日/最終日）へ必ず合わせる。
-  if (entry.mode === "home") {
-    const placeText = entryPlaceText(entry);
-    const events: ParsedEvent[] = [];
-    const departIso = ctx && entry.departAt ? alignToDay(entry.departAt, ctx.reference, 0) : entry.departAt;
-    const returnIso = ctx && entry.arriveBy ? alignToDay(entry.arriveBy, ctx.reference, ctx.dayCount - 1) : entry.arriveBy;
-    const departMs = new Date(departIso ?? slot.arriveAt).getTime();
-    if (!Number.isNaN(departMs)) {
-      events.push({
-        ...base,
-        id: `evt-${entry.id}-depart`,
-        title: `${entry.title || "自宅"}を出発`,
-        placeTo: placeText,
-        placeToGeo: entry.placeGeo,
-        startAt: new Date(departMs).toISOString(),
-        travelMode: entry.travelMode,
-      });
-    }
-    const returnMs = returnIso ? new Date(returnIso).getTime() : NaN;
-    if (!Number.isNaN(returnMs)) {
-      events.push({
-        ...base,
-        id: `evt-${entry.id}-return`,
-        title: `${entry.title || "自宅"}に帰着`,
-        placeTo: placeText,
-        placeToGeo: entry.placeGeo,
-        startAt: new Date(returnMs).toISOString(),
-        travelMode: entry.travelMode,
-      });
-    }
-    return events;
-  }
 
   // 移動系（出発地・到着地あり）→ 出発〜到着の区間イベント
   if (isTransitMode(entry.mode) && entry.placeFrom && entry.placeTo) {
@@ -420,16 +371,14 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot, ctx?: { reference: 
  */
 export function buildEventsFromSchedule(
   entries: PlanEntry[],
-  slots: ScheduleSlot[],
-  /** 旅行の初日（朝）と日数。出発地の日付を旅程へ合わせるために使う */
-  ctx?: { reference: Date; dayCount: number }
+  slots: ScheduleSlot[]
 ): ParsedEvent[] {
   const byId = new Map(entries.map((e) => [e.id, e]));
   const events: ParsedEvent[] = [];
   for (const slot of slots) {
     const entry = byId.get(slot.entryId);
     if (!entry) continue;
-    events.push(...entryToEvents(entry, slot, ctx));
+    events.push(...entryToEvents(entry, slot));
   }
   return events.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 }
@@ -483,8 +432,6 @@ export interface PlanEntryInput {
   openTo?: string;
   /** 定休日（0=日 … 6=土） */
   closedDays?: number[];
-  /** 出発地: 最初のスポットへの移動手段 */
-  travelMode?: "car" | "walk" | "rail";
 }
 
 export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | null {
@@ -510,7 +457,6 @@ export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | nul
     openFrom: input.openFrom || undefined,
     openTo: input.openTo || undefined,
     closedDays: input.closedDays && input.closedDays.length > 0 ? input.closedDays : undefined,
-    travelMode: input.travelMode,
   };
 }
 

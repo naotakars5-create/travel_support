@@ -292,15 +292,28 @@ export function staticRouteMapUrl(
   url.searchParams.set("language", "ja");
   url.searchParams.set("maptype", "roadmap");
 
-  if (points.length > 1) {
-    const path = points.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join("|");
-    url.searchParams.append("path", `color:0xD96F4Ccc|weight:4|${path}`);
-  }
+  // 同じ場所が続く場合（宿のチェックイン→翌朝出発など）は1点にまとめる。
+  // 長さ0の線が重なって動線が読みづらくなるのを防ぐ。
+  const stops: { p: GeoPoint; label: string }[] = [];
   points.forEach((p, i) => {
-    // ラベル指定があればそれを（行き先の通し番号）、無ければ連番。Static Maps のラベルは英数字1文字のみ。
-    const raw = labels?.[i] ?? String(i + 1);
-    const label = /^[0-9A-Za-z]$/.test(raw) ? raw : "";
-    url.searchParams.append("markers", `color:0x23201D|label:${label}|${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
+    const prev = stops[stops.length - 1]?.p;
+    const same = prev && prev.lat.toFixed(5) === p.lat.toFixed(5) && prev.lng.toFixed(5) === p.lng.toFixed(5);
+    if (same) return;
+    stops.push({ p, label: labels?.[i] ?? String(i + 1) });
+  });
+
+  if (stops.length > 1) {
+    // 訪問順に線を引く（＝その日の動線）
+    const path = stops.map(({ p }) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join("|");
+    url.searchParams.append("path", `color:0xD96F4Cdd|weight:5|${path}`);
+  }
+  stops.forEach(({ p, label }, i) => {
+    // Static Maps のラベルは英数字1文字のみ。10箇所目以降は数字が入らないので
+    // ラベル無しの小さめマーカーにし、番号は本文側の一覧で確認してもらう。
+    const usable = /^[0-9A-Za-z]$/.test(label) ? `label:${label}|` : "size:small|";
+    // その日の最初の地点だけ塗りを変えて「ここから始まる」と分かるようにする
+    const color = i === 0 ? "0xD96F4C" : "0x23201D";
+    url.searchParams.append("markers", `color:${color}|${usable}${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
   });
   // 現在地は青いマーカーで表示（ラベルなし）
   if (me) {
