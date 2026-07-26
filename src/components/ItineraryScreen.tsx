@@ -80,6 +80,8 @@ interface DayGroup {
   numberOf: Map<string, number>;
   mapPoints: GeoPoint[];
   mapLabels: (string | undefined)[];
+  /** 座標が無いときにGoogleマップへ渡す地点名（住所または行き先名） */
+  mapPlaces: string[];
 }
 
 export function ItineraryScreen({
@@ -152,6 +154,7 @@ export function ItineraryScreen({
             numberOf: new Map(),
             mapPoints: [],
             mapLabels: [],
+            mapPlaces: [],
           };
           groups.push(current);
           prevDate = dk;
@@ -169,9 +172,14 @@ export function ItineraryScreen({
         const num = isReturnPoint ? -1 : isDeparturePoint ? 0 : ++spotSeq;
         current.numberOf.set(item.key, num);
         // 自宅（出発地）はプライバシーのため地図には載せない
-        if (item.geo && !isHome) {
-          current.mapPoints.push(item.geo);
-          current.mapLabels.push(String(num));
+        if (!isHome) {
+          if (item.geo) {
+            current.mapPoints.push(item.geo);
+            current.mapLabels.push(String(num));
+          }
+          // 座標が無くてもGoogleマップは開けるよう、地点名を控えておく
+          const placeText = (item.place || item.event.title || "").trim();
+          if (placeText) current.mapPlaces.push(placeText);
         }
       }
     }
@@ -250,9 +258,10 @@ export function ItineraryScreen({
                 <Text className="font-gothic-400 text-[11px] text-kinari/80">{g.dateLabel}</Text>
               </View>
             )}
-            {/* その日の全行程マップ（番号はその日の1,2,3…と一致） */}
-            {(g.mapPoints.length > 0 || (gi === 0 && liveLocation)) && (
-              <RouteMap points={g.mapPoints} me={liveLocation} labels={g.mapLabels} />
+            {/* その日の全行程マップ（番号はその日の1,2,3…と一致）。
+                座標がまだ無い日も、地点名でGoogleマップを開くボタンとして必ず出す。 */}
+            {(g.mapPoints.length > 0 || g.mapPlaces.length > 0 || (gi === 0 && liveLocation)) && (
+              <RouteMap points={g.mapPoints} places={g.mapPlaces} me={liveLocation} labels={g.mapLabels} />
             )}
             {g.items.map((item, i) => {
               if (item.type === "node") {
