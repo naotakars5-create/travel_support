@@ -40,8 +40,11 @@ function lineBorderStyle(style: LineStyle | null) {
   };
 }
 
+/** 路線図の縦線を引く左側の溝（幅22px・線はその中央）。 */
+const GUTTER_W = 22;
+
 function LineFull({ style }: { style: LineStyle | null }) {
-  return <View style={[{ position: "absolute", left: 12, top: 0, width: 1, height: "100%" } as const, lineBorderStyle(style)]} />;
+  return <View style={[{ position: "absolute", left: 10, top: 0, width: 1, height: "100%" } as const, lineBorderStyle(style)]} />;
 }
 
 /**
@@ -50,7 +53,7 @@ function LineFull({ style }: { style: LineStyle | null }) {
  */
 function RouteLink({ url, label }: { url: string; label: string }) {
   return (
-    <Pressable onPress={() => void Linking.openURL(url)} hitSlop={6} className="mt-0.5 self-start">
+    <Pressable onPress={() => void Linking.openURL(url)} hitSlop={6} className="self-start">
       <Text className="font-gothic-400 text-[10px] text-muted underline">{label}</Text>
     </Pressable>
   );
@@ -196,7 +199,7 @@ export function ItineraryScreen({
           <View key={`day-${g.day}-${gi}`}>
             {/* 日の見出し（複数日程では塗りのバンドで目立たせる） */}
             {dayGroups.length > 1 && (
-              <View className={`mb-2 flex-row items-baseline justify-between rounded-[10px] bg-ink px-4 py-2 ${gi > 0 ? "mt-3" : "mt-1"}`}>
+              <View className={`mb-1.5 flex-row items-baseline justify-between rounded-[10px] bg-ink px-4 py-1.5 ${gi > 0 ? "mt-2.5" : "mt-0.5"}`}>
                 <Text className="font-gothic-700 text-[14px] text-kinari">{g.day}日目</Text>
                 <Text className="font-gothic-400 text-[11px] text-kinari/80">{g.dateLabel}</Text>
               </View>
@@ -224,12 +227,12 @@ export function ItineraryScreen({
                 const style = lineStyleFor(item);
                 const routeUrl = directionsUrl(item.leg, item.mode);
                 return (
-                  <View key={`edge-${gi}-${i}`} className="min-h-[28px] flex-row">
-                    <View className="w-12" />
-                    <View className="w-[26px]">
+                  <View key={`edge-${gi}-${i}`} className="min-h-[22px] flex-row">
+                    <View style={{ width: GUTTER_W }}>
                       <LineFull style={style} />
                     </View>
-                    <View className="flex-1 justify-center pb-1 pl-1">
+                    {/* 移動時間と経路リンクは1行に並べる（改行を減らして間延びを防ぐ） */}
+                    <View className="flex-1 flex-row flex-wrap items-center gap-x-2 py-0.5 pl-1">
                       {item.explicit ? (
                         // 出発地→最初のスポット等、移動手段が指定された区間は指定手段のみ表示
                         <Text className="font-gothic-500 text-[11px]" style={[{ color: style?.color }, TNUM]}>
@@ -249,12 +252,7 @@ export function ItineraryScreen({
                           {MODE_LABEL[item.mode]} · {formatDurationMin(item.durationMin)}
                         </Text>
                       )}
-                      {routeUrl && (
-                        <RouteLink
-                          url={routeUrl}
-                          label={item.mode === "rail" || item.mode === "bus" ? "乗換をGoogleマップで見る" : "経路をGoogleマップで見る"}
-                        />
-                      )}
+                      {routeUrl && <RouteLink url={routeUrl} label={item.mode === "rail" || item.mode === "bus" ? "乗換を見る" : "経路を見る"} />}
                     </View>
                   </View>
                 );
@@ -264,12 +262,11 @@ export function ItineraryScreen({
               const isConflict = item.kind === "conflict";
               const isUnconfirmed = item.kind === "unconfirmed";
               return (
-                <View key={`gap-${gi}-${i}`} className="min-h-[38px] flex-row">
-                  <View className="w-12" />
-                  <View className="w-[26px]">
+                <View key={`gap-${gi}-${i}`} className="min-h-[30px] flex-row">
+                  <View style={{ width: GUTTER_W }}>
                     <LineFull style={style} />
                   </View>
-                  <View className="flex-1 justify-center py-1 pl-1">
+                  <View className="flex-1 justify-center py-0.5 pl-1">
                     {isConflict ? (
                       <View className="self-start rounded-[10px] border border-ink/50 bg-surface px-3 py-1.5">
                         <Text className="font-gothic-500 text-[11px] text-ink">
@@ -291,7 +288,11 @@ export function ItineraryScreen({
                         )}
                         {(() => {
                           const url = directionsUrl(item.leg, "car");
-                          return url ? <RouteLink url={url} label="経路をGoogleマップで見る" /> : null;
+                          return url ? (
+                            <View className="mt-0.5">
+                              <RouteLink url={url} label="経路をGoogleマップで見る" />
+                            </View>
+                          ) : null;
                         })()}
                       </View>
                     ) : isUnconfirmed ? (
@@ -368,32 +369,46 @@ function NodeRow({
 }) {
   const nodeInStyle = useNodeInStyle(justAdded);
   const markerBg = isCurrent ? "#D96F4C" : isPast ? "#6E675C" : "#23201D";
+  // 時刻は「開始〜終了」の1行にまとめる（滞在時間を別行に出さずに済み、情報が密になる）
+  const start = new Date(item.time);
+  const timeLabel =
+    item.stayMin && item.stayMin > 0
+      ? `${formatJstTime(start)}–${formatJstTime(new Date(start.getTime() + item.stayMin * 60000))}`
+      : formatJstTime(start);
+  // 住所と補足も1行にまとめる
+  const meta = [item.place && item.place !== item.event.title ? item.place : null, item.sub ?? null]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <Animated.View style={nodeInStyle} className="min-h-[44px] flex-row">
-      <View className="w-12 items-end pt-1 pr-2">
-        <Text className={`font-mincho-600 text-[14px] ${isPast ? "text-muted-light" : "text-ink"}`} style={TNUM}>
-          {formatJstTime(new Date(item.time))}
-        </Text>
-      </View>
-      <View className="w-[26px] items-center">
-        {/* 番号マーカー自体が地点の目印。上下の縦線は引かない（番号の上に棒が出るため） */}
-        <View style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
-          {isCurrent && <PulseRing size={22} color="rgba(217,111,76,.45)" />}
-          <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: markerBg, alignItems: "center", justifyContent: "center" }}>
-            <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>
-              {stopNumber === -1 ? "着" : stopNumber ?? ""}
-            </Text>
-          </View>
-        </View>
-      </View>
-      <View className="flex-1 pb-1.5 pl-1">
+    <Animated.View style={nodeInStyle} className="flex-row">
+      {/* 溝は空ける（番号はカードの中に入れる。縦線はカードとカードの間だけ通る） */}
+      <View style={{ width: GUTTER_W }} />
+      <View className="flex-1 pb-1 pl-1">
         <View
-          className={`rounded-[12px] border px-3 py-2 ${isCurrent ? "border-accent/50 bg-accent/[.06]" : "border-black/[.07] bg-white/60"}`}
+          className={`rounded-[12px] border px-2.5 py-1.5 ${isCurrent ? "border-accent/50 bg-accent/[.06]" : "border-black/[.07] bg-white/60"}`}
           // 次に向かう予定：左に3pxのテラコッタ縦ボーダー（今・進行中の合図）
           style={isNext && !isCurrent ? { borderLeftWidth: 3, borderLeftColor: "#D96F4C" } : undefined}
         >
-          <View className="flex-row flex-wrap items-center gap-2">
-            <Text className={`font-mincho-600 text-[15px] ${isPast ? "text-muted-light" : "text-ink"}`}>{item.event.title || item.place}</Text>
+          {/* 番号・時刻・行き先を1行に。番号がカードの中に入るので、地点の区切りが分かりやすい */}
+          <View className="flex-row items-center gap-2">
+            <View style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
+              {isCurrent && <PulseRing size={22} color="rgba(217,111,76,.45)" />}
+              <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: markerBg, alignItems: "center", justifyContent: "center" }}>
+                <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>
+                  {stopNumber === -1 ? "着" : stopNumber ?? ""}
+                </Text>
+              </View>
+            </View>
+            <Text className={`font-gothic-500 text-[11px] ${isPast ? "text-muted-light" : "text-muted"}`} style={TNUM}>
+              {timeLabel}
+            </Text>
+            <Text
+              numberOfLines={1}
+              className={`flex-1 font-mincho-600 text-[15px] leading-[20px] ${isPast ? "text-muted-light" : "text-ink"}`}
+            >
+              {item.event.title || item.place}
+            </Text>
             {isCurrent && (
               <Blinker>
                 <View className="rounded-full bg-accent/15 px-2 py-[2px]">
@@ -401,23 +416,19 @@ function NodeRow({
                 </View>
               </Blinker>
             )}
-            {item.confidence < 0.5 && (
-              <View className="rounded-full border border-muted px-2 py-[1px]">
-                <Text className="font-gothic-400 text-[9px] text-muted">要確認</Text>
-              </View>
-            )}
           </View>
-          {item.place && item.place !== item.event.title && (
-            <Text className="mt-1 font-gothic-400 text-[10px] text-muted-light">{item.place}</Text>
-          )}
-          {(item.stayMin || item.sub) && (
-            <View className="mt-1 flex-row flex-wrap items-center gap-x-2 gap-y-0.5">
-              {item.stayMin ? (
-                <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
-                  滞在 {formatDurationMin(item.stayMin)}
+          {(meta || item.confidence < 0.5) && (
+            <View className="mt-0.5 flex-row items-center gap-1.5" style={{ paddingLeft: 30 }}>
+              {item.confidence < 0.5 && (
+                <View className="rounded-full border border-muted px-1.5">
+                  <Text className="font-gothic-400 text-[9px] text-muted">要確認</Text>
+                </View>
+              )}
+              {meta ? (
+                <Text numberOfLines={2} className="flex-1 font-gothic-400 text-[10px] leading-[14px] text-muted-light">
+                  {meta}
                 </Text>
               ) : null}
-              {item.sub && <Text className="font-gothic-400 text-[11px] text-muted">{item.sub}</Text>}
             </View>
           )}
         </View>
