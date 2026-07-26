@@ -45,6 +45,27 @@ npx eas deploy --prod
 
 > 注: EAS Hosting は無料枠があります。GPSはブラウザの位置情報許可で動作します（iOS Safari では https 必須なので、この公開URL上では有効）。
 
+## 公開（デプロイ）をGitHubに任せる
+
+`.github/workflows/deploy-web.yml` を入れてあるので、ターミナルを使わずに公開できます。
+
+**初回だけ必要な設定（すべてブラウザで完結）**
+
+1. <https://expo.dev> → 右上のアカウントメニュー → **Access tokens** → **Create token**
+   （名前は任意。表示されたトークンをコピーする）
+2. GitHub のリポジトリ → **Settings** → **Secrets and variables** → **Actions**
+   → **New repository secret**
+   - Name: `EXPO_TOKEN`
+   - Secret: 1でコピーしたトークン
+
+**以降の使い方**
+
+- **プルリクエストをマージする** → 自動でビルド・デプロイされる
+- **コードを変えずに公開し直したい**（環境変数を追加した時など）
+  → GitHub の **Actions** タブ → 左の **Deploy Web** → **Run workflow** ボタン
+
+デプロイの進行状況と結果は Actions タブで確認できます。
+
 ## 共有リンクを短くする（任意）
 
 共有は既定で「旅程そのものをURLに埋め込む」方式です。サーバー不要で動く代わりに、
