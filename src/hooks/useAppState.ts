@@ -82,6 +82,8 @@ export function useAppState() {
   const [transitCache, setTransitCache] = useState<Record<string, EdgeTravel>>({});
   // 最後にAIで最適化した時点の「構造」署名。行き先が増減・変更されたら最適化を提案する。
   const [composedSig, setComposedSig] = useState<string | null>(null);
+  // AIへのお願い（自由文）。「1日目はホテルの後は予定を入れない」等のニュアンスを毎回渡す。
+  const [planRequest, setPlanRequest] = useState<string>("");
 
   const initializedRef = useRef(false);
   // 「構造」が既にスケジュール済みかを追跡し、座標だけ埋まった時の不要な再ローカル化を防ぐ。
@@ -132,6 +134,7 @@ export function useAppState() {
         if (persisted.tripDate) setTripDateState(persisted.tripDate);
         if (persisted.tripDayCount) setTripDayCountState(persisted.tripDayCount);
         if (persisted.baseMode) setBaseMode(persisted.baseMode);
+        if (persisted.planRequest) setPlanRequest(persisted.planRequest);
         scheduleSigRef.current = scheduleSignature(ordered);
       } else {
         const seeded = buildSeedEntries(new Date());
@@ -163,6 +166,7 @@ export function useAppState() {
       tripDayCount,
       baseMode,
       transitCache: trimmedCache,
+      planRequest,
       savedAt: new Date().toISOString(),
     });
     void persistPromise.then((ok) => {
@@ -176,7 +180,7 @@ export function useAppState() {
       setFlash({ visible: true, text: "端末への保存に失敗しました\n空き容量を確認してください（このままだと閉じた時に消えます）" });
       setTimeout(() => setFlash({ visible: false, text: "" }), 3200);
     });
-  }, [entries, slots, currentNodeKey, currentNodeSetAt, packing, tripDate, tripDayCount, baseMode, transitCache, readOnly]);
+  }, [entries, slots, currentNodeKey, currentNodeSetAt, packing, tripDate, tripDayCount, baseMode, transitCache, planRequest, readOnly]);
 
   // 現在時刻の更新（当日画面のカウントダウン用）
   useEffect(() => {
@@ -717,6 +721,7 @@ export function useAppState() {
             entries: list,
             referenceDate: `${tripStart}T09:00:00+09:00`,
             dayCount: tripDayCount,
+            request: planRequest.trim() || undefined,
           }),
         },
         90000 // AIの旅程作成は時間がかかる（永久に回り続けるよりは打ち切って伝える）
@@ -780,7 +785,7 @@ export function useAppState() {
     } finally {
       setComposing(false);
     }
-  }, [entries, slots, suggestions, planNotes, tripDayCount]);
+  }, [entries, slots, suggestions, planNotes, tripDayCount, planRequest]);
 
   const togglePacking = useCallback((id: string) => {
     setPacking((prev) => prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p)));
@@ -919,6 +924,7 @@ export function useAppState() {
           tripDate,
           tripDayCount,
           baseMode,
+          planRequest,
         };
         const next = existing ? prev.map((t) => (t.id === existing.id ? trip : t)) : [trip, ...prev];
         persistTrips(next);
@@ -928,7 +934,7 @@ export function useAppState() {
         return next;
       });
     },
-    [entries, slots, packing, tripDate, tripDayCount, baseMode, activeTripId, persistTrips]
+    [entries, slots, packing, tripDate, tripDayCount, baseMode, planRequest, activeTripId, persistTrips]
   );
 
   /** しおりの表紙写真を更新する。 */
@@ -980,6 +986,7 @@ export function useAppState() {
       setTripDateState(trip.tripDate);
       setTripDayCountState(trip.tripDayCount);
       setBaseMode(trip.baseMode);
+      setPlanRequest(trip.planRequest ?? "");
       setSuggestions([]);
       setPlanNotes(null);
       setActiveTripId(trip.id);
@@ -1099,6 +1106,8 @@ export function useAppState() {
     canUndoCompose: composeBackup !== null,
     tripEnded,
     activeTripId,
+    planRequest,
+    setPlanRequest,
     isOnline,
     suggestOptimize,
     togglePacking,

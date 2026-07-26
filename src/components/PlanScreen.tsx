@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PlanEntry, Priority, SpotSuggestion } from "@/lib/types";
 import {
@@ -22,6 +22,7 @@ import { Illustration, illustrationUri } from "./Illustration";
 import { Floater } from "./animations";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
+const MUTED = "#6E675C";
 
 // 日ごとの淡い背景色（複数日程で日を見分けやすくする）。1日目は無地。
 // 有彩色は「今・完了」専用のため、日の区別は砂色（surface）の濃淡で行う。
@@ -58,6 +59,8 @@ export function PlanScreen({
   onOpenAddStart,
   onOpenAddRental,
   onGoShiori,
+  planRequest,
+  onSetPlanRequest,
   onCompose,
   onRemoveEntry,
   onEditEntry,
@@ -94,6 +97,9 @@ export function PlanScreen({
   onOpenAddRental: () => void;
   /** 旅行終了後の「しおりへ」導線 */
   onGoShiori: () => void;
+  /** AIへのお願い（自由文）。旅程を組むときの希望として渡される */
+  planRequest: string;
+  onSetPlanRequest: (v: string) => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
@@ -623,6 +629,21 @@ export function PlanScreen({
 
         {!readOnly && entries.length > 0 && (
           <View className="mt-5">
+            {/* AIへのお願い（自由文）。並び順や時間配分のニュアンスを言葉で伝える。 */}
+            <View className="mb-2 gap-1">
+              <Text className="font-gothic-400 text-[10px] text-muted">AIへのお願い（任意・入れたままにできます）</Text>
+              <TextInput
+                value={planRequest}
+                onChangeText={onSetPlanRequest}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+                placeholder={"例: 1日目はホテルに着いたら、そのあとは予定を入れない\n朝はゆっくりめ / 移動は少なめに"}
+                placeholderTextColor={MUTED}
+                accessibilityLabel="AIへのお願い"
+                className="min-h-[56px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2 font-gothic-400 text-[12px] leading-[18px] text-ink"
+              />
+            </View>
             <Pressable
               disabled={composing}
               onPress={onCompose}

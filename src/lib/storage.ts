@@ -24,6 +24,8 @@ export interface PersistedState {
   baseMode?: BaseMode;
   /** 実測の移動時間キャッシュ（edgeKey → 分）。リロード時のDirections API再取得を減らす */
   transitCache?: Record<string, EdgeTravel>;
+  /** AIへのお願い（自由文）。旅程を組むときの希望として毎回渡す */
+  planRequest?: string;
   savedAt: string;
 }
 

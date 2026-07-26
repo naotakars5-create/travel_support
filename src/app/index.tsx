@@ -68,6 +68,8 @@ export default function Home() {
           onOpenAddStart={() => setAddStartOpen(true)}
           onOpenAddRental={() => setAddRentalOpen(true)}
           onGoShiori={() => app.setTab("shiori")}
+          planRequest={app.planRequest}
+          onSetPlanRequest={app.setPlanRequest}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}

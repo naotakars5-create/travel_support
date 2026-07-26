@@ -22,6 +22,8 @@ export interface SavedTrip {
   tripDate: string;
   tripDayCount: number;
   baseMode: BaseMode;
+  /** AIへのお願い（自由文）。旅を読み込んだときに一緒に戻す */
+  planRequest?: string;
 }
 
 /** 思い出写真の上限枚数。 */
