@@ -493,6 +493,10 @@ export function useAppState() {
           },
           45000 // LLM読み取り
         );
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
+          return { ok: false, message: body.message ?? body.error ?? `読み取りに失敗しました（${res.status}）` };
+        }
         const data = (await res.json()) as
           | { kind: "entries"; entries: { title: string; mode: PlanEntry["mode"]; day?: number; stayMin?: number }[] }
           | { kind: "error"; message: string };
@@ -539,6 +543,10 @@ export function useAppState() {
           { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(brief) },
           90000 // 旅程まるごとの生成は時間がかかる
         );
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
+          return { ok: false, message: body.message ?? body.error ?? `旅程を作成できませんでした（${res.status}）` };
+        }
         const data = (await res.json()) as
           | { kind: "plan"; spots: { title: string; area?: string; day: number; mode: PlanEntry["mode"]; stayMin: number; note?: string }[]; notes?: string }
           | { kind: "error"; message: string };
@@ -808,6 +816,13 @@ export function useAppState() {
         },
         90000 // AIの旅程作成は時間がかかる（永久に回り続けるよりは打ち切って伝える）
       );
+      // ガードの応答（403/429）は {error} 形式で kind を持たない。
+      // そのまま読むとエラー文が空欄になり、原因が分からなくなる。
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
+        setComposeError(body.message ?? body.error ?? `旅程を作成できませんでした（${res.status}）`);
+        return;
+      }
       const data = (await res.json()) as PlanApiResponse;
       if (data.kind === "plan") {
         // AIが時刻を付けた予定はその時刻をアンカーに採用。宿泊・時刻固定は必ず残す。

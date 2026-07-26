@@ -22,20 +22,50 @@ function clientKey(request: Request): string {
   return request.headers.get("x-real-ip") ?? "unknown";
 }
 
-/** ブラウザ由来（Origin あり）のリクエストは、同一ホストからのみ許可する。 */
+/**
+ * このサーバーが「自分のホスト名」として認めるものを集める。
+ *
+ * request.url はプロキシの内側では内部アドレス（localhost:8081 等）になり、
+ * 公開ホスト名と一致しない。それだけで判定すると、同一オリジンからの
+ * 正当なリクエスト（fetch の POST は同一オリジンでも Origin を送る）まで
+ * 403 で弾いてしまうため、転送ヘッダも候補に含める。
+ */
+function selfHosts(request: Request): string[] {
+  const hosts: string[] = [];
+  const push = (v: string | null | undefined) => {
+    if (!v) return;
+    for (const one of v.split(",")) {
+      const h = one.trim().toLowerCase();
+      if (h) hosts.push(h);
+    }
+  };
+  push(request.headers.get("x-forwarded-host"));
+  push(request.headers.get("host"));
+  try {
+    hosts.push(new URL(request.url).host.toLowerCase());
+  } catch {
+    // request.url が解釈できない環境でもヘッダ側で判定できる
+  }
+  const envBase = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (envBase) {
+    try {
+      hosts.push(new URL(envBase).host.toLowerCase());
+    } catch {
+      // 設定ミスは無視（他の候補で判定する）
+    }
+  }
+  return hosts;
+}
+
+/** ブラウザ由来（Origin あり）のリクエストは、自分のホストからのみ許可する。 */
 function originAllowed(request: Request): boolean {
   const origin = request.headers.get("origin");
-  if (!origin) return true; // ネイティブアプリ・curl 等。レート制限側で守る
+  if (!origin) return true; // ネイティブアプリ・画像読み込み等。レート制限側で守る
   try {
-    const originHost = new URL(origin).host;
-    const requestHost = new URL(request.url).host;
-    if (originHost === requestHost) return true;
-    // 明示的に許可されたベースURL（別ドメイン配信の構成）
-    const envBase = process.env.EXPO_PUBLIC_API_BASE_URL;
-    if (envBase && new URL(envBase).host === originHost) return true;
+    const originHost = new URL(origin).host.toLowerCase();
     // ローカル開発（Expo dev server はポートが異なる）
     if (/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(originHost)) return true;
-    return false;
+    return selfHosts(request).includes(originHost);
   } catch {
     return false;
   }

@@ -66,10 +66,12 @@ export function GeneratePlanSheet({
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <View className="flex-1">
-        <Pressable className="flex-1 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
-        <SlideUp trigger="generate-plan">
-          <View className="max-h-[92%] rounded-t-sheet bg-sheet px-6 pt-3" style={{ paddingBottom: insets.bottom + 24 }}>
+      {/* 背景は絶対配置にして、シート側だけが高さを持つようにする
+          （シートの maxHeight が画面高に対して効き、ScrollView が正しく縮む） */}
+      <View className="flex-1 justify-end">
+        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <SlideUp trigger="generate-plan" style={{ maxHeight: "92%" }}>
+          <View className="rounded-t-sheet bg-sheet px-6 pt-3" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />
             <View className="mb-3 flex-row items-center justify-between">
               <Pressable onPress={onClose} hitSlop={8} className="rounded-full border border-black/[.15] px-3 py-1">
@@ -79,7 +81,7 @@ export function GeneratePlanSheet({
               <View className="w-[52px]" />
             </View>
 
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
               <View className="gap-4">
                 <Text className="-mt-1 font-gothic-400 text-[11px] leading-[18px] text-muted">
                   行き先だけ決まっていれば大丈夫。条件を選ぶと、AIが行き先を選んで日ごとに割り振ります。

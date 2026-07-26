@@ -623,7 +623,7 @@ export function PlanScreen({
               accessibilityRole="button"
               className="mb-2 self-center rounded-full border border-ink/25 px-3 py-1"
             >
-              <Text className="font-gothic-400 text-[10px] text-muted">条件を選んでAIにゼロから作り直してもらう</Text>
+              <Text className="font-gothic-400 text-[10px] text-muted">条件を選んでAIにゼロから組み直してもらう</Text>
             </Pressable>
             <Pressable
               disabled={composing}
@@ -631,10 +631,10 @@ export function PlanScreen({
               className={`flex-row items-center justify-center gap-2 rounded-[12px] py-3.5 ${composing ? "bg-ink/40" : "bg-ink"}`}
             >
               {composing && <ActivityIndicator size="small" color="#F4EFE5" />}
-              <Text className="font-gothic-500 text-[12px] text-kinari">{composing ? "AIが最適化しています…" : "AIで順番を最適化"}</Text>
+              <Text className="font-gothic-500 text-[12px] text-kinari">{composing ? "AIが予定を組んでいます…" : "AIで予定を組む"}</Text>
             </Pressable>
             <Text className="mt-2 text-center font-gothic-400 text-[10px] text-muted-light">
-              旅程は並び順から自動で組まれています。押すとAIが移動効率・営業時間・定休日を見て順番と時間配分を最適化します。
+              旅程は並び順から自動で組まれています。押すとAIが移動効率・営業時間・定休日を見て、順番と時間配分を組み直します。
             </Text>
             {composeError && <Text className="mt-2 text-center font-gothic-400 text-[11px] text-ink">{composeError}</Text>}
             {planNotes && (

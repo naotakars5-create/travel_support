@@ -20,7 +20,7 @@ function radiusForFreeMinutes(freeMinutes: number): number {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const denied = guardRequest(request, 30);
+  const denied = guardRequest(request, 60);
   if (denied) return denied;
 
   let payload: NearbyRequest;

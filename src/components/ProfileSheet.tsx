@@ -26,10 +26,10 @@ export function ProfileSheet({
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <View className="flex-1">
-        <Pressable className="flex-1 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
-        <SlideUp trigger="profile">
-          <View className="max-h-[88%] rounded-t-sheet bg-sheet px-6 pt-3" style={{ paddingBottom: insets.bottom + 24 }}>
+      <View className="flex-1 justify-end">
+        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <SlideUp trigger="profile" style={{ maxHeight: "90%" }}>
+          <View className="rounded-t-sheet bg-sheet px-6 pt-3" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />
             <View className="mb-4 flex-row items-center justify-between">
               <Pressable onPress={onClose} hitSlop={8} className="rounded-full border border-black/[.15] px-3 py-1">
@@ -39,7 +39,7 @@ export function ProfileSheet({
               <View className="w-[52px]" />
             </View>
 
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
               {/* アイコンプレビュー（写真優先・無ければ選択中のイラスト） */}
               <View className="items-center gap-3">
                 <View className="h-[84px] w-[84px] overflow-hidden rounded-full bg-surface">

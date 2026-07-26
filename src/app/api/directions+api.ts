@@ -11,7 +11,7 @@ interface DirectionsRequest {
 const cache = new LruCache<{ durationMin: number; distanceMeters: number } | null>(500);
 
 export async function POST(request: Request): Promise<Response> {
-  const denied = guardRequest(request, 120);
+  const denied = guardRequest(request, 300);
   if (denied) return denied;
 
   let payload: DirectionsRequest;

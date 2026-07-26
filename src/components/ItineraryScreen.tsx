@@ -243,7 +243,7 @@ export function ItineraryScreen({
         {suggestOptimize && !optimizeDismissed && rail.length > 0 && (
           <View className="mb-2 flex-row items-center gap-2 rounded-[12px] border border-ink/15 bg-surface/60 px-3 py-2">
             <Text className="flex-1 font-gothic-400 text-[11px] leading-[16px] text-ink">
-              行き先が変わりました。AIで順番を最適化しますか？
+              行き先が変わりました。AIで予定を組み直しますか？
             </Text>
             <Pressable
               disabled={composing}
@@ -251,7 +251,7 @@ export function ItineraryScreen({
               accessibilityRole="button"
               className={`rounded-full px-3 py-1.5 ${composing ? "bg-ink/40" : "bg-ink"}`}
             >
-              <Text className="font-gothic-500 text-[11px] text-kinari">{composing ? "最適化中…" : "最適化する"}</Text>
+              <Text className="font-gothic-500 text-[11px] text-kinari">{composing ? "組んでいます…" : "予定を組む"}</Text>
             </Pressable>
             <Pressable onPress={() => setOptimizeDismissed(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="この提案を閉じる">
               <Text className="font-gothic-400 text-[14px] text-muted-light">×</Text>

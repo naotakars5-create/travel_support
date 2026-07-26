@@ -66,10 +66,12 @@ export function AddEntrySheet({
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <View className="flex-1">
-        <Pressable className="flex-1 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
-        <SlideUp trigger="add-entry">
-          <View className="max-h-[88%] rounded-t-sheet bg-sheet px-6 pt-3" style={{ paddingBottom: insets.bottom + 24 }}>
+      {/* 背景は絶対配置にして、シート側だけが高さを持つようにする
+          （シートの maxHeight が画面高に対して効き、ScrollView が正しく縮む） */}
+      <View className="flex-1 justify-end">
+        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <SlideUp trigger="add-entry" style={{ maxHeight: "88%" }}>
+          <View className="rounded-t-sheet bg-sheet px-6 pt-3" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />
 
             <View className="mb-3 flex-row items-center justify-between">
@@ -96,7 +98,7 @@ export function AddEntrySheet({
               </View>
             )}
 
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
               {mode === "manual" || fixedMode ? (
                 <PlanEntryForm
                   onSubmit={onAdd}

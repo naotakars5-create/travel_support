@@ -21,7 +21,8 @@ export function BottomNav({ tab, onChange, dark }: { tab: Tab; onChange: (t: Tab
     >
       <View className="h-[66px] flex-row">
         {ITEMS.map((item) => {
-          const active = item.id === tab;
+          // しおり・持ち物はマイページの中の画面なので、開いている間はマイページを点灯させる
+          const active = item.id === tab || (item.id === "profile" && (tab === "shiori" || tab === "packing"));
           return (
             <Pressable
               key={item.id}
