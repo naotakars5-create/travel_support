@@ -83,6 +83,8 @@ export interface PlanEntryFormInitial {
   openFrom?: string;
   openTo?: string;
   closedDays?: number[];
+  photoRef?: string;
+  photoAttribution?: string;
 }
 
 /** 行き先を入力するフォーム。種別で入力欄が変わり、複数日程では「何日目」を選べる。 */
@@ -134,6 +136,11 @@ export function PlanEntryForm({
   const [openTo, setOpenTo] = useState<string | undefined>(initial?.openTo);
   const [placeGeo, setPlaceGeo] = useState<GeoPoint | undefined>(initial?.placeGeo);
   const [closedDays, setClosedDays] = useState<number[] | undefined>(initial?.closedDays);
+  // スポット写真（旅程カードのサムネイルに使う）
+  const [photo, setPhoto] = useState<{ ref?: string; attribution?: string }>({
+    ref: initial?.photoRef,
+    attribution: initial?.photoAttribution,
+  });
   // レンタカーを返す日（借りる日と別日になりうる）
   const [returnDay, setReturnDay] = useState<number>(() => {
     if (initial?.mode === "rental" && initial.arriveBy) {
@@ -176,6 +183,7 @@ export function PlanEntryForm({
         setOpenFrom(details.openFrom);
         setOpenTo(details.openTo);
         setClosedDays(details.closedDays);
+        setPhoto({ ref: details.photoRef, attribution: details.photoAttribution });
       }
       setLoadingDetails(false);
     })();
@@ -188,6 +196,7 @@ export function PlanEntryForm({
     setClosedDays(undefined);
     setOpenFrom(undefined);
     setOpenTo(undefined);
+    setPhoto({});
   };
 
   const iso = (d: number, t: string) => (t ? combineDateAndTime(dateForDay(tripDate, d), t)?.toISOString() : undefined);
@@ -226,6 +235,8 @@ export function PlanEntryForm({
       input.openFrom = openFrom;
       input.openTo = openTo;
       input.closedDays = closedDays;
+      input.photoRef = photo.ref;
+      input.photoAttribution = photo.attribution;
     } else {
       input.place = place || undefined;
       input.placeGeo = placeGeo;
@@ -235,6 +246,8 @@ export function PlanEntryForm({
       input.openFrom = openFrom;
       input.openTo = openTo;
       input.closedDays = closedDays;
+      input.photoRef = photo.ref;
+      input.photoAttribution = photo.attribution;
     }
     onSubmit(input);
     if (!resetAfterSubmit) return;
@@ -254,6 +267,7 @@ export function PlanEntryForm({
     setOpenFrom(undefined);
     setOpenTo(undefined);
     setClosedDays(undefined);
+    setPhoto({});
     setPlaceGeo(undefined);
   };
 

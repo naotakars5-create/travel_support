@@ -161,6 +161,15 @@ export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number,
     .slice(0, 15);
 }
 
+/** Places Photo の画像URL（サーバー専用・キーを含む）。 */
+export function placePhotoUrl(photoRef: string, maxWidth: number): string {
+  const url = new URL("https://maps.googleapis.com/maps/api/place/photo");
+  url.searchParams.set("maxwidth", String(maxWidth));
+  url.searchParams.set("photo_reference", photoRef);
+  url.searchParams.set("key", apiKey());
+  return url.toString();
+}
+
 export interface PlaceDetails {
   /** 番地まで含む整形済み住所 */
   address?: string;
@@ -173,6 +182,10 @@ export interface PlaceDetails {
   weekdayText?: string[];
   /** 定休日（0=日 … 6=土）。営業時間データが無い場合は undefined（不明） */
   closedDays?: number[];
+  /** 代表写真の参照ID（/api/place-photo に渡すと画像が返る） */
+  photoRef?: string;
+  /** 写真の提供元表示（Googleの規約で表示が必須） */
+  photoAttribution?: string;
 }
 
 /**
@@ -202,7 +215,8 @@ function hhmm(t: string | undefined): string | undefined {
 export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
   const url = new URL("https://maps.googleapis.com/maps/api/place/details/json");
   url.searchParams.set("place_id", placeId);
-  url.searchParams.set("fields", "formatted_address,geometry,opening_hours,name");
+  // photos は Basic Data なので Place Details の料金内で取得できる（写真の実取得だけが別課金）。
+  url.searchParams.set("fields", "formatted_address,geometry,opening_hours,name,photos");
   url.searchParams.set("language", "ja");
   url.searchParams.set("region", "jp");
   url.searchParams.set("key", apiKey());
@@ -215,6 +229,7 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | n
     formatted_address?: string;
     geometry?: { location?: { lat: number; lng: number } };
     opening_hours?: { periods?: { open?: { day?: number; time?: string }; close?: { time?: string } }[]; weekday_text?: string[] };
+    photos?: { photo_reference?: string; html_attributions?: string[] }[];
   };
 
   const details: PlaceDetails = {
@@ -236,6 +251,16 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | n
   details.openFrom = hhmm(mostCommon(opens));
   details.openTo = hhmm(mostCommon(closes));
   details.closedDays = closedDaysFromPeriods(periods);
+
+  // 代表写真（1枚目）。参照IDだけ保存し、画像はサーバー経由で必要になった時に取得する。
+  const photo = r.photos?.[0];
+  if (photo?.photo_reference) {
+    details.photoRef = photo.photo_reference;
+    // html_attributions は <a href=...>名前</a> の形。表示用に名前だけ取り出す。
+    const raw = photo.html_attributions?.[0];
+    const name = raw ? raw.replace(/<[^>]*>/g, "").trim() : "";
+    details.photoAttribution = name || undefined;
+  }
 
   return details;
 }

@@ -29,10 +29,20 @@ function entryTime(e: PlanEntry): number {
   return t ? new Date(t).getTime() : Number.MAX_SAFE_INTEGER;
 }
 
+/**
+ * しおりの表紙画像。優先順位は「自分で設定した写真 > 地域から自動取得した風景 > 既定イラスト」。
+ * 自動表紙は Unsplash 由来で、規約により撮影者クレジットの表示が必要。
+ */
+function coverOf(trip: SavedTrip): { uri: string; isPhoto: boolean; credit?: string } {
+  if (trip.coverPhoto) return { uri: trip.coverPhoto, isPhoto: true };
+  if (trip.autoCover) return { uri: trip.autoCover.url, isPhoto: true, credit: `Photo: ${trip.autoCover.credit} / Unsplash` };
+  return { uri: illustrationUri("cover-default"), isPhoto: false };
+}
+
 /** 1枚のしおりカード（表紙写真＋タイトル＋期間）。 */
 function ShioriCard({ trip, onPress }: { trip: SavedTrip; onPress: () => void }) {
-  // 表紙は「ユーザーの写真 > 既定イラスト」。どちらも上部に墨のグラデを重ねて白文字を可読にする。
-  const coverUri = trip.coverPhoto ?? illustrationUri("cover-default");
+  // 上部に墨のグラデを重ねて白文字を可読にする。
+  const cover = coverOf(trip);
   // 墨の半透明を上から下へ段階的に薄くして擬似グラデにする（追加ライブラリなし）。
   const Header = (
     <View>
@@ -51,10 +61,10 @@ function ShioriCard({ trip, onPress }: { trip: SavedTrip; onPress: () => void })
   return (
     <Pressable onPress={onPress} className="mb-3 w-[48%] overflow-hidden rounded-[14px] border border-black/[.08] bg-surface" style={{ aspectRatio: 0.82 }}>
       <ImageBackground
-        source={{ uri: coverUri }}
+        source={{ uri: cover.uri }}
         resizeMode="cover"
         // 既定イラストは下側（人物）を見せたいので bottom 寄せ
-        imageStyle={trip.coverPhoto ? undefined : { resizeMode: "cover", top: undefined, bottom: 0 }}
+        imageStyle={cover.isPhoto ? undefined : { resizeMode: "cover", top: undefined, bottom: 0 }}
         style={{ flex: 1, justifyContent: "flex-start" }}
       >
         {Header}
@@ -69,6 +79,7 @@ export function ShioriScreen({
   canCreate,
   onCreate,
   onNavigatePlan,
+  onBack,
   onOpen,
   onDelete,
   onSetCover,
@@ -80,6 +91,8 @@ export function ShioriScreen({
   onCreate: (name: string, coverPhoto?: string) => void;
   /** 「計画を立てにいく」導線（計画タブへ移動） */
   onNavigatePlan: () => void;
+  /** 下タブから外したので、マイページへ戻る導線を置く */
+  onBack: () => void;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
   onSetCover: (id: string, coverPhoto?: string) => void;
@@ -93,8 +106,11 @@ export function ShioriScreen({
 
   return (
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
-      <View className="flex-row items-center justify-between px-[26px] pb-3 pt-4">
-        <Text className="font-mincho-600 text-[26px] text-ink">旅のしおり</Text>
+      <View className="px-[26px] pb-3 pt-4">
+        <Pressable onPress={onBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="マイページへ戻る" className="self-start">
+          <Text className="font-gothic-400 text-[12px] text-muted">‹ マイページ</Text>
+        </Pressable>
+        <Text className="mt-1 font-mincho-600 text-[26px] text-ink">旅のしおり</Text>
       </View>
       <View className="h-px w-full bg-black/[.08]" />
 
@@ -276,6 +292,7 @@ function ShioriDetail({
 }) {
   const insets = useSafeAreaInsets();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const detailCover = coverOf(trip);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const photos = trip.photos ?? [];
 
@@ -309,14 +326,17 @@ function ShioriDetail({
                 <Text className="font-gothic-500 text-[12px] text-white">‹ 戻る</Text>
               </Pressable>
               <ImageBackground
-                source={{ uri: trip.coverPhoto ?? illustrationUri("cover-default") }}
+                source={{ uri: detailCover.uri }}
                 resizeMode="cover"
-                imageStyle={trip.coverPhoto ? undefined : { top: undefined, bottom: 0 }}
+                imageStyle={detailCover.isPhoto ? undefined : { top: undefined, bottom: 0 }}
                 style={{ flex: 1, justifyContent: "flex-end" }}
               >
                 <View className="bg-ink/45 p-4">
                   <Text className="font-mincho-700 text-[22px] text-white">{trip.name}</Text>
                   <Text className="mt-1 font-gothic-400 text-[11px] text-white/90">{dateRange(trip)}</Text>
+                  {detailCover.credit && (
+                    <Text className="mt-1 font-gothic-400 text-[9px] text-white/70">{detailCover.credit}</Text>
+                  )}
                 </View>
               </ImageBackground>
             </View>

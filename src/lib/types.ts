@@ -42,6 +42,10 @@ export interface ParsedEvent {
   placeToGeo?: GeoPoint;
   /** 定休日（0=日 … 6=土）。旅程で「定休日と重なっている」警告に使う */
   closedDays?: number[];
+  /** スポット写真の参照ID（Places Photo） */
+  photoRef?: string;
+  /** 写真の提供元表示（Googleの規約で表示が必須） */
+  photoAttribution?: string;
 }
 
 /** 行き先の重要度（時間が足りない時にAIが取捨選択する優先度）。 */
@@ -83,6 +87,10 @@ export interface PlanEntry {
   openTo?: string;
   /** 定休日（0=日 … 6=土）。この曜日には配置しない・警告を出す。不明なら undefined */
   closedDays?: number[];
+  /** スポット写真の参照ID（Places Photo）。旅程やしおりの表紙に使う */
+  photoRef?: string;
+  /** 写真の提供元表示（Googleの規約で表示が必須） */
+  photoAttribution?: string;
 
   // --- 移動系（鉄道・バス・飛行機・車）専用 ---
   /** 出発地 */

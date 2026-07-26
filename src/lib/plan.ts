@@ -277,6 +277,8 @@ function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
     fields: [] as ParsedField[],
     confidence: 1,
     closedDays: entry.closedDays,
+    photoRef: entry.photoRef,
+    photoAttribution: entry.photoAttribution,
   };
 
   // レンタカーは「借りている期間」であって地点ではないため、旅程には出さない
@@ -432,6 +434,9 @@ export interface PlanEntryInput {
   openTo?: string;
   /** 定休日（0=日 … 6=土） */
   closedDays?: number[];
+  /** スポット写真（Places Photo の参照IDと提供元） */
+  photoRef?: string;
+  photoAttribution?: string;
 }
 
 export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | null {
@@ -457,6 +462,8 @@ export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | nul
     openFrom: input.openFrom || undefined,
     openTo: input.openTo || undefined,
     closedDays: input.closedDays && input.closedDays.length > 0 ? input.closedDays : undefined,
+    photoRef: input.photoRef,
+    photoAttribution: input.photoAttribution,
   };
 }
 

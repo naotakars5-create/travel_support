@@ -23,7 +23,17 @@ interface InfoContent {
 }
 
 /** マイページ（プロフィール・旅の履歴・各種設定）。下タブの独立画面。 */
-export function ProfileScreen({ profile, onEditProfile }: { profile: Profile; onEditProfile: () => void }) {
+export function ProfileScreen({
+  profile,
+  onEditProfile,
+  onOpenShiori,
+  onOpenPacking,
+}: {
+  profile: Profile;
+  onEditProfile: () => void;
+  onOpenShiori: () => void;
+  onOpenPacking: () => void;
+}) {
   const insets = useSafeAreaInsets();
   const [info, setInfo] = useState<InfoContent | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -89,12 +99,33 @@ export function ProfileScreen({ profile, onEditProfile }: { profile: Profile; on
           </Pressable>
         </View>
 
-        {/* 旅の履歴（しおり）への導線 */}
-        <View className="mt-8 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
-          <Text className="font-gothic-500 text-[11px] text-ink">旅のしおり</Text>
-          <Text className="mt-1 font-gothic-400 text-[10px] leading-[16px] text-muted">
-            保存した旅は下タブの「しおり」に、表紙写真つきで一覧表示されます。
-          </Text>
+        {/* しおり・持ち物は下タブから外したので、ここが入口になる */}
+        <Text className="mb-2 mt-8 font-gothic-500 text-[10px] tracking-[.15em] text-muted">旅の道具</Text>
+        <View className="overflow-hidden rounded-[16px] border border-ink/10">
+          <Pressable
+            onPress={onOpenShiori}
+            accessibilityRole="button"
+            accessibilityLabel="旅のしおりを開く"
+            className="flex-row items-center justify-between px-4 py-3.5"
+          >
+            <View className="flex-1">
+              <Text className="font-gothic-400 text-[13px] text-ink">旅のしおり</Text>
+              <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">保存した旅を表紙つきで残す・見返す</Text>
+            </View>
+            <Text className="font-gothic-400 text-[14px] text-muted-light">›</Text>
+          </Pressable>
+          <Pressable
+            onPress={onOpenPacking}
+            accessibilityRole="button"
+            accessibilityLabel="持ち物リストを開く"
+            className="flex-row items-center justify-between border-t border-ink/10 px-4 py-3.5"
+          >
+            <View className="flex-1">
+              <Text className="font-gothic-400 text-[13px] text-ink">持ち物リスト</Text>
+              <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">出発前の忘れ物チェック</Text>
+            </View>
+            <Text className="font-gothic-400 text-[14px] text-muted-light">›</Text>
+          </Pressable>
         </View>
 
         {/* 各種設定 */}

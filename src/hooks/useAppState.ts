@@ -27,12 +27,15 @@ import { createSpotProvider, Spot } from "@/lib/spots";
 import { dateForDay, dayOfIso, todayDateStr } from "@/lib/date";
 import { apiUrl } from "@/lib/apiBase";
 import { geoSpread, haversineMeters } from "@/lib/geo";
+import { fetchCoverPhoto } from "@/lib/coverPhoto";
+import { tripRegion } from "@/lib/region";
+import { TripBrief } from "@/lib/tripBrief";
 import { useLiveLocation } from "./useLiveLocation";
 
 /** この距離（メートル）以内に近づいたら、GPSで到着を自動記録する。 */
 const ARRIVAL_THRESHOLD_METERS = 120;
 
-export type Tab = "plan" | "itin" | "today" | "packing" | "shiori" | "profile";
+export type Tab = "plan" | "itin" | "map" | "today" | "packing" | "shiori" | "profile";
 
 interface FlashState {
   visible: boolean;
@@ -522,6 +525,77 @@ export function useAppState() {
       }
     },
     [entries, tripDayCount, flashNewEvent]
+  );
+
+  /**
+   * 行き先ゼロの状態から、条件だけでAIに旅程を作ってもらう。
+   * 返ってきた行き先で今のリストを置き換え、日数もその旅程に合わせる。
+   */
+  const generatePlanFromBrief = useCallback(
+    async (brief: TripBrief): Promise<{ ok: boolean; message?: string }> => {
+      try {
+        const res = await fetchWithTimeout(
+          apiUrl("/api/generate-plan"),
+          { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(brief) },
+          90000 // 旅程まるごとの生成は時間がかかる
+        );
+        const data = (await res.json()) as
+          | { kind: "plan"; spots: { title: string; area?: string; day: number; mode: PlanEntry["mode"]; stayMin: number; note?: string }[]; notes?: string }
+          | { kind: "error"; message: string };
+        if (data.kind !== "plan") return { ok: false, message: data.message };
+
+        const newEntries = data.spots
+          .map((s) =>
+            inputToEntry(genId("entry"), {
+              title: s.title,
+              place: s.area,
+              mode: s.mode,
+              priority: "want",
+              day: s.day,
+              stayMin: s.stayMin > 0 ? s.stayMin : undefined,
+              detail: s.note,
+            })
+          )
+          .filter((e): e is PlanEntry => e !== null);
+        if (newEntries.length === 0) return { ok: false, message: "行き先を作成できませんでした" };
+
+        // ゼロベース生成なので今の内容を置き換える。取り消せるようにスナップショットを残す。
+        setComposeBackup({ entries: entries ?? [], slots, suggestions, planNotes });
+        setEntries(newEntries);
+        setTripDayCountState(brief.dayCount);
+        setPlanNotes(data.notes ?? null);
+        setSuggestions([]);
+        setActiveTripId(null);
+        scheduleSigRef.current = null; // next effect で時刻を組み直させる
+        setTab("plan");
+        setFlash({ visible: true, text: `${newEntries.length}件の行き先で旅程を作りました\n並び替え・追加は自由にできます` });
+        setTimeout(() => setFlash({ visible: false, text: "" }), 2400);
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, message: err instanceof Error ? err.message : "旅程の作成に失敗しました" };
+      }
+    },
+    [entries, slots, suggestions, planNotes]
+  );
+
+  /** 地図で見つけたスポットを1件だけ行き先リストへ追加する。 */
+  const addSpot = useCallback(
+    (spot: Spot) => {
+      const entry = inputToEntry(genId("entry"), {
+        title: spot.name,
+        place: spot.address,
+        placeGeo: spot.lat != null && spot.lng != null ? { lat: spot.lat, lng: spot.lng } : undefined,
+        mode: "activity",
+        priority: "want",
+        stayMin: 60,
+      });
+      if (!entry) return;
+      setEntries((prev) => [...(prev ?? []), entry]);
+      flashNewEvent(entry.id);
+      setFlash({ visible: true, text: `「${spot.name}」を行き先に追加しました` });
+      setTimeout(() => setFlash({ visible: false, text: "" }), 1700);
+    },
+    [flashNewEvent]
   );
 
   /** おすすめスポットを複数まとめて行き先リストへ追加する（選択したものを一気に）。 */
@@ -1039,6 +1113,33 @@ export function useAppState() {
     return composedSig !== scheduleSignature(entries);
   }, [entries, readOnly, composing, composedSig]);
 
+  // しおりの表紙を自動で用意する。手動の表紙が無い旅について、行き先の住所から
+  // 地域名（例: 香川県）を割り出し、その地域らしい風景写真を1回だけ取りに行く。
+  useEffect(() => {
+    if (readOnly) return;
+    const target = savedTrips.find((t) => {
+      if (t.coverPhoto || t.autoCover) return false;
+      const region = tripRegion(t.entries.map((e) => e.place));
+      // 一度探して見つからなかった地域は再挑戦しない（無料枠を無駄にしない）
+      return Boolean(region) && t.autoCoverRegion !== region;
+    });
+    if (!target) return;
+    const region = tripRegion(target.entries.map((e) => e.place));
+    if (!region) return;
+    let cancelled = false;
+    void fetchCoverPhoto(region).then((photo) => {
+      if (cancelled) return;
+      setSavedTrips((prev) => {
+        const next = prev.map((t) => (t.id === target.id ? { ...t, autoCover: photo ?? undefined, autoCoverRegion: region } : t));
+        persistTrips(next);
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [savedTrips, readOnly, persistTrips]);
+
   // 旅行が終わったか（最終日の翌日以降）。しおりへの保存を促すバナーに使う。
   const tripEnded = useMemo(() => {
     if (!entries || entries.length === 0 || readOnly) return false;
@@ -1089,7 +1190,9 @@ export function useAppState() {
     shareCurrentPlan,
     importSharedToOwn,
     addEntry,
+    addSpot,
     bulkAddFromText,
+    generatePlanFromBrief,
     addSuggestions,
     updateEntry,
     editEntry,
@@ -1106,6 +1209,7 @@ export function useAppState() {
     activeTripId,
     planRequest,
     setPlanRequest,
+    areaRefGeo,
     isOnline,
     suggestOptimize,
     togglePacking,

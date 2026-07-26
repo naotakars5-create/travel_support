@@ -58,6 +58,7 @@ export function PlanScreen({
   onOpenAddLodging,
   onOpenAddRental,
   onGoShiori,
+  onOpenGenerate,
   planRequest,
   onSetPlanRequest,
   onCompose,
@@ -95,6 +96,8 @@ export function PlanScreen({
   onOpenAddRental: () => void;
   /** 旅行終了後の「しおりへ」導線 */
   onGoShiori: () => void;
+  /** 条件を選んでAIに旅程をまるごと作ってもらう */
+  onOpenGenerate: () => void;
   /** AIへのお願い（自由文）。旅程を組むときの希望として渡される */
   planRequest: string;
   onSetPlanRequest: (v: string) => void;
@@ -420,10 +423,26 @@ export function PlanScreen({
           </View>
         )}
 
-        {entries.length === 0 && (
-          <Text className="mt-10 text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
-            右上の＋から行きたい場所をどんどん追加してください。{"\n"}時間は入れなくてOK。予約など決まっている時刻だけ入力すれば、{"\n"}AIが効率のよい順路と時間を自動で組みます。
-          </Text>
+        {entries.length === 0 && !readOnly && (
+          <View className="mt-6 items-center">
+            {/* 行き先ゼロの時こそ、いちばん強い導線を置く */}
+            <Illustration name="loading-map" size="md" alt="" />
+            <Text className="mt-3 font-mincho-600 text-[16px] text-ink">どこへ行きましょうか</Text>
+            <Text className="mt-2 text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
+              行き先だけ決まっていれば、{"\n"}あとはAIが旅程をまるごと組み立てます。
+            </Text>
+            <Pressable
+              onPress={onOpenGenerate}
+              accessibilityRole="button"
+              accessibilityLabel="AIに旅程を作ってもらう"
+              className="mt-5 rounded-[12px] bg-ink px-6 py-3.5"
+            >
+              <Text className="font-gothic-500 text-[13px] text-kinari">AIに旅程を作ってもらう</Text>
+            </Pressable>
+            <Text className="mt-4 text-center font-gothic-400 text-[11px] leading-[18px] text-muted-light">
+              自分で決めたい場合は、右上の＋から{"\n"}行きたい場所を追加してください。
+            </Text>
+          </View>
         )}
 
         {visible.map((e) => {
@@ -598,6 +617,14 @@ export function PlanScreen({
                 className="min-h-[56px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2 font-gothic-400 text-[12px] leading-[18px] text-ink"
               />
             </View>
+            {/* 今の内容を捨てて作り直したい時のための入口（控えめに置く） */}
+            <Pressable
+              onPress={onOpenGenerate}
+              accessibilityRole="button"
+              className="mb-2 self-center rounded-full border border-ink/25 px-3 py-1"
+            >
+              <Text className="font-gothic-400 text-[10px] text-muted">条件を選んでAIにゼロから作り直してもらう</Text>
+            </Pressable>
             <Pressable
               disabled={composing}
               onPress={onCompose}

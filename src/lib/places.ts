@@ -32,6 +32,8 @@ export interface PlaceDetails {
   weekdayText?: string[];
   /** 定休日（0=日 … 6=土）。不明なら undefined */
   closedDays?: number[];
+  photoRef?: string;
+  photoAttribution?: string;
 }
 
 /** place_id から詳細（番地までの住所・営業時間）を取得する（/api/place-details 経由）。失敗時は null。 */
