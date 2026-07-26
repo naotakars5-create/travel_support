@@ -249,6 +249,12 @@ export function PlanScreen({
             </Pressable>
           </View>
         )}
+        {/* 費用が1件も入っていないと予算ブロックは出ない。消えているのか未入力なのか分かるよう一言だけ添える */}
+        {!readOnly && totals.totalCost === 0 && entries.length > 0 && (
+          <Text className="mb-2 font-gothic-400 text-[10px] text-muted-light">
+            予算のめやす：行き先に費用を入れると、ここに交通・宿泊・食事・観光の内訳が出ます。
+          </Text>
+        )}
         {totals.totalCost > 0 && (
           <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
             <View className="flex-row items-baseline justify-between">
@@ -295,7 +301,9 @@ export function PlanScreen({
                 </Text>
               </View>
             ) : (
-              <View className="mt-2 flex-row items-center gap-2">
+              <View className="mt-2 flex-row items-center gap-3">
+                {/* 登録済みでもアイコンは残す（登録した瞬間に絵が消えて「表示されない」と見えるのを防ぐ） */}
+                <Image source={{ uri: illustrationUri("icon-home") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
                 <Pressable onPress={() => onEditEntry(startPoint.id)} className="flex-1">
                   <Text className="font-mincho-600 text-[13px] text-ink">{startPoint.title || "自宅"}</Text>
                   <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
@@ -336,7 +344,9 @@ export function PlanScreen({
             ) : (
               <View className="mt-2 gap-2">
                 {lodging.map((e) => (
-                  <View key={e.id} className="flex-row items-center gap-2">
+                  <View key={e.id} className="flex-row items-center gap-3">
+                    {/* 登録済みでもアイコンは残す（未登録時だけ絵が出る挙動を分かりにくくしない） */}
+                    <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
                     <Pressable onPress={() => onEditEntry(e.id)} className="flex-1">
                       <Text className="font-mincho-600 text-[13px] text-ink">{e.title}</Text>
                       <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
