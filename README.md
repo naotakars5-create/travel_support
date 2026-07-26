@@ -30,6 +30,9 @@ npx eas login
 #    production 環境にキーを保存する
 npx eas env:create --environment production --name ANTHROPIC_API_KEY --value "sk-ant-..." --visibility secret
 npx eas env:create --environment production --name GOOGLE_MAPS_API_KEY --value "AIza..." --visibility secret
+#    （任意）共有リンクを短くする場合は Upstash Redis の認証情報も登録する
+npx eas env:create --environment production --name UPSTASH_REDIS_REST_URL --value "https://xxx.upstash.io" --visibility secret
+npx eas env:create --environment production --name UPSTASH_REDIS_REST_TOKEN --value "AX...." --visibility secret
 
 # 3. Web版としてビルド
 npx expo export --platform web
@@ -41,6 +44,21 @@ npx eas deploy --prod
 デプロイが成功すると `https://<プロジェクト名>.expo.app` のような固定URLが発行されます。以降はコードを変えたら `npx expo export --platform web && npx eas deploy --prod` を実行すれば同じURLに反映されます。
 
 > 注: EAS Hosting は無料枠があります。GPSはブラウザの位置情報許可で動作します（iOS Safari では https 必須なので、この公開URL上では有効）。
+
+## 共有リンクを短くする（任意）
+
+共有は既定で「旅程そのものをURLに埋め込む」方式です。サーバー不要で動く代わりに、
+18スポットの旅程で **1,000〜1,700文字** のURLになり、LINE や QR では扱いづらくなります。
+
+保存先（Redis互換のKV）を1つ用意すると、旅程をサーバーに預けて
+`https://<アプリのURL>/?s=a7Bx9K2mQd`（**全体で約40文字**）の短いリンクになります。
+
+1. <https://upstash.com> で無料アカウントを作り、Redis データベースを1つ作成する（無料枠あり）
+2. ダッシュボードの **REST API** から `UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` をコピー
+3. ローカルなら `.env.local`、本番なら上記の `eas env:create` で登録する
+
+未設定・通信失敗のときは自動的に従来のURL埋め込み方式へ戻るので、
+設定しなくてもアプリは問題なく動きます。共有された旅程は **90日** で失効します。
 
 ## 実機ネイティブアプリにする（任意・有料）
 
@@ -56,6 +74,7 @@ npx eas deploy --prod
 | `OPENAI_MODEL` | - | OpenAI 利用時のモデル名（未指定なら `gpt-4.1`）。 |
 | `GOOGLE_MAPS_API_KEY` | - | Google Maps Platform キー（**Geocoding API・Directions API・Places API（レガシー版、"Places API (New)" ではない）・Maps Static API** を有効化したもの）。未設定でもアプリは動作する（ヒューリスティック推定・固定スポットにフォールバックし、全行程マップは非表示）。設定すると住所→座標変換・地点間の実測移動時間・周辺観光スポット提案・全行程マップが実データになる。 |
 | `EXPO_PUBLIC_API_BASE_URL` | - | API呼び出しの起点URLを固定したい場合に指定（本番ビルド向け）。未指定時は開発中は Expo の dev server ホストを自動解決する（`src/lib/apiBase.ts`）。 |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | - | 共有リンクを短くするための保存先（Upstash Redis の REST 認証情報。Vercel KV の `KV_REST_API_URL` / `KV_REST_API_TOKEN` でも可）。未設定でも共有はできるが、旅程をURLに埋め込むため1,000〜1,700文字の長いURLになる。設定すると `?s=a7Bx9K2mQd`（全体で約40文字）になる。保持期間90日。 |
 
 `ANTHROPIC_API_KEY`・`OPENAI_API_KEY` のどちらか一方があれば AI 機能が動きます。両方とも未設定でも起動でき、その場合はローカル・ヒューリスティックで旅程を組み、メール解析は手入力フォームへフォールバックします。
 

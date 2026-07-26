@@ -21,7 +21,7 @@ import {
 } from "@/lib/plan";
 import { buildDefaultPacking } from "@/lib/packing";
 import { DEFAULT_PROFILE, loadProfile, Profile, saveProfile } from "@/lib/profile";
-import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM } from "@/lib/share";
+import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM, SHORT_PARAM } from "@/lib/share";
 import { BaseMode, CarWindow, EdgeTravel, createPrecomputedEstimator, edgeKey, guessMode } from "@/lib/transit";
 import { createSpotProvider, Spot } from "@/lib/spots";
 import { combineDateAndTime, dateForDay, dayOfIso, timeStrFromIso, todayDateStr } from "@/lib/date";
@@ -819,6 +819,7 @@ export function useAppState() {
     if (typeof window !== "undefined" && window.history?.replaceState) {
       const url = new URL(window.location.href);
       url.searchParams.delete(SHARE_PARAM);
+      url.searchParams.delete(SHORT_PARAM);
       window.history.replaceState({}, "", url.toString());
     }
     setFlash({ visible: true, text: "自分のプランに保存しました\n編集できます" });
