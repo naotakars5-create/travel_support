@@ -12,7 +12,6 @@ import {
   COST_CATEGORY_LABEL,
   COST_CATEGORY_ORDER,
 } from "@/lib/plan";
-import { Profile } from "@/lib/profile";
 import { BaseMode } from "@/lib/transit";
 import { MODE_LABEL } from "@/lib/modeMeta";
 import { formatDurationMin } from "@/lib/itinerary";
@@ -54,7 +53,6 @@ export function PlanScreen({
   onSetTripDayCount,
   baseMode,
   onSetBaseMode,
-  profile,
   onOpenAdd,
   onOpenAddLodging,
   onOpenAddStart,
@@ -90,7 +88,6 @@ export function PlanScreen({
   onSetTripDayCount: (n: number) => void;
   baseMode: BaseMode;
   onSetBaseMode: (m: BaseMode) => void;
-  profile: Profile;
   onOpenAdd: () => void;
   onOpenAddLodging: () => void;
   onOpenAddStart: () => void;
@@ -170,10 +167,7 @@ export function PlanScreen({
       <View className="px-[26px] pb-2 pt-3">
         <View className="flex-row items-start justify-between">
           <View className="flex-1">
-            <Text className="font-gothic-400 text-[10px] tracking-[.2em] text-muted">
-              {profile.name ? profile.name : "TABI-NAVI"}
-            </Text>
-            <Text className="mt-1 font-mincho-600 text-[26px] text-ink">{readOnly ? "共有された旅程" : "行き先リスト"}</Text>
+            <Text className="font-mincho-600 text-[26px] text-ink">{readOnly ? "共有された旅程" : "行き先リスト"}</Text>
           </View>
           {!readOnly && (
             <View className="mt-1 flex-row items-center gap-2">
@@ -472,11 +466,12 @@ export function PlanScreen({
             <View key={e.id}>
               {showHeader && (
                 <View className="mb-1 mt-3 flex-row items-center gap-2">
-                  <View className="h-[18px] w-[18px] items-center justify-center rounded-full bg-ink">
-                    <Text className="font-gothic-500 text-[9px] text-kinari" style={TNUM}>{day}</Text>
+                  {/* 日の印は「角ラベル」。スポットの丸番号と見分けが付くようにする */}
+                  <View className="rounded-[4px] bg-ink px-1.5 py-[2px]">
+                    <Text className="font-gothic-700 text-[9px] tracking-[.05em] text-kinari" style={TNUM}>DAY {day}</Text>
                   </View>
                   <Text className="font-gothic-500 text-[12px] text-ink">
-                    {day}日目 · {formatJstMonthDayJa(new Date(`${dateForDay(tripDate, day)}T00:00`))}
+                    {formatJstMonthDayJa(new Date(`${dateForDay(tripDate, day)}T00:00`))}
                   </Text>
                   <View className="h-px flex-1 bg-black/[.1]" />
                 </View>
@@ -624,10 +619,10 @@ export function PlanScreen({
               className={`flex-row items-center justify-center gap-2 rounded-[12px] py-3.5 ${composing ? "bg-ink/40" : "bg-ink"}`}
             >
               {composing && <ActivityIndicator size="small" color="#F4EFE5" />}
-              <Text className="font-gothic-500 text-[12px] text-kinari">{composing ? "AIが旅程を組んでいます…" : "AIで旅程を組む"}</Text>
+              <Text className="font-gothic-500 text-[12px] text-kinari">{composing ? "AIが最適化しています…" : "AIで順番を最適化"}</Text>
             </Pressable>
             <Text className="mt-2 text-center font-gothic-400 text-[10px] text-muted-light">
-              時間未定のままでOK。重要度と移動効率をもとに複数日へ自動配置します。入りきらない予定は旅程の下部へ。
+              旅程は並び順から自動で組まれています。押すとAIが移動効率・営業時間・定休日を見て順番と時間配分を最適化します。
             </Text>
             {composeError && <Text className="mt-2 text-center font-gothic-400 text-[11px] text-ink">{composeError}</Text>}
             {planNotes && (

@@ -16,15 +16,34 @@ function googleMapsRouteUrl(points: GeoPoint[], me?: GeoPoint | null): string {
  * 座標がまだ無い / APIキー未設定 / 読み込み失敗時は、そっと非表示にする（フォールバック）。
  */
 export function RouteMap({ points, me, labels }: { points: GeoPoint[]; me?: GeoPoint | null; labels?: (string | undefined)[] }) {
-  const [failed, setFailed] = useState(false);
+  // 失敗はURL単位で記録する（地点が変わって別URLになったら自動でリトライされる）
+  const [failedUri, setFailedUri] = useState<string | null>(null);
   const uri = routeMapImageUrl(points, me, labels);
-
-  if (!uri || failed) return null;
+  const failed = uri !== null && failedUri === uri;
 
   const openInteractive = () => {
-    if (points.length === 0) return;
+    if (points.length === 0 && !me) return;
     void Linking.openURL(googleMapsRouteUrl(points, me));
   };
+
+  // 座標が1点も無ければ出しようがない（ジオコーディング完了までの短い間だけ）
+  if (!uri && !(points.length > 0)) return null;
+
+  // 画像が取得できない時も黙って消えない：Googleマップを開くボタンとして残す。
+  // （以前は失敗時に非表示にしていたため「地図が消えた」ように見えていた）
+  if (!uri || failed) {
+    return (
+      <Pressable
+        onPress={openInteractive}
+        accessibilityRole="button"
+        accessibilityLabel="経路をGoogleマップで開く"
+        className="mb-2 flex-row items-center justify-between rounded-[16px] border border-black/[.08] bg-black/[.03] px-4 py-3"
+      >
+        <Text className="font-gothic-500 text-[11px] text-ink">この日の経路をGoogleマップで見る</Text>
+        <Text className="font-gothic-400 text-[13px] text-muted">›</Text>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable
@@ -34,7 +53,7 @@ export function RouteMap({ points, me, labels }: { points: GeoPoint[]; me?: GeoP
       className="mb-2 overflow-hidden rounded-[16px] border border-black/[.08] bg-black/[.03]">
       <Image
         source={{ uri }}
-        onError={() => setFailed(true)}
+        onError={() => setFailedUri(uri)}
         resizeMode="cover"
         style={{ width: "100%", aspectRatio: 2 }}
       />
