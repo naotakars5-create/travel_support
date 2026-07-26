@@ -1,4 +1,4 @@
-import { decodePlan, encodePlan } from "../share";
+import { buildShareUrl, decodePlan, encodePlan } from "../share";
 import { PlanEntry, ScheduleSlot } from "../types";
 
 const ENTRIES: PlanEntry[] = [
@@ -70,5 +70,36 @@ describe("share: 圧縮表現の往復", () => {
     expect(encoded.length).toBeLessThan(4000);
     const decoded = await decodePlan(encoded);
     expect(decoded!.entries).toHaveLength(18);
+  });
+});
+
+describe("share: 短縮リンク", () => {
+  const origFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = origFetch;
+  });
+
+  it("サーバーがIDを返せば短いURLになる", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "a7Bx9K2mQd" }),
+    }) as unknown as typeof fetch;
+    const url = await buildShareUrl(ENTRIES, SLOTS);
+    expect(url).toContain("?s=a7Bx9K2mQd");
+    expect(url.length).toBeLessThan(80);
+  });
+
+  it("保存先が無い（503）ときは従来のURL埋め込みへ戻る", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) }) as unknown as typeof fetch;
+    const url = await buildShareUrl(ENTRIES, SLOTS);
+    expect(url).toContain("?p=");
+    const encoded = url.split("?p=")[1];
+    expect(await decodePlan(encoded)).not.toBeNull();
+  });
+
+  it("通信そのものが失敗しても共有URLは作れる", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error("offline")) as unknown as typeof fetch;
+    const url = await buildShareUrl(ENTRIES, SLOTS);
+    expect(url).toContain("?p=");
   });
 });

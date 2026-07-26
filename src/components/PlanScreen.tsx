@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PlanEntry, Priority, SpotSuggestion } from "@/lib/types";
 import {
@@ -12,7 +12,6 @@ import {
   COST_CATEGORY_LABEL,
   COST_CATEGORY_ORDER,
 } from "@/lib/plan";
-import { Profile } from "@/lib/profile";
 import { BaseMode } from "@/lib/transit";
 import { MODE_LABEL } from "@/lib/modeMeta";
 import { formatDurationMin } from "@/lib/itinerary";
@@ -23,6 +22,7 @@ import { Illustration, illustrationUri } from "./Illustration";
 import { Floater } from "./animations";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
+const MUTED = "#6E675C";
 
 // 日ごとの淡い背景色（複数日程で日を見分けやすくする）。1日目は無地。
 // 有彩色は「今・完了」専用のため、日の区別は砂色（surface）の濃淡で行う。
@@ -54,12 +54,13 @@ export function PlanScreen({
   onSetTripDayCount,
   baseMode,
   onSetBaseMode,
-  profile,
   onOpenAdd,
   onOpenAddLodging,
   onOpenAddStart,
   onOpenAddRental,
   onGoShiori,
+  planRequest,
+  onSetPlanRequest,
   onCompose,
   onRemoveEntry,
   onEditEntry,
@@ -90,13 +91,15 @@ export function PlanScreen({
   onSetTripDayCount: (n: number) => void;
   baseMode: BaseMode;
   onSetBaseMode: (m: BaseMode) => void;
-  profile: Profile;
   onOpenAdd: () => void;
   onOpenAddLodging: () => void;
   onOpenAddStart: () => void;
   onOpenAddRental: () => void;
   /** 旅行終了後の「しおりへ」導線 */
   onGoShiori: () => void;
+  /** AIへのお願い（自由文）。旅程を組むときの希望として渡される */
+  planRequest: string;
+  onSetPlanRequest: (v: string) => void;
   onCompose: () => void;
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
@@ -170,10 +173,7 @@ export function PlanScreen({
       <View className="px-[26px] pb-2 pt-3">
         <View className="flex-row items-start justify-between">
           <View className="flex-1">
-            <Text className="font-gothic-400 text-[10px] tracking-[.2em] text-muted">
-              {profile.name ? profile.name : "TABI-NAVI"}
-            </Text>
-            <Text className="mt-1 font-mincho-600 text-[26px] text-ink">{readOnly ? "共有された旅程" : "行き先リスト"}</Text>
+            <Text className="font-mincho-600 text-[26px] text-ink">{readOnly ? "共有された旅程" : "行き先リスト"}</Text>
           </View>
           {!readOnly && (
             <View className="mt-1 flex-row items-center gap-2">
@@ -255,6 +255,12 @@ export function PlanScreen({
             </Pressable>
           </View>
         )}
+        {/* 費用が1件も入っていないと予算ブロックは出ない。消えているのか未入力なのか分かるよう一言だけ添える */}
+        {!readOnly && totals.totalCost === 0 && entries.length > 0 && (
+          <Text className="mb-2 font-gothic-400 text-[10px] text-muted-light">
+            予算のめやす：行き先に費用を入れると、ここに交通・宿泊・食事・観光の内訳が出ます。
+          </Text>
+        )}
         {totals.totalCost > 0 && (
           <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
             <View className="flex-row items-baseline justify-between">
@@ -301,7 +307,9 @@ export function PlanScreen({
                 </Text>
               </View>
             ) : (
-              <View className="mt-2 flex-row items-center gap-2">
+              <View className="mt-2 flex-row items-center gap-3">
+                {/* 登録済みでもアイコンは残す（登録した瞬間に絵が消えて「表示されない」と見えるのを防ぐ） */}
+                <Image source={{ uri: illustrationUri("icon-home") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
                 <Pressable onPress={() => onEditEntry(startPoint.id)} className="flex-1">
                   <Text className="font-mincho-600 text-[13px] text-ink">{startPoint.title || "自宅"}</Text>
                   <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
@@ -342,7 +350,9 @@ export function PlanScreen({
             ) : (
               <View className="mt-2 gap-2">
                 {lodging.map((e) => (
-                  <View key={e.id} className="flex-row items-center gap-2">
+                  <View key={e.id} className="flex-row items-center gap-3">
+                    {/* 登録済みでもアイコンは残す（未登録時だけ絵が出る挙動を分かりにくくしない） */}
+                    <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
                     <Pressable onPress={() => onEditEntry(e.id)} className="flex-1">
                       <Text className="font-mincho-600 text-[13px] text-ink">{e.title}</Text>
                       <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
@@ -472,11 +482,12 @@ export function PlanScreen({
             <View key={e.id}>
               {showHeader && (
                 <View className="mb-1 mt-3 flex-row items-center gap-2">
-                  <View className="h-[18px] w-[18px] items-center justify-center rounded-full bg-ink">
-                    <Text className="font-gothic-500 text-[9px] text-kinari" style={TNUM}>{day}</Text>
+                  {/* 日の印は「角ラベル」。スポットの丸番号と見分けが付くようにする */}
+                  <View className="rounded-[4px] bg-ink px-1.5 py-[2px]">
+                    <Text className="font-gothic-700 text-[9px] tracking-[.05em] text-kinari" style={TNUM}>DAY {day}</Text>
                   </View>
                   <Text className="font-gothic-500 text-[12px] text-ink">
-                    {day}日目 · {formatJstMonthDayJa(new Date(`${dateForDay(tripDate, day)}T00:00`))}
+                    {formatJstMonthDayJa(new Date(`${dateForDay(tripDate, day)}T00:00`))}
                   </Text>
                   <View className="h-px flex-1 bg-black/[.1]" />
                 </View>
@@ -618,16 +629,31 @@ export function PlanScreen({
 
         {!readOnly && entries.length > 0 && (
           <View className="mt-5">
+            {/* AIへのお願い（自由文）。並び順や時間配分のニュアンスを言葉で伝える。 */}
+            <View className="mb-2 gap-1">
+              <Text className="font-gothic-400 text-[10px] text-muted">AIへのお願い（任意・入れたままにできます）</Text>
+              <TextInput
+                value={planRequest}
+                onChangeText={onSetPlanRequest}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+                placeholder={"例: 1日目はホテルに着いたら、そのあとは予定を入れない\n朝はゆっくりめ / 移動は少なめに"}
+                placeholderTextColor={MUTED}
+                accessibilityLabel="AIへのお願い"
+                className="min-h-[56px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2 font-gothic-400 text-[12px] leading-[18px] text-ink"
+              />
+            </View>
             <Pressable
               disabled={composing}
               onPress={onCompose}
               className={`flex-row items-center justify-center gap-2 rounded-[12px] py-3.5 ${composing ? "bg-ink/40" : "bg-ink"}`}
             >
               {composing && <ActivityIndicator size="small" color="#F4EFE5" />}
-              <Text className="font-gothic-500 text-[12px] text-kinari">{composing ? "AIが旅程を組んでいます…" : "AIで旅程を組む"}</Text>
+              <Text className="font-gothic-500 text-[12px] text-kinari">{composing ? "AIが最適化しています…" : "AIで順番を最適化"}</Text>
             </Pressable>
             <Text className="mt-2 text-center font-gothic-400 text-[10px] text-muted-light">
-              時間未定のままでOK。重要度と移動効率をもとに複数日へ自動配置します。入りきらない予定は旅程の下部へ。
+              旅程は並び順から自動で組まれています。押すとAIが移動効率・営業時間・定休日を見て順番と時間配分を最適化します。
             </Text>
             {composeError && <Text className="mt-2 text-center font-gothic-400 text-[11px] text-ink">{composeError}</Text>}
             {planNotes && (

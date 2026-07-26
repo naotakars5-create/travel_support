@@ -63,12 +63,13 @@ export default function Home() {
           onSetTripDayCount={app.setTripDayCount}
           baseMode={app.baseMode}
           onSetBaseMode={app.setBaseMode}
-          profile={app.profile}
           onOpenAdd={() => setAddOpen(true)}
           onOpenAddLodging={() => setAddLodgingOpen(true)}
           onOpenAddStart={() => setAddStartOpen(true)}
           onOpenAddRental={() => setAddRentalOpen(true)}
           onGoShiori={() => app.setTab("shiori")}
+          planRequest={app.planRequest}
+          onSetPlanRequest={app.setPlanRequest}
           onCompose={app.composeWithAi}
           onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
@@ -91,6 +92,9 @@ export default function Home() {
           now={app.now}
           tripDate={app.tripDate}
           canUndoCompose={app.canUndoCompose}
+          suggestOptimize={app.suggestOptimize}
+          composing={app.composing}
+          onCompose={app.composeWithAi}
           onUndoCompose={app.undoCompose}
           onNavigatePlan={() => app.setTab("plan")}
           onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
@@ -116,6 +120,7 @@ export default function Home() {
           trips={app.savedTrips}
           canCreate={(app.entries?.length ?? 0) > 0}
           onCreate={app.saveCurrentTrip}
+          onNavigatePlan={() => app.setTab("plan")}
           onOpen={(id) => {
             app.loadTrip(id);
           }}
@@ -140,6 +145,11 @@ export default function Home() {
             app.addEntry(input);
             setAddOpen(false);
             app.setTab("plan");
+          }}
+          onBulkAdd={async (text) => {
+            const res = await app.bulkAddFromText(text);
+            if (res.ok) app.setTab("plan");
+            return res;
           }}
           onImportMail={app.importFromMail}
         />

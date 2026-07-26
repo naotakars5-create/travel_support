@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Animated, Linking, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RailItem, computeStats, formatDurationMin } from "@/lib/itinerary";
@@ -80,6 +80,8 @@ interface DayGroup {
   numberOf: Map<string, number>;
   mapPoints: GeoPoint[];
   mapLabels: (string | undefined)[];
+  /** 座標が無いときにGoogleマップへ渡す地点名（住所または行き先名） */
+  mapPlaces: string[];
 }
 
 export function ItineraryScreen({
@@ -91,6 +93,9 @@ export function ItineraryScreen({
   now,
   tripDate,
   canUndoCompose,
+  suggestOptimize,
+  composing,
+  onCompose,
   onUndoCompose,
   onNavigatePlan,
   onBumpPriority,
@@ -105,11 +110,18 @@ export function ItineraryScreen({
   tripDate: string;
   /** 直前のAI組み直しを取り消せるか（スナップショットがあるか） */
   canUndoCompose: boolean;
+  /** 行き先が最後の最適化から変わっている（AI最適化の提案チップを出す） */
+  suggestOptimize: boolean;
+  composing: boolean;
+  onCompose: () => void;
   onUndoCompose: () => void;
   onNavigatePlan: () => void;
   onBumpPriority: (id: string) => void;
 }) {
   const insets = useSafeAreaInsets();
+  // 「最適化しますか？」チップを閉じたか。行き先がさらに変わったら（suggestOptimize が立ち直したら）また出す
+  const [optimizeDismissed, setOptimizeDismissed] = useState(false);
+  if (!suggestOptimize && optimizeDismissed) setOptimizeDismissed(false);
   const stats = computeStats(rail);
   const heading = formatJstHeadingJa(new Date());
   const currentNode = rail.find((i) => i.type === "node" && i.key === currentNodeKey);
@@ -142,6 +154,7 @@ export function ItineraryScreen({
             numberOf: new Map(),
             mapPoints: [],
             mapLabels: [],
+            mapPlaces: [],
           };
           groups.push(current);
           prevDate = dk;
@@ -159,9 +172,14 @@ export function ItineraryScreen({
         const num = isReturnPoint ? -1 : isDeparturePoint ? 0 : ++spotSeq;
         current.numberOf.set(item.key, num);
         // 自宅（出発地）はプライバシーのため地図には載せない
-        if (item.geo && !isHome) {
-          current.mapPoints.push(item.geo);
-          current.mapLabels.push(String(num));
+        if (!isHome) {
+          if (item.geo) {
+            current.mapPoints.push(item.geo);
+            current.mapLabels.push(String(num));
+          }
+          // 座標が無くてもGoogleマップは開けるよう、地点名を控えておく
+          const placeText = (item.place || item.event.title || "").trim();
+          if (placeText) current.mapPlaces.push(placeText);
         }
       }
     }
@@ -204,6 +222,25 @@ export function ItineraryScreen({
       <View className="h-px w-full bg-black/[.08]" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 80 }}>
+        {/* 行き先が変わった時だけそっと出す「最適化しますか？」チップ（B案）。押し忘れをなくす */}
+        {suggestOptimize && !optimizeDismissed && rail.length > 0 && (
+          <View className="mb-2 flex-row items-center gap-2 rounded-[12px] border border-ink/15 bg-surface/60 px-3 py-2">
+            <Text className="flex-1 font-gothic-400 text-[11px] leading-[16px] text-ink">
+              行き先が変わりました。AIで順番を最適化しますか？
+            </Text>
+            <Pressable
+              disabled={composing}
+              onPress={onCompose}
+              accessibilityRole="button"
+              className={`rounded-full px-3 py-1.5 ${composing ? "bg-ink/40" : "bg-ink"}`}
+            >
+              <Text className="font-gothic-500 text-[11px] text-kinari">{composing ? "最適化中…" : "最適化する"}</Text>
+            </Pressable>
+            <Pressable onPress={() => setOptimizeDismissed(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="この提案を閉じる">
+              <Text className="font-gothic-400 text-[14px] text-muted-light">×</Text>
+            </Pressable>
+          </View>
+        )}
         {rail.length === 0 && (
           <Pressable onPress={onNavigatePlan} className="mt-10 self-center rounded-[12px] border border-ink/25 px-5 py-3">
             <Text className="text-center font-gothic-400 text-[12px] text-muted">
@@ -221,9 +258,10 @@ export function ItineraryScreen({
                 <Text className="font-gothic-400 text-[11px] text-kinari/80">{g.dateLabel}</Text>
               </View>
             )}
-            {/* その日の全行程マップ（番号はその日の1,2,3…と一致） */}
-            {(g.mapPoints.length > 0 || (gi === 0 && liveLocation)) && (
-              <RouteMap points={g.mapPoints} me={liveLocation} labels={g.mapLabels} />
+            {/* その日の全行程マップ（番号はその日の1,2,3…と一致）。
+                座標がまだ無い日も、地点名でGoogleマップを開くボタンとして必ず出す。 */}
+            {(g.mapPoints.length > 0 || g.mapPlaces.length > 0 || (gi === 0 && liveLocation)) && (
+              <RouteMap points={g.mapPoints} places={g.mapPlaces} me={liveLocation} labels={g.mapLabels} />
             )}
             {g.items.map((item, i) => {
               if (item.type === "node") {

@@ -68,6 +68,7 @@ export function ShioriScreen({
   trips,
   canCreate,
   onCreate,
+  onNavigatePlan,
   onOpen,
   onDelete,
   onSetCover,
@@ -77,6 +78,8 @@ export function ShioriScreen({
   trips: SavedTrip[];
   canCreate: boolean;
   onCreate: (name: string, coverPhoto?: string) => void;
+  /** 「計画を立てにいく」導線（計画タブへ移動） */
+  onNavigatePlan: () => void;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
   onSetCover: (id: string, coverPhoto?: string) => void;
@@ -99,13 +102,19 @@ export function ShioriScreen({
         {trips.length === 0 ? (
           <View className="mt-14 items-center">
             <Illustration name="empty-suitcase" size="lg" alt="" />
-            <Text className="mt-3 font-mincho-600 text-[16px] text-ink">まだ旅がありません</Text>
+            <Text className="mt-3 font-mincho-600 text-[16px] text-ink">まだしおりがありません</Text>
             <Text className="mt-1.5 text-center font-gothic-400 text-[11px] leading-[18px] text-muted">
-              計画で行き先を作ったら、{"\n"}表紙つきのしおりにできます。
+              しおりは「計画」で立てた旅程から作ります。{"\n"}まず計画タブで行き先を決めて、{"\n"}ここに登録しましょう。
             </Text>
-            <Pressable onPress={() => setCreateOpen(true)} className="mt-5 rounded-[12px] bg-ink px-6 py-3">
-              <Text className="font-gothic-500 text-[12px] text-kinari">新しいしおりを作る</Text>
-            </Pressable>
+            {canCreate ? (
+              <Pressable onPress={() => setCreateOpen(true)} className="mt-5 rounded-[12px] bg-ink px-6 py-3">
+                <Text className="font-gothic-500 text-[12px] text-kinari">今の計画をしおりに登録する</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={onNavigatePlan} className="mt-5 rounded-[12px] bg-ink px-6 py-3">
+                <Text className="font-gothic-500 text-[12px] text-kinari">計画を立てにいく</Text>
+              </Pressable>
+            )}
           </View>
         ) : (
           <View className="flex-row flex-wrap justify-between">
@@ -116,11 +125,11 @@ export function ShioriScreen({
         )}
       </ScrollView>
 
-      {/* ＋ しおりを作る */}
+      {/* ＋ 今の計画をしおりに登録（計画が無ければ計画タブへ誘導） */}
       <Pressable
-        onPress={() => setCreateOpen(true)}
+        onPress={() => (canCreate ? setCreateOpen(true) : onNavigatePlan())}
         accessibilityRole="button"
-        accessibilityLabel="しおりを作る"
+        accessibilityLabel="今の計画をしおりに登録"
         className="absolute right-6 h-14 w-14 items-center justify-center rounded-full bg-ink shadow"
         style={{ bottom: insets.bottom + 20 }}
       >

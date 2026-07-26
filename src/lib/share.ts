@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import { GeoPoint, PlanEntry, Priority, ScheduleSlot, TransportMode } from "./types";
-import { getApiBaseUrl } from "./apiBase";
+import { apiUrl, getApiBaseUrl } from "./apiBase";
+import { fetchWithTimeout } from "./http";
 
 /**
  * 共有リンク（Tier 1）：アカウント不要・閲覧のみの共有。
@@ -20,8 +21,11 @@ export interface SharedPlan {
   slots: ScheduleSlot[];
 }
 
-/** 共有URLのクエリキー。 */
+/** 共有URLのクエリキー（旅程をURLに埋め込む従来方式）。 */
 export const SHARE_PARAM = "p";
+
+/** 短縮リンクのクエリキー（旅程はサーバーに預け、IDだけを載せる）。 */
+export const SHORT_PARAM = "s";
 
 // --- 圧縮表現（短キー） ---
 
@@ -240,14 +244,55 @@ export async function decodePlan(encoded: string): Promise<SharedPlan | null> {
   return decodeLegacy(encoded);
 }
 
-/** 共有URLを組み立てる。Web では現在のオリジンを使う。 */
+/** 共有リンクの基点URL（Web では現在のオリジン）。 */
+function shareBaseUrl(): string {
+  const base = getApiBaseUrl();
+  if (!base && Platform.OS === "web" && typeof window !== "undefined") return window.location.origin;
+  return base;
+}
+
+/**
+ * 旅程をサーバーに預けて短いIDをもらう。
+ * 保存先（KV）が未設定・通信失敗なら null を返し、呼び出し側はURL埋め込みへ戻る。
+ */
+async function requestShortId(payload: string): Promise<string | null> {
+  try {
+    const res = await fetchWithTimeout(apiUrl("/api/share"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ payload }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { id?: string };
+    return typeof data.id === "string" && data.id ? data.id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 共有URLを組み立てる。
+ * まず短縮リンク（旅程はサーバー保管・URLにはIDだけ）を試み、
+ * 使えない場合は旅程をURLに埋め込む従来方式へ自動でフォールバックする。
+ */
 export async function buildShareUrl(entries: PlanEntry[], slots: ScheduleSlot[]): Promise<string> {
   const encoded = await encodePlan(entries, slots);
-  let base = getApiBaseUrl();
-  if (!base && Platform.OS === "web" && typeof window !== "undefined") {
-    base = window.location.origin;
-  }
+  const base = shareBaseUrl();
+  const id = await requestShortId(encoded);
+  if (id) return `${base}/?${SHORT_PARAM}=${id}`;
   return `${base}/?${SHARE_PARAM}=${encoded}`;
+}
+
+/** 短縮リンクのIDから旅程本体（圧縮済み文字列）を取り出す。 */
+async function fetchSharedPayload(id: string): Promise<string | null> {
+  try {
+    const res = await fetchWithTimeout(apiUrl(`/api/share?id=${encodeURIComponent(id)}`));
+    if (!res.ok) return null;
+    const data = (await res.json()) as { payload?: string };
+    return typeof data.payload === "string" ? data.payload : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 現在のURLから共有プランを読み取る（Web のみ）。無ければ null。 */
@@ -255,6 +300,13 @@ export async function readSharedPlanFromUrl(): Promise<SharedPlan | null> {
   if (Platform.OS !== "web" || typeof window === "undefined") return null;
   try {
     const params = new URLSearchParams(window.location.search);
+    // 短縮リンク（?s=xxxx）：本体をサーバーから取り出す
+    const shortId = params.get(SHORT_PARAM);
+    if (shortId) {
+      const payload = await fetchSharedPayload(shortId);
+      return payload ? await decodePlan(payload) : null;
+    }
+    // 旧来のURL埋め込み（?p=...）。過去に配ったリンクも開ける。
     const encoded = params.get(SHARE_PARAM);
     if (!encoded) return null;
     return await decodePlan(encoded);

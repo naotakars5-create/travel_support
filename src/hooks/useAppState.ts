@@ -21,7 +21,7 @@ import {
 } from "@/lib/plan";
 import { buildDefaultPacking } from "@/lib/packing";
 import { DEFAULT_PROFILE, loadProfile, Profile, saveProfile } from "@/lib/profile";
-import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM } from "@/lib/share";
+import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM, SHORT_PARAM } from "@/lib/share";
 import { BaseMode, CarWindow, EdgeTravel, createPrecomputedEstimator, edgeKey, guessMode } from "@/lib/transit";
 import { createSpotProvider, Spot } from "@/lib/spots";
 import { combineDateAndTime, dateForDay, dayOfIso, timeStrFromIso, todayDateStr } from "@/lib/date";
@@ -80,6 +80,10 @@ export function useAppState() {
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   // 実測の移動時間キャッシュ（`edgeKey` → 車/徒歩/公共交通の分数）。永続化して再取得を減らす。
   const [transitCache, setTransitCache] = useState<Record<string, EdgeTravel>>({});
+  // 最後にAIで最適化した時点の「構造」署名。行き先が増減・変更されたら最適化を提案する。
+  const [composedSig, setComposedSig] = useState<string | null>(null);
+  // AIへのお願い（自由文）。「1日目はホテルの後は予定を入れない」等のニュアンスを毎回渡す。
+  const [planRequest, setPlanRequest] = useState<string>("");
 
   const initializedRef = useRef(false);
   // 「構造」が既にスケジュール済みかを追跡し、座標だけ埋まった時の不要な再ローカル化を防ぐ。
@@ -130,6 +134,7 @@ export function useAppState() {
         if (persisted.tripDate) setTripDateState(persisted.tripDate);
         if (persisted.tripDayCount) setTripDayCountState(persisted.tripDayCount);
         if (persisted.baseMode) setBaseMode(persisted.baseMode);
+        if (persisted.planRequest) setPlanRequest(persisted.planRequest);
         scheduleSigRef.current = scheduleSignature(ordered);
       } else {
         const seeded = buildSeedEntries(new Date());
@@ -161,6 +166,7 @@ export function useAppState() {
       tripDayCount,
       baseMode,
       transitCache: trimmedCache,
+      planRequest,
       savedAt: new Date().toISOString(),
     });
     void persistPromise.then((ok) => {
@@ -174,7 +180,7 @@ export function useAppState() {
       setFlash({ visible: true, text: "端末への保存に失敗しました\n空き容量を確認してください（このままだと閉じた時に消えます）" });
       setTimeout(() => setFlash({ visible: false, text: "" }), 3200);
     });
-  }, [entries, slots, currentNodeKey, currentNodeSetAt, packing, tripDate, tripDayCount, baseMode, transitCache, readOnly]);
+  }, [entries, slots, currentNodeKey, currentNodeSetAt, packing, tripDate, tripDayCount, baseMode, transitCache, planRequest, readOnly]);
 
   // 現在時刻の更新（当日画面のカウントダウン用）
   useEffect(() => {
@@ -461,6 +467,56 @@ export function useAppState() {
     [flashNewEvent]
   );
 
+  /**
+   * 「まとめて追加」：自由文をAIで行き先リストへ変換して一括登録する。
+   * 住所・座標・営業時間・定休日は登録後に既存の自動補完（ジオコーディング等）が埋める。
+   */
+  const bulkAddFromText = useCallback(
+    async (text: string): Promise<{ ok: boolean; count?: number; message?: string }> => {
+      try {
+        const res = await fetchWithTimeout(
+          apiUrl("/api/bulk-parse"),
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ text, dayCount: tripDayCount }),
+          },
+          45000 // LLM読み取り
+        );
+        const data = (await res.json()) as
+          | { kind: "entries"; entries: { title: string; mode: PlanEntry["mode"]; day?: number; stayMin?: number }[] }
+          | { kind: "error"; message: string };
+        if (data.kind !== "entries") return { ok: false, message: data.message };
+
+        // 既に同名の行き先があるものは足さない（二重登録防止）
+        const existing = new Set((entries ?? []).map((e) => e.title));
+        const fresh = data.entries.filter((e) => !existing.has(e.title));
+        const newEntries = fresh
+          .map((e) =>
+            inputToEntry(genId("entry"), {
+              title: e.title,
+              mode: e.mode,
+              priority: "want",
+              day: e.day,
+              stayMin: e.stayMin,
+            })
+          )
+          .filter((e): e is PlanEntry => e !== null);
+        if (newEntries.length === 0) {
+          return { ok: false, message: "すべて登録済みの行き先でした" };
+        }
+        setEntries((prev) => [...(prev ?? []), ...newEntries]);
+        flashNewEvent(newEntries[0].id);
+        setFlash({ visible: true, text: `${newEntries.length}件の行き先を追加しました\n住所・営業時間は自動で補完します` });
+        setTimeout(() => setFlash({ visible: false, text: "" }), 2200);
+        return { ok: true, count: newEntries.length };
+      } catch (err) {
+        return { ok: false, message: err instanceof Error ? err.message : "読み取りに失敗しました" };
+      }
+    },
+    [entries, tripDayCount, flashNewEvent]
+  );
+
   /** おすすめスポットを複数まとめて行き先リストへ追加する（選択したものを一気に）。 */
   const addSuggestions = useCallback(
     (list: SpotSuggestion[]) => {
@@ -640,6 +696,8 @@ export function useAppState() {
       setSuggestions(backup.suggestions);
       setPlanNotes(backup.planNotes);
       scheduleSigRef.current = scheduleSignature(backup.entries);
+      // 戻した直後に「最適化しますか？」と即座に迫らない
+      setComposedSig(scheduleSignature(backup.entries));
       setFlash({ visible: true, text: "AIで組む前の旅程に戻しました" });
       setTimeout(() => setFlash({ visible: false, text: "" }), 1700);
       return null;
@@ -663,6 +721,7 @@ export function useAppState() {
             entries: list,
             referenceDate: `${tripStart}T09:00:00+09:00`,
             dayCount: tripDayCount,
+            request: planRequest.trim() || undefined,
           }),
         },
         90000 // AIの旅程作成は時間がかかる（永久に回り続けるよりは打ち切って伝える）
@@ -705,6 +764,7 @@ export function useAppState() {
         setSlots(allSlots);
         // AIの順路を採用したので、この構造は「スケジュール済み」として記録し、ローカル再計算で上書きしない。
         scheduleSigRef.current = scheduleSignature(reordered);
+        setComposedSig(scheduleSignature(reordered));
         setSuggestions(data.suggestions);
         setPlanNotes(data.notes ?? null);
         // 反映が分かるように：旅程タブへ切り替え＋通知
@@ -725,7 +785,7 @@ export function useAppState() {
     } finally {
       setComposing(false);
     }
-  }, [entries, slots, suggestions, planNotes, tripDayCount]);
+  }, [entries, slots, suggestions, planNotes, tripDayCount, planRequest]);
 
   const togglePacking = useCallback((id: string) => {
     setPacking((prev) => prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p)));
@@ -764,6 +824,7 @@ export function useAppState() {
     if (typeof window !== "undefined" && window.history?.replaceState) {
       const url = new URL(window.location.href);
       url.searchParams.delete(SHARE_PARAM);
+      url.searchParams.delete(SHORT_PARAM);
       window.history.replaceState({}, "", url.toString());
     }
     setFlash({ visible: true, text: "自分のプランに保存しました\n編集できます" });
@@ -863,6 +924,7 @@ export function useAppState() {
           tripDate,
           tripDayCount,
           baseMode,
+          planRequest,
         };
         const next = existing ? prev.map((t) => (t.id === existing.id ? trip : t)) : [trip, ...prev];
         persistTrips(next);
@@ -872,7 +934,7 @@ export function useAppState() {
         return next;
       });
     },
-    [entries, slots, packing, tripDate, tripDayCount, baseMode, activeTripId, persistTrips]
+    [entries, slots, packing, tripDate, tripDayCount, baseMode, planRequest, activeTripId, persistTrips]
   );
 
   /** しおりの表紙写真を更新する。 */
@@ -924,6 +986,7 @@ export function useAppState() {
       setTripDateState(trip.tripDate);
       setTripDayCountState(trip.tripDayCount);
       setBaseMode(trip.baseMode);
+      setPlanRequest(trip.planRequest ?? "");
       setSuggestions([]);
       setPlanNotes(null);
       setActiveTripId(trip.id);
@@ -969,6 +1032,14 @@ export function useAppState() {
     }
   }, [liveLocation, dayOfState, recordArrival]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // 行き先の構造が最後のAI最適化から変わっていて、最適化する価値があるか（旅程画面のチップに使う）。
+  const suggestOptimize = useMemo(() => {
+    if (!entries || readOnly || composing) return false;
+    const spots = entries.filter((e) => e.mode !== "stay" && e.mode !== "home" && e.mode !== "rental");
+    if (spots.length < 3) return false; // 少ないうちは並び替えで十分
+    return composedSig !== scheduleSignature(entries);
+  }, [entries, readOnly, composing, composedSig]);
 
   // 旅行が終わったか（最終日の翌日以降）。しおりへの保存を促すバナーに使う。
   const tripEnded = useMemo(() => {
@@ -1020,6 +1091,7 @@ export function useAppState() {
     shareCurrentPlan,
     importSharedToOwn,
     addEntry,
+    bulkAddFromText,
     addSuggestions,
     updateEntry,
     editEntry,
@@ -1034,7 +1106,10 @@ export function useAppState() {
     canUndoCompose: composeBackup !== null,
     tripEnded,
     activeTripId,
+    planRequest,
+    setPlanRequest,
     isOnline,
+    suggestOptimize,
     togglePacking,
     addPacking,
     removePacking,

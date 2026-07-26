@@ -1,0 +1,53 @@
+# Web版（EAS Hosting）へ自動デプロイする。
+#
+# - 既定ブランチへマージされると自動で公開される
+# - GitHub の Actions タブ →「Deploy Web」→「Run workflow」で手動デプロイもできる
+#   （環境変数だけ変えた時など、コード変更なしで公開し直したい場合に使う）
+#
+# 事前に GitHub のリポジトリ Secrets へ `EXPO_TOKEN` を登録しておくこと
+# （expo.dev → アカウント設定 → Access tokens で発行）。
+name: Deploy Web
+
+on:
+  push:
+    branches: [claude/tabi-navi-react-rwn79e]
+  workflow_dispatch: # 手動実行（再デプロイ用）
+
+# 同時に複数のデプロイが走らないようにする（後から来たものを優先）
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Node.js を用意
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 依存関係をインストール
+        run: npm ci
+
+      - name: 型チェック
+        run: npx tsc --noEmit
+
+      - name: テスト
+        run: npx jest --ci
+
+      - name: EAS CLI を用意
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Web版をビルド
+        run: npx expo export --platform web
+
+      - name: 本番へデプロイ
+        run: npx eas deploy --prod

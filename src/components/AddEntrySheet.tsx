@@ -6,12 +6,13 @@ import { PlanEntryInput } from "@/lib/plan";
 import { TransportMode } from "@/lib/types";
 import { SlideUp } from "./animations";
 
-type Mode = "manual" | "mail";
+type Mode = "manual" | "bulk" | "mail";
 const MUTED = "#6E675C";
 
 export function AddEntrySheet({
   onClose,
   onAdd,
+  onBulkAdd,
   onImportMail,
   tripDate,
   tripDayCount,
@@ -20,6 +21,8 @@ export function AddEntrySheet({
 }: {
   onClose: () => void;
   onAdd: (input: PlanEntryInput) => void;
+  /** 自由文からの一括追加（未指定ならタブを出さない） */
+  onBulkAdd?: (text: string) => Promise<{ ok: boolean; count?: number; message?: string }>;
   onImportMail: (body: string, source: string) => Promise<{ ok: boolean; message?: string }>;
   tripDate: string;
   tripDayCount: number;
@@ -31,8 +34,22 @@ export function AddEntrySheet({
   const [mode, setMode] = useState<Mode>("manual");
   const [source, setSource] = useState("");
   const [body, setBody] = useState("");
+  const [bulkText, setBulkText] = useState("");
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const runBulk = async () => {
+    if (!onBulkAdd || !bulkText.trim() || importing) return;
+    setImporting(true);
+    setError(null);
+    const res = await onBulkAdd(bulkText.trim());
+    setImporting(false);
+    if (res.ok) {
+      onClose();
+    } else {
+      setError(res.message ?? "読み取りに失敗しました");
+    }
+  };
 
   const runImport = async () => {
     if (!body.trim() || importing) return;
@@ -66,10 +83,15 @@ export function AddEntrySheet({
             {!fixedMode && (
               <View className="mb-5 flex-row gap-2">
                 <Pressable onPress={() => setMode("manual")} className={`flex-1 rounded-[10px] py-2 ${mode === "manual" ? "bg-ink" : "border border-black/[.1]"}`}>
-                  <Text className={`text-center font-gothic-500 text-[11px] ${mode === "manual" ? "text-kinari" : "text-muted"}`}>行き先を入力</Text>
+                  <Text className={`text-center font-gothic-500 text-[11px] ${mode === "manual" ? "text-kinari" : "text-muted"}`}>1件ずつ</Text>
                 </Pressable>
+                {onBulkAdd && (
+                  <Pressable onPress={() => setMode("bulk")} className={`flex-1 rounded-[10px] py-2 ${mode === "bulk" ? "bg-ink" : "border border-black/[.1]"}`}>
+                    <Text className={`text-center font-gothic-500 text-[11px] ${mode === "bulk" ? "text-kinari" : "text-muted"}`}>まとめて</Text>
+                  </Pressable>
+                )}
                 <Pressable onPress={() => setMode("mail")} className={`flex-1 rounded-[10px] py-2 ${mode === "mail" ? "bg-ink" : "border border-black/[.1]"}`}>
-                  <Text className={`text-center font-gothic-500 text-[11px] ${mode === "mail" ? "text-kinari" : "text-muted"}`}>メールから追加</Text>
+                  <Text className={`text-center font-gothic-500 text-[11px] ${mode === "mail" ? "text-kinari" : "text-muted"}`}>メールから</Text>
                 </Pressable>
               </View>
             )}
@@ -92,6 +114,35 @@ export function AddEntrySheet({
                           : "行き先を追加"
                   }
                 />
+              ) : mode === "bulk" ? (
+                <View className="gap-3">
+                  <Text className="-mt-2 font-gothic-400 text-[11px] leading-[18px] text-muted">
+                    行きたい場所を思いつくまま書くだけでOK。AIが読み取って一括で登録します。{"\n"}住所・営業時間・定休日は自動で補完されます。
+                  </Text>
+                  <View className="gap-1">
+                    <TextInput
+                      value={bulkText}
+                      onChangeText={setBulkText}
+                      multiline
+                      numberOfLines={6}
+                      textAlignVertical="top"
+                      placeholder={"例: 大阪城、海遊館、道頓堀で夕食。\n2日目はUSJに1日いる"}
+                      placeholderTextColor={MUTED}
+                      className="min-h-[120px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[13px] leading-[20px] text-ink"
+                    />
+                  </View>
+                  {error && <Text className="font-gothic-400 text-[11px] text-ink">{error}</Text>}
+                  <Pressable
+                    disabled={!bulkText.trim() || importing}
+                    onPress={runBulk}
+                    className={`mt-1 flex-row items-center justify-center gap-2 rounded-[12px] px-4 py-3 ${bulkText.trim() && !importing ? "bg-ink" : "bg-ink/30"}`}
+                  >
+                    {importing && <ActivityIndicator size="small" color="#F4EFE5" />}
+                    <Text className="text-center font-gothic-500 text-[12px] text-kinari">
+                      {importing ? "読み取り中…" : "AIで読み取って追加"}
+                    </Text>
+                  </Pressable>
+                </View>
               ) : (
                 <View className="gap-3">
                   <Text className="-mt-2 font-gothic-400 text-[11px] leading-[18px] text-muted">

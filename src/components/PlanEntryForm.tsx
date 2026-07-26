@@ -278,14 +278,26 @@ export function PlanEntryForm({
             ? "スタート地点の名称（任意・例: 自宅 / 東京駅集合）"
             : rental
               ? "レンタカー会社・営業所（任意）"
-              : transit
-                ? "名称 *（例: JL105便）"
-                : "行き先 *（名前を入れると住所候補が出ます）"}
+              : stay
+                ? "宿の名前 *（名前を入れると住所候補が出ます）"
+                : transit
+                  ? "名称 *（例: JL105便）"
+                  : "行き先 *（名前を入れると住所候補が出ます）"}
         </Text>
         <TextInput
           value={title}
           onChangeText={onTitleChange}
-          placeholder={home ? "自宅" : rental ? "例: トヨタレンタカー 高松空港店" : transit ? "例: のぞみ / JL105" : "例: 中之島美術館"}
+          placeholder={
+            home
+              ? "自宅"
+              : rental
+                ? "例: トヨタレンタカー 高松空港店"
+                : stay
+                  ? "例: ホテルグランヴィア大阪"
+                  : transit
+                    ? "例: のぞみ / JL105"
+                    : "例: 大阪城天守閣"
+          }
           placeholderTextColor={MUTED}
           className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
         />
@@ -434,7 +446,7 @@ export function PlanEntryForm({
             <TextInput
               value={place}
               onChangeText={onPlaceChange}
-              placeholder="例: 大阪府大阪市中央区西心斎橋1-2-3"
+              placeholder="例: 大阪府大阪市北区梅田3-1-1"
               placeholderTextColor={MUTED}
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
             />
@@ -460,7 +472,7 @@ export function PlanEntryForm({
             <TextInput
               value={place}
               onChangeText={onPlaceChange}
-              placeholder="例: 大阪府大阪市北区中之島4-3-1"
+              placeholder="例: 大阪府大阪市中央区大阪城1-1"
               placeholderTextColor={MUTED}
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
             />
