@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "旅ナビ",
+    "name": "つばめみち",
     "slug": "travel-support",
     "owner": "naotaka0131",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "tabinavi",
+    "scheme": "tsubamemichi",
     "userInterfaceStyle": "automatic",
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#f3efe6",
+        "backgroundColor": "#F4EFE5",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -26,9 +26,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#f3efe6",
+          "backgroundColor": "#F4EFE5",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 160
+          "imageWidth": 190
         }
       ],
       [

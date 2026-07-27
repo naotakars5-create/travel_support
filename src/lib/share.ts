@@ -322,7 +322,7 @@ export async function readSharedPlanFromUrl(): Promise<SharedPlan | null> {
  * 共有リンクを送る。Web Share API（LINE等に送れる）が使えればそれを使い、
  * 使えなければクリップボードにコピーする。結果を返す。
  */
-export async function sharePlanLink(url: string, title = "旅ナビの旅程"): Promise<"shared" | "copied" | "failed"> {
+export async function sharePlanLink(url: string, title = "つばめみちの旅程"): Promise<"shared" | "copied" | "failed"> {
   try {
     const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { share?: (d: unknown) => Promise<void> }) : undefined;
     if (nav?.share) {
