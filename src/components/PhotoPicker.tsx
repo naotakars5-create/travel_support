@@ -22,7 +22,7 @@ export function PhotoPicker({
   label?: string;
 }) {
   if (Platform.OS !== "web") {
-    return <Text className="font-gothic-400 text-[10px] text-muted-light">写真の設定はブラウザ版でご利用ください</Text>;
+    return <Text className="font-gothic-400 text-[11px] text-muted-light">写真の設定はブラウザ版でご利用ください</Text>;
   }
 
   const inputId = `tabinavi-photo-input-${pickerSeq++}`;
@@ -62,7 +62,7 @@ export function PhotoPicker({
     <>
       {input}
       <Pressable onPress={openPicker} className="rounded-full border border-ink/25 px-4 py-1.5">
-        <Text className="font-gothic-500 text-[11px] text-ink">{label}</Text>
+        <Text className="font-gothic-500 text-[12px] text-ink">{label}</Text>
       </Pressable>
     </>
   );

@@ -13,6 +13,7 @@ import { placePhotoImageUrl } from "@/lib/placePhoto";
 import { Illustration } from "./Illustration";
 import { RouteMap } from "./RouteMap";
 import { Blinker, PulseRing, useNodeInStyle } from "./animations";
+import { SectionHeading } from "./ui";
 
 const MUTED_LIGHT = "#6E675C";
 const INK = "#23201D";
@@ -56,7 +57,7 @@ function LineFull({ style }: { style: LineStyle | null }) {
 function RouteLink({ url, label }: { url: string; label: string }) {
   return (
     <Pressable onPress={() => void Linking.openURL(url)} hitSlop={6} className="self-start">
-      <Text className="font-gothic-400 text-[10px] text-muted underline">{label}</Text>
+      <Text className="font-gothic-400 text-[11px] text-muted underline">{label}</Text>
     </Pressable>
   );
 }
@@ -131,6 +132,7 @@ export function ItineraryScreen({
   onMoveEntry,
   onSetEntryDay,
   onAddToDay,
+  embedded = false,
 }: {
   rail: RailItem[];
   /** 旅程の元になっている行き先一覧（この画面から直接編集するために引く） */
@@ -160,6 +162,8 @@ export function ItineraryScreen({
   onSetEntryDay: (id: string, day: number) => void;
   /** その日に新しい行き先を足す（空き時間の「＋」から） */
   onAddToDay: (day: number) => void;
+  /** 「旅」タブの中に埋め込まれているか（見出しは TripHero が持つので出さない） */
+  embedded?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   // タップして開いている地点（そこだけ操作バーを出す）。もう一度押すと閉じる。
@@ -229,15 +233,49 @@ export function ItineraryScreen({
   const subLine = `予定${stats.reservationCount}件 · 空き${stats.gapCount}件 · 総移動${formatDurationMin(stats.totalTransitMin)}`;
 
   return (
-    <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
-      <View className="px-[26px] pb-2 pt-3">
-        <View className="flex-row items-baseline justify-between">
-          <Text className="font-gothic-400 text-[11px] text-muted">{heading}</Text>
-          <Text className="font-gothic-500 text-[11px] text-ink" style={TNUM}>現在 {formatJstTime(now)}</Text>
+    <View className="flex-1 bg-kinari" style={embedded ? undefined : { paddingTop: insets.top }}>
+      {!embedded && (
+        <View className="px-[26px] pb-2 pt-3">
+          <View className="flex-row items-baseline justify-between">
+            <Text className="font-gothic-400 text-[12px] text-muted">{heading}</Text>
+            <Text className="font-gothic-500 text-[12px] text-ink" style={TNUM}>現在 {formatJstTime(now)}</Text>
+          </View>
+          <View className="mt-1 flex-row items-center justify-between">
+            <Text className="font-mincho-600 text-[26px] text-ink">今回の旅程</Text>
+            <View className="flex-row items-center gap-2">
+              {canUndoCompose && (
+                <Pressable
+                  onPress={onUndoCompose}
+                  accessibilityRole="button"
+                  accessibilityLabel="AIで組む前の旅程に戻す"
+                  className="rounded-full border border-ink/25 px-3 py-1.5"
+                >
+                  <Text className="font-gothic-500 text-[12px] text-ink">元に戻す</Text>
+                </Pressable>
+              )}
+              {rail.length > 0 && (
+                <Pressable onPress={onNavigatePlan} className="rounded-full border border-ink/25 px-3 py-1.5">
+                  <Text className="font-gothic-500 text-[12px] text-ink">行き先を編集</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+          <Text className="mt-1 font-gothic-400 text-[12px] text-muted" style={TNUM}>
+            {subLine}
+          </Text>
+          {rail.length > 0 && !readOnly && (
+            <Text className="mt-0.5 font-gothic-400 text-[12px] text-muted-light">
+              地点をタップすると、順番・日・内容をその場で変えられます
+            </Text>
+          )}
         </View>
-        <View className="mt-1 flex-row items-center justify-between">
-          <Text className="font-mincho-600 text-[26px] text-ink">本日の旅程</Text>
-          <View className="flex-row items-center gap-2">
+      )}
+      {!embedded && <View className="h-px w-full bg-black/[.08]" />}
+
+      <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 90 }}>
+        {embedded && rail.length > 0 && (
+          <View className="mb-2 flex-row items-center justify-between">
+            <Text className="font-gothic-400 text-[12px] text-muted" style={TNUM}>{subLine}</Text>
             {canUndoCompose && (
               <Pressable
                 onPress={onUndoCompose}
@@ -245,32 +283,20 @@ export function ItineraryScreen({
                 accessibilityLabel="AIで組む前の旅程に戻す"
                 className="rounded-full border border-ink/25 px-3 py-1"
               >
-                <Text className="font-gothic-500 text-[11px] text-ink">元に戻す</Text>
-              </Pressable>
-            )}
-            {rail.length > 0 && (
-              <Pressable onPress={onNavigatePlan} className="rounded-full border border-ink/25 px-3 py-1">
-                <Text className="font-gothic-500 text-[11px] text-ink">計画を編集</Text>
+                <Text className="font-gothic-500 text-[12px] text-ink">組む前に戻す</Text>
               </Pressable>
             )}
           </View>
-        </View>
-        <Text className="mt-1 font-gothic-400 text-[11px] text-muted" style={TNUM}>
-          {subLine}
-        </Text>
-        {rail.length > 0 && !readOnly && (
-          <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted-light">
+        )}
+        {embedded && rail.length > 0 && !readOnly && (
+          <Text className="mb-2 font-gothic-400 text-[12px] text-muted-light">
             地点をタップすると、順番・日・内容をその場で変えられます
           </Text>
         )}
-      </View>
-      <View className="h-px w-full bg-black/[.08]" />
-
-      <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 80 }}>
         {/* 行き先が変わった時だけそっと出す「最適化しますか？」チップ（B案）。押し忘れをなくす */}
         {suggestOptimize && !optimizeDismissed && rail.length > 0 && (
           <View className="mb-2 flex-row items-center gap-2 rounded-[12px] border border-ink/15 bg-surface/60 px-3 py-2">
-            <Text className="flex-1 font-gothic-400 text-[11px] leading-[16px] text-ink">
+            <Text className="flex-1 font-gothic-400 text-[12px] leading-[18px] text-ink">
               行き先が変わりました。AIで予定を組み直しますか？
             </Text>
             <Pressable
@@ -279,7 +305,7 @@ export function ItineraryScreen({
               accessibilityRole="button"
               className={`rounded-full px-3 py-1.5 ${composing ? "bg-ink/40" : "bg-ink"}`}
             >
-              <Text className="font-gothic-500 text-[11px] text-kinari">{composing ? "組んでいます…" : "予定を組む"}</Text>
+              <Text className="font-gothic-500 text-[12px] text-kinari">{composing ? "組んでいます…" : "予定を組む"}</Text>
             </Pressable>
             <Pressable onPress={() => setOptimizeDismissed(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="この提案を閉じる">
               <Text className="font-gothic-400 text-[14px] text-muted-light">×</Text>
@@ -289,7 +315,7 @@ export function ItineraryScreen({
         {rail.length === 0 && (
           <Pressable onPress={onNavigatePlan} className="mt-10 self-center rounded-[12px] border border-ink/25 px-5 py-3">
             <Text className="text-center font-gothic-400 text-[12px] text-muted">
-              まだ予定がありません。{"\n"}「計画」で行き先を追加してください。
+              まだ予定がありません。{"\n"}行き先を追加すると、ここに旅程が並びます。
             </Text>
           </Pressable>
         )}
@@ -303,7 +329,7 @@ export function ItineraryScreen({
                 style={{ backgroundColor: dayColor(g.day) }}
               >
                 <Text className="font-gothic-700 text-[14px] text-kinari">{g.day}日目</Text>
-                <Text className="font-gothic-400 text-[11px] text-kinari/80">{g.dateLabel}</Text>
+                <Text className="font-gothic-400 text-[12px] text-kinari/80">{g.dateLabel}</Text>
               </View>
             )}
             {/* その日の動線マップ。日の見出しのすぐ下＝各日の一番頭に必ず置く。
@@ -362,7 +388,7 @@ export function ItineraryScreen({
                     {/* 移動時間と経路リンクは1行に並べる（改行を減らして間延びを防ぐ） */}
                     <View className="flex-1 flex-row flex-wrap items-center gap-x-2 py-0.5 pl-1">
                       {item.driving != null || item.walking != null ? (
-                        <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
+                        <Text className="font-gothic-400 text-[12px]" style={[{ color: style?.color }, TNUM]}>
                           {[
                             item.driving != null ? `車 ${formatDurationMin(item.driving)}` : null,
                             item.walking != null ? `徒歩 ${formatDurationMin(item.walking)}` : null,
@@ -371,7 +397,7 @@ export function ItineraryScreen({
                             .join(" ／ ")}
                         </Text>
                       ) : (
-                        <Text className="font-gothic-400 text-[11px]" style={[{ color: style?.color }, TNUM]}>
+                        <Text className="font-gothic-400 text-[12px]" style={[{ color: style?.color }, TNUM]}>
                           {MODE_LABEL[item.mode]} · {formatDurationMin(item.durationMin)}
                         </Text>
                       )}
@@ -392,11 +418,11 @@ export function ItineraryScreen({
                   <View className="flex-1 justify-center py-0.5 pl-1">
                     {isConflict ? (
                       <View className="self-start rounded-[10px] border border-ink/50 bg-surface px-3 py-1.5">
-                        <Text className="font-gothic-500 text-[11px] text-ink">
+                        <Text className="font-gothic-500 text-[12px] text-ink">
                           {item.durationMin < 0 ? "予定が重なっています" : "移動時間が足りない可能性があります"}
                         </Text>
                         {(item.driving != null || item.walking != null || item.requiredMin != null) && (
-                          <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                          <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted" style={TNUM}>
                             実際の移動{" "}
                             {item.driving != null || item.walking != null
                               ? [
@@ -420,19 +446,19 @@ export function ItineraryScreen({
                       </View>
                     ) : isUnconfirmed ? (
                       <Pressable onPress={onNavigatePlan} className="self-start rounded-[10px] border border-ink px-3 py-1.5">
-                        <Text className="font-gothic-400 text-[11px] text-ink">未確定 · 計画で行き先を追加</Text>
+                        <Text className="font-gothic-400 text-[12px] text-ink">未確定 · 行き先を追加する</Text>
                       </Pressable>
                     ) : item.durationMin >= 360 && i === g.items.length - 1 && gi < dayGroups.length - 1 ? (
                       // 実際に日をまたぐ（その日の最後×翌日がある）場合だけ「翌日まで」
                       <View className="self-start rounded-[10px] border border-muted-light px-3 py-1">
-                        <Text className="font-gothic-400 text-[11px] text-muted">翌日まで（宿泊）</Text>
+                        <Text className="font-gothic-400 text-[12px] text-muted">翌日まで（宿泊）</Text>
                       </View>
                     ) : (
                       <View className="flex-row items-center gap-2">
                         {/* 直前ノードの時刻をシードに、常に同じ絵を出す（Math.randomは使わない） */}
                         <Illustration name={pickBenchIllustration(gapSeed(g, item, gi, i))} size="sm" alt="" />
                         <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
-                          <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>
+                          <Text className="font-gothic-400 text-[12px] text-muted" style={TNUM}>
                             空き時間 · {formatDurationMin(item.durationMin)}
                           </Text>
                         </View>
@@ -445,7 +471,7 @@ export function ItineraryScreen({
                             accessibilityLabel={`${g.day}日目のこの時間に行き先を追加`}
                             className="rounded-full border border-accent/45 bg-accent/[.08] px-2.5 py-1"
                           >
-                            <Text className="font-gothic-500 text-[11px] text-accent">＋ ここに追加</Text>
+                            <Text className="font-gothic-500 text-[12px] text-accent">＋ ここに追加</Text>
                           </Pressable>
                         )}
                       </View>
@@ -460,26 +486,23 @@ export function ItineraryScreen({
         {/* AIが時間内に収まらないと判断して外した予定 */}
         {unplaced.length > 0 && (
           <View className="mt-7">
-            <View className="mb-2 flex-row items-center gap-1.5">
-              <View className="h-[11px] w-[3px] rounded-full bg-accent" />
-              <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-ink">旅程に入らなかった予定</Text>
-            </View>
+<SectionHeading label="旅程に入らなかった予定" className="mb-2" />
             <View className="rounded-[16px] border border-ink/25">
               {unplaced.map((e, i) => (
                 <View key={e.id} className={`flex-row items-center justify-between px-4 py-3 ${i > 0 ? "border-t border-black/[.06]" : ""}`}>
                   <View className="flex-1 pr-2">
                     <Text className="font-mincho-600 text-[14px] text-ink">{e.title}</Text>
-                    <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{PRIORITY_META[e.priority].label}</Text>
+                    <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted">{PRIORITY_META[e.priority].label}</Text>
                   </View>
                   {e.priority !== "must" && (
                     <Pressable onPress={() => onBumpPriority(e.id)} className="rounded-full border border-ink px-3 py-1.5">
-                      <Text className="font-gothic-500 text-[11px] text-ink">必ず行くにする</Text>
+                      <Text className="font-gothic-500 text-[12px] text-ink">必ず行くにする</Text>
                     </Pressable>
                   )}
                 </View>
               ))}
             </View>
-            <Text className="mt-1.5 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+            <Text className="mt-1.5 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
               時間が足りず入らなかった予定です。「必ず行くにする」→もう一度「AIで旅程を組む」と優先して組み込みます。
             </Text>
           </View>
@@ -518,7 +541,7 @@ function ActionChip({
       accessibilityLabel={accessibilityLabel ?? label}
       className={`rounded-full border px-2.5 py-1 ${cls} ${disabled ? "opacity-35" : ""}`}
     >
-      <Text className={`font-gothic-500 text-[11px] ${textCls}`}>{label}</Text>
+      <Text className={`font-gothic-500 text-[12px] ${textCls}`}>{label}</Text>
     </Pressable>
   );
 }
@@ -606,24 +629,24 @@ function NodeRow({
             <View style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
               {isCurrent && <PulseRing size={22} color="rgba(217,111,76,.45)" />}
               <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: markerBg, alignItems: "center", justifyContent: "center" }}>
-                <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>
+                <Text className="font-gothic-500 text-[12px] text-kinari" style={TNUM}>
                   {stopNumber ?? ""}
                 </Text>
               </View>
             </View>
-            <Text className={`font-gothic-500 text-[11px] ${isPast ? "text-muted-light" : "text-muted"}`} style={TNUM}>
+            <Text className={`font-gothic-500 text-[12px] ${isPast ? "text-muted-light" : "text-muted"}`} style={TNUM}>
               {timeLabel}
             </Text>
             <Text
               numberOfLines={1}
-              className={`flex-1 font-mincho-600 text-[15px] leading-[20px] ${isPast ? "text-muted-light" : "text-ink"}`}
+              className={`flex-1 font-mincho-600 text-[15px] leading-[21px] ${isPast ? "text-muted-light" : "text-ink"}`}
             >
               {item.event.title || item.place}
             </Text>
             {isCurrent && (
               <Blinker>
                 <View className="rounded-full bg-accent/15 px-2 py-[2px]">
-                  <Text className="font-gothic-500 text-[9px] text-ink">● 現在地</Text>
+                  <Text className="font-gothic-500 text-[10px] text-ink">● 現在地</Text>
                 </View>
               </Blinker>
             )}
@@ -633,18 +656,18 @@ function NodeRow({
             <View className="mt-0.5 flex-row items-center gap-1.5" style={{ paddingLeft: 30 }}>
               {closedConflict && (
                 <View className="rounded-full border border-ink bg-surface px-1.5">
-                  <Text className="font-gothic-500 text-[9px] text-ink">
+                  <Text className="font-gothic-500 text-[10px] text-ink">
                     {closedDaysLabel(item.event) ?? "定休日"}・この日は休み
                   </Text>
                 </View>
               )}
               {item.confidence < 0.5 && (
                 <View className="rounded-full border border-muted px-1.5">
-                  <Text className="font-gothic-400 text-[9px] text-muted">要確認</Text>
+                  <Text className="font-gothic-400 text-[10px] text-muted">要確認</Text>
                 </View>
               )}
               {meta ? (
-                <Text numberOfLines={2} className="flex-1 font-gothic-400 text-[10px] leading-[14px] text-muted-light">
+                <Text numberOfLines={2} className="flex-1 font-gothic-400 text-[11px] leading-[16px] text-muted-light">
                   {meta}
                 </Text>
               ) : null}
@@ -666,7 +689,7 @@ function NodeRow({
               </View>
               {tripDayCount > 1 && reorderable && (
                 <View className="mt-1.5 flex-row flex-wrap items-center gap-1.5">
-                  <Text className="font-gothic-400 text-[10px] text-muted">日を移す</Text>
+                  <Text className="font-gothic-400 text-[11px] text-muted">日を移す</Text>
                   {Array.from({ length: tripDayCount }, (_, k) => k + 1).map((d) => (
                     <Pressable
                       key={d}
@@ -681,7 +704,7 @@ function NodeRow({
                           : { backgroundColor: "rgba(255,255,255,.7)", borderColor: tint(dayColor(d), 0.3) }
                       }
                     >
-                      <Text className={`font-gothic-500 text-[10px] ${d === dayNumber ? "text-kinari" : "text-ink"}`} style={TNUM}>
+                      <Text className={`font-gothic-500 text-[11px] ${d === dayNumber ? "text-kinari" : "text-ink"}`} style={TNUM}>
                         {d}日目
                       </Text>
                     </Pressable>

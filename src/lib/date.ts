@@ -109,3 +109,33 @@ export function formatDateStrJa(dateStr: string): string {
   const wd = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
   return `${d.getMonth() + 1}月${d.getDate()}日(${wd})`;
 }
+
+/**
+ * 旅がいま「いつ」なのか。ヒーロー表示（あと◯日 / ◯日目 / 終わった）に使う。
+ * - before: 出発前。daysUntil は残り日数（1 なら明日、0 は当日扱いにならない）
+ * - during: 旅行中。day は何日目か（1始まり）
+ * - after : 最終日を過ぎた
+ */
+export type TripPhase =
+  | { phase: "before"; daysUntil: number }
+  | { phase: "during"; day: number; dayCount: number }
+  | { phase: "after" };
+
+export function tripPhase(startDate: string, dayCount: number, now: Date): TripPhase {
+  const start = new Date(`${startDate}T00:00`);
+  if (Number.isNaN(start.getTime())) return { phase: "before", daysUntil: 0 };
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.max(1, Math.floor(dayCount));
+  const diff = Math.round((start.getTime() - today.getTime()) / 86400000);
+  if (diff > 0) return { phase: "before", daysUntil: diff };
+  const dayIndex = -diff + 1; // 開始日なら1日目
+  if (dayIndex <= days) return { phase: "during", day: dayIndex, dayCount: days };
+  return { phase: "after" };
+}
+
+/** 旅の期間表記（「8月1日(土) 〜 8月3日(月)」／1日なら1つだけ）。 */
+export function tripRangeLabel(startDate: string, dayCount: number): string {
+  const start = formatDateStrJa(startDate);
+  if (Math.max(1, dayCount) <= 1) return start;
+  return `${start} 〜 ${formatDateStrJa(dateForDay(startDate, dayCount))}`;
+}

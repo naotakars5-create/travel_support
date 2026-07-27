@@ -61,7 +61,7 @@ export function RouteMap({
         accessibilityLabel="経路をGoogleマップで開く"
         className="mb-2 flex-row items-center justify-between rounded-[16px] border border-black/[.08] bg-black/[.03] px-4 py-3"
       >
-        <Text className="font-gothic-500 text-[11px] text-ink">{caption ?? "この日の動線"}をGoogleマップで見る</Text>
+        <Text className="font-gothic-500 text-[12px] text-ink">{caption ?? "この日の動線"}をGoogleマップで見る</Text>
         <Text className="font-gothic-400 text-[13px] text-muted">›</Text>
       </Pressable>
     );
@@ -80,10 +80,10 @@ export function RouteMap({
         style={{ width: "100%", aspectRatio: 2 }}
       />
       <View className="absolute left-3 top-3 rounded-full bg-kinari/90 px-2.5 py-[3px]">
-        <Text className="font-gothic-500 text-[9px] tracking-[.1em] text-ink">{caption ?? "全行程マップ"}</Text>
+        <Text className="font-gothic-500 text-[10px] tracking-[.1em] text-ink">{caption ?? "全行程マップ"}</Text>
       </View>
       <View className="absolute bottom-3 right-3 rounded-full bg-ink/85 px-2.5 py-[3px]">
-        <Text className="font-gothic-500 text-[9px] text-kinari">タップで拡大 · ズーム</Text>
+        <Text className="font-gothic-500 text-[10px] text-kinari">タップで拡大 · ズーム</Text>
       </View>
     </Pressable>
   );

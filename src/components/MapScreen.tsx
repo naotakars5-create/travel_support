@@ -28,6 +28,7 @@ export function MapScreen({
   center,
   liveLocation,
   existingTitles,
+  readOnly,
   onAddSpot,
   onNavigatePlan,
 }: {
@@ -36,6 +37,8 @@ export function MapScreen({
   liveLocation: GeoPoint | null;
   /** すでに計画にある行き先の名前（重複追加を防ぐ） */
   existingTitles: Set<string>;
+  /** 共有された旅程を見ているだけの状態（押しても保存されない操作は出さない） */
+  readOnly: boolean;
   onAddSpot: (spot: Spot) => void;
   onNavigatePlan: () => void;
 }) {
@@ -107,8 +110,8 @@ export function MapScreen({
         </View>
         <View className="h-px w-full bg-black/[.08]" />
         <Pressable onPress={onNavigatePlan} className="mt-10 self-center rounded-[12px] border border-ink/25 px-5 py-3">
-          <Text className="text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
-            まだ基点がありません。{"\n"}「計画」で行き先をひとつ追加してください。
+          <Text className="text-center font-gothic-400 text-[12px] leading-[21px] text-muted">
+            まだ基点がありません。{"\n"}「旅」で行き先をひとつ追加してください。
           </Text>
         </Pressable>
       </View>
@@ -120,7 +123,7 @@ export function MapScreen({
       {/* 見出しは1行だけ。地図に高さを譲る */}
       <View className="flex-row items-baseline justify-between px-[26px] pb-2 pt-2">
         <Text className="font-mincho-600 text-[20px] text-ink">地図で探す</Text>
-        <Text className="font-gothic-400 text-[10px] text-muted">指で動かして、見えている範囲から探せます</Text>
+        <Text className="font-gothic-400 text-[12px] text-muted">指で動かして探せます</Text>
       </View>
 
       <View
@@ -174,7 +177,7 @@ export function MapScreen({
           <View className="absolute bottom-0 left-0 right-0 pb-2">
             {!loading && fresh.length === 0 ? (
               <View className="mx-4 rounded-[14px] border border-ink/12 bg-kinari/95 px-4 py-3">
-                <Text className="text-center font-gothic-400 text-[11px] leading-[17px] text-muted">
+                <Text className="text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
                   この範囲では候補が見つかりませんでした。{"\n"}地図を動かすか「−」で広げて探してみてください。
                 </Text>
               </View>
@@ -204,7 +207,7 @@ export function MapScreen({
                     >
                       <View className="flex-row items-center gap-2">
                         <View className="h-[18px] w-[18px] items-center justify-center rounded-full bg-ink">
-                          <Text className="font-gothic-500 text-[10px] text-kinari" style={TNUM}>
+                          <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>
                             {i + 1}
                           </Text>
                         </View>
@@ -212,26 +215,28 @@ export function MapScreen({
                           {s.name}
                         </Text>
                       </View>
-                      <Text numberOfLines={1} className="mt-1 font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                      <Text numberOfLines={1} className="mt-1 font-gothic-400 text-[11px] text-muted" style={TNUM}>
                         {[s.category, distance != null ? formatDistance(distance) : null, s.note]
                           .filter(Boolean)
                           .join(" · ")}
                       </Text>
                       <View className="mt-2 flex-row items-center gap-2">
-                        <Pressable
-                          disabled={isAdded}
-                          onPress={() => {
-                            onAddSpot(s);
-                            setAdded((prev) => new Set(prev).add(s.name));
-                          }}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${s.name}を計画に追加`}
-                          className={`flex-1 items-center rounded-full py-1.5 ${isAdded ? "border border-ink/20" : "bg-accent"}`}
-                        >
-                          <Text className={`font-gothic-500 text-[11px] ${isAdded ? "text-muted-light" : "text-kinari"}`}>
-                            {isAdded ? "追加済み" : "＋ 計画へ"}
-                          </Text>
-                        </Pressable>
+                        {!readOnly && (
+                          <Pressable
+                            disabled={isAdded}
+                            onPress={() => {
+                              onAddSpot(s);
+                              setAdded((prev) => new Set(prev).add(s.name));
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${s.name}を行き先に追加`}
+                            className={`flex-1 items-center rounded-full py-2 ${isAdded ? "border border-ink/20" : "bg-accent"}`}
+                          >
+                            <Text className={`font-gothic-700 text-[12px] ${isAdded ? "text-muted-light" : "text-kinari"}`}>
+                              {isAdded ? "✓ 追加済み" : "＋ 旅に追加"}
+                            </Text>
+                          </Pressable>
+                        )}
                         <Pressable
                           onPress={() => {
                             const q = s.lat != null && s.lng != null ? `${s.lat},${s.lng}` : s.name;
@@ -242,7 +247,7 @@ export function MapScreen({
                           accessibilityLabel={`${s.name}をGoogleマップで見る`}
                           className="rounded-full border border-ink/20 px-2.5 py-1.5"
                         >
-                          <Text className="font-gothic-400 text-[10px] text-muted">詳しく</Text>
+                          <Text className="font-gothic-400 text-[11px] text-muted">詳しく</Text>
                         </Pressable>
                       </View>
                     </Pressable>

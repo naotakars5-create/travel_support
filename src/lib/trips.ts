@@ -10,6 +10,8 @@ export interface SavedTrip {
   id: string;
   /** 旅の名前（例: 大阪日帰り） */
   name: string;
+  /** 行き先（例: 香川県 高松・小豆島）。旅の見出しと表紙の手がかりに使う */
+  destination?: string;
   /** しおりの表紙写真（data URL・任意） */
   coverPhoto?: string;
   /** 旅の思い出写真（data URL・最大30枚） */

@@ -38,7 +38,7 @@ export function EditEntrySheet({
               </Pressable>
               <Text className="font-mincho-600 text-[16px] text-ink">行き先を編集</Text>
               <Pressable onPress={onDelete} hitSlop={8} className="rounded-full border border-black/[.15] px-3 py-1">
-                <Text className="font-gothic-400 text-[11px] text-muted">削除</Text>
+                <Text className="font-gothic-400 text-[12px] text-muted">削除</Text>
               </Pressable>
             </View>
             <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>

@@ -5,7 +5,14 @@ import { BaseMode, EdgeTravel } from "./transit";
 const STORAGE_KEY = "tabinavi.state.v2";
 
 export interface PersistedState {
-  version: 2;
+  /** 2 = 旅の名前を持たない旧形式。3 で旅の名前・行き先・しおりとの紐付けを追加。 */
+  version: 2 | 3;
+  /** 旅の名前（例: 香川ふたり旅）。空なら日付から自動で付ける */
+  tripName?: string;
+  /** 行き先（例: 香川県 高松・小豆島）。ヒーローとしおりの表紙に使う */
+  tripDestination?: string;
+  /** しおり一覧の中で、この旅がどれかを指すID */
+  activeTripId?: string | null;
   /** ユーザーが追加した行き先リスト（主入力） */
   entries: PlanEntry[];
   /** 直近に組み上げた時刻割り当て（旅程イベントは entries+slots から都度導出する） */
@@ -34,7 +41,8 @@ export async function loadState(): Promise<PersistedState | null> {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed?.version !== 2) return null;
+    // v2（旅の名前を持たない形式）もそのまま読める。足りない項目は後から埋まる。
+    if (parsed?.version !== 2 && parsed?.version !== 3) return null;
     return parsed as PersistedState;
   } catch {
     return null;

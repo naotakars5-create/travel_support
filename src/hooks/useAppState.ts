@@ -1,7 +1,6 @@
 import { fetchWithTimeout } from "@/lib/http";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GeoPoint, isTransitMode, PackingItem, ParseApiResponse, PlanApiResponse, PlanEntry, ScheduleSlot, SpotSuggestion } from "@/lib/types";
-import { buildSeedEntries } from "@/lib/seedEntries";
 import { loadState, saveState } from "@/lib/storage";
 import { loadTrips, saveTrips, SavedTrip, MAX_TRIP_PHOTOS } from "@/lib/trips";
 import { buildRail, firstSeedGeo, lastSeedGeo, RailItem, sortedGroupEvents } from "@/lib/itinerary";
@@ -35,11 +34,25 @@ import { useLiveLocation } from "./useLiveLocation";
 /** この距離（メートル）以内に近づいたら、GPSで到着を自動記録する。 */
 const ARRIVAL_THRESHOLD_METERS = 120;
 
-export type Tab = "plan" | "itin" | "map" | "today" | "packing" | "shiori" | "profile";
+export type Tab = "trip" | "map" | "today" | "packing" | "shiori" | "profile";
+/** 「旅」タブの中の見せ方。リスト（集める）とタイムライン（並んだ形を見る）。 */
+export type TripView = "list" | "timeline";
 
 interface FlashState {
   visible: boolean;
   text: string;
+}
+
+/**
+ * 旅の名前が空のときの表示名。行き先が分かっていればそれを、無ければ日付から作る。
+ * 「無題」ではなく、その人の旅として読める言葉にする。
+ */
+export function defaultTripName(destination: string, tripDate: string): string {
+  const dest = destination.trim();
+  if (dest) return `${dest}の旅`;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(tripDate);
+  if (m) return `${Number(m[2])}月${Number(m[3])}日からの旅`;
+  return "名前のない旅";
 }
 
 function genId(prefix: string): string {
@@ -54,7 +67,13 @@ export function useAppState() {
   const [currentNodeKey, setCurrentNodeKey] = useState<string | null>(null);
   // 到着記録を行った時刻。予定時刻ベースの自動進行と手動記録の優先順位付けに使う。
   const [currentNodeSetAt, setCurrentNodeSetAt] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("plan");
+  const [tab, setTab] = useState<Tab>("trip");
+  const [tripView, setTripView] = useState<TripView>("list");
+  /** 旅タブを開きつつ見せ方も指定する（AI組み立て直後にタイムラインを見せる等）。 */
+  const openTrip = useCallback((view: TripView = "list") => {
+    setTripView(view);
+    setTab("trip");
+  }, []);
   const [flash, setFlash] = useState<FlashState>({ visible: false, text: "" });
   const [justAddedEventId, setJustAddedEventId] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(new Date());
@@ -87,6 +106,9 @@ export function useAppState() {
   const [composedSig, setComposedSig] = useState<string | null>(null);
   // AIへのお願い（自由文）。「1日目はホテルの後は予定を入れない」等のニュアンスを毎回渡す。
   const [planRequest, setPlanRequest] = useState<string>("");
+  // 旅の名前と行き先。画面の一番上に出し、しおり（＝旅の一覧）でもこの名前で並ぶ。
+  const [tripName, setTripName] = useState<string>("");
+  const [tripDestination, setTripDestination] = useState<string>("");
 
   const initializedRef = useRef(false);
   // 「構造」が既にスケジュール済みかを追跡し、座標だけ埋まった時の不要な再ローカル化を防ぐ。
@@ -101,7 +123,9 @@ export function useAppState() {
     return Number.isNaN(d.getTime()) ? new Date() : d;
   };
 
-  // 初期化：AsyncStorageに保存済みなら復元、無ければシード行き先を生成
+  // 初期化：AsyncStorageに保存済みなら復元。無ければ「まっさら」から始める
+  // （デモの行き先を入れてしまうと、初回の人が他人の旅行を消すところから
+  //  始めることになるため、あえて何も入れない）
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
@@ -140,13 +164,15 @@ export function useAppState() {
         if (persisted.tripDayCount) setTripDayCountState(persisted.tripDayCount);
         if (persisted.baseMode) setBaseMode(persisted.baseMode);
         if (persisted.planRequest) setPlanRequest(persisted.planRequest);
+        if (persisted.tripName) setTripName(persisted.tripName);
+        if (persisted.tripDestination) setTripDestination(persisted.tripDestination);
+        if (persisted.activeTripId) setActiveTripId(persisted.activeTripId);
         scheduleSigRef.current = scheduleSignature(ordered);
       } else {
-        const seeded = buildSeedEntries(new Date());
-        setEntries(seeded);
-        setSlots(sequentialSchedule(seeded, localReferenceDate()));
+        setEntries([]);
+        setSlots([]);
         setPacking(buildDefaultPacking());
-        scheduleSigRef.current = scheduleSignature(seeded);
+        scheduleSigRef.current = scheduleSignature([]);
       }
     })();
   }, []);
@@ -161,7 +187,10 @@ export function useAppState() {
     const cacheEntries = Object.entries(transitCache);
     const trimmedCache = cacheEntries.length > 400 ? Object.fromEntries(cacheEntries.slice(-400)) : transitCache;
     const persistPromise = saveState({
-      version: 2,
+      version: 3,
+      tripName,
+      tripDestination,
+      activeTripId,
       entries,
       slots,
       currentNodeKey,
@@ -185,7 +214,22 @@ export function useAppState() {
       setFlash({ visible: true, text: "端末への保存に失敗しました\n空き容量を確認してください（このままだと閉じた時に消えます）" });
       setTimeout(() => setFlash({ visible: false, text: "" }), 3200);
     });
-  }, [entries, slots, currentNodeKey, currentNodeSetAt, packing, tripDate, tripDayCount, baseMode, transitCache, planRequest, readOnly]);
+  }, [
+    entries,
+    slots,
+    currentNodeKey,
+    currentNodeSetAt,
+    packing,
+    tripDate,
+    tripDayCount,
+    baseMode,
+    transitCache,
+    planRequest,
+    tripName,
+    tripDestination,
+    activeTripId,
+    readOnly,
+  ]);
 
   // 現在時刻の更新（当日画面のカウントダウン用）
   useEffect(() => {
@@ -575,7 +619,7 @@ export function useAppState() {
         setSuggestions([]);
         setActiveTripId(null);
         scheduleSigRef.current = null; // next effect で時刻を組み直させる
-        setTab("plan");
+        openTrip("list");
         setFlash({ visible: true, text: `${newEntries.length}件の行き先で旅程を作りました\n並び替え・追加は自由にできます` });
         setTimeout(() => setFlash({ visible: false, text: "" }), 2400);
         return { ok: true };
@@ -583,7 +627,7 @@ export function useAppState() {
         return { ok: false, message: err instanceof Error ? err.message : "旅程の作成に失敗しました" };
       }
     },
-    [entries, slots, suggestions, planNotes]
+    [entries, slots, suggestions, planNotes, openTrip]
   );
 
   /** 地図で見つけたスポットを1件だけ行き先リストへ追加する。 */
@@ -861,7 +905,7 @@ export function useAppState() {
         setSuggestions(data.suggestions);
         setPlanNotes(data.notes ?? null);
         // 反映が分かるように：旅程タブへ切り替え＋通知
-        setTab("itin");
+        openTrip("timeline");
         setFlash({
           visible: true,
           text:
@@ -878,7 +922,7 @@ export function useAppState() {
     } finally {
       setComposing(false);
     }
-  }, [entries, slots, suggestions, planNotes, tripDayCount, planRequest, baseMode]);
+  }, [entries, slots, suggestions, planNotes, tripDayCount, planRequest, baseMode, openTrip]);
 
   const togglePacking = useCallback((id: string) => {
     setPacking((prev) => prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p)));
@@ -1001,7 +1045,8 @@ export function useAppState() {
         const existing = activeTripId ? prev.find((t) => t.id === activeTripId) : undefined;
         const trip: SavedTrip = {
           id: existing?.id ?? genId("trip"),
-          name: name.trim() || existing?.name || `${tripDate} の旅`,
+          name: name.trim() || tripName.trim() || existing?.name || defaultTripName(tripDestination, tripDate),
+          destination: tripDestination.trim() || existing?.destination,
           coverPhoto: coverPhoto ?? existing?.coverPhoto,
           photos: existing?.photos,
           savedAt: new Date().toISOString(),
@@ -1021,7 +1066,7 @@ export function useAppState() {
         return next;
       });
     },
-    [entries, slots, packing, tripDate, tripDayCount, baseMode, planRequest, activeTripId, persistTrips]
+    [entries, slots, packing, tripDate, tripDayCount, baseMode, planRequest, tripName, tripDestination, activeTripId, persistTrips]
   );
 
   /** しおりの表紙写真を更新する。 */
@@ -1074,16 +1119,106 @@ export function useAppState() {
       setTripDayCountState(trip.tripDayCount);
       setBaseMode(trip.baseMode);
       setPlanRequest(trip.planRequest ?? "");
+      setTripName(trip.name);
+      setTripDestination(trip.destination ?? "");
       setSuggestions([]);
       setPlanNotes(null);
       setActiveTripId(trip.id);
       scheduleSigRef.current = scheduleSignature(trip.entries);
-      setTab("plan");
+      openTrip("list");
       setFlash({ visible: true, text: `「${trip.name}」を読み込みました` });
       setTimeout(() => setFlash({ visible: false, text: "" }), 1700);
       return prev;
     });
-  }, []);
+  }, [openTrip]);
+
+  /**
+   * 今の旅を、しおり（＝旅の一覧）へ自動で保存し続ける。
+   *
+   * 「保存する」という操作を覚えなくていいようにするため。しおりが旅の一覧を
+   * 兼ねるので、複数の旅を持つために新しい概念を増やさずに済む。
+   * 中身が変わっていない時は書き込まない（写真ごと毎回書き直さないため）。
+   */
+  const autoSaveSigRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!entries || readOnly || entries.length === 0) return;
+    const sig = JSON.stringify([
+      entries.map((e) => [e.id, e.title, e.place, e.day, e.mode, e.priority, e.arriveBy, e.stayMin, e.cost]),
+      slots.map((s) => [s.entryId, s.arriveAt, s.stayMin]),
+      tripDate,
+      tripDayCount,
+      baseMode,
+      planRequest,
+      tripName,
+      tripDestination,
+    ]);
+    if (autoSaveSigRef.current === sig) return;
+    const timer = setTimeout(() => {
+      autoSaveSigRef.current = sig;
+      setSavedTrips((prev) => {
+        const existing = activeTripId ? prev.find((t) => t.id === activeTripId) : undefined;
+        const id = existing?.id ?? genId("trip");
+        const trip: SavedTrip = {
+          ...existing,
+          id,
+          name: tripName.trim() || existing?.name || defaultTripName(tripDestination, tripDate),
+          destination: tripDestination.trim() || existing?.destination,
+          savedAt: new Date().toISOString(),
+          entries,
+          slots,
+          packing,
+          tripDate,
+          tripDayCount,
+          baseMode,
+          planRequest,
+        };
+        const next = existing ? prev.map((t) => (t.id === id ? trip : t)) : [trip, ...prev];
+        persistTrips(next);
+        if (!existing) setActiveTripId(id);
+        return next;
+      });
+    }, 1500); // 入力のたびに書かないよう少し待つ
+    return () => clearTimeout(timer);
+  }, [
+    entries,
+    slots,
+    packing,
+    tripDate,
+    tripDayCount,
+    baseMode,
+    planRequest,
+    tripName,
+    tripDestination,
+    activeTripId,
+    readOnly,
+    persistTrips,
+  ]);
+
+  /**
+   * 新しい旅を始める（今の旅はしおりに残っているので消えない）。
+   * 「保存しなきゃ」と身構えずに次の旅を作れるようにするための入口。
+   */
+  const startNewTrip = useCallback(() => {
+    setReadOnly(false);
+    setEntries([]);
+    setSlots([]);
+    setPacking(buildDefaultPacking());
+    setCurrentNodeKey(null);
+    setCurrentNodeSetAt(null);
+    setSuggestions([]);
+    setPlanNotes(null);
+    setPlanRequest("");
+    setComposeBackup(null);
+    setComposedSig(null);
+    setTripName("");
+    setTripDestination("");
+    setTripDayCountState(1);
+    setTripDateState(todayDateStr());
+    setActiveTripId(null);
+    autoSaveSigRef.current = null;
+    scheduleSigRef.current = scheduleSignature([]);
+    openTrip("list");
+  }, [openTrip]);
 
   /** 保存した旅を履歴から削除する。 */
   const deleteTrip = useCallback((id: string) => {
@@ -1170,6 +1305,9 @@ export function useAppState() {
     packing,
     tab,
     setTab,
+    tripView,
+    setTripView,
+    openTrip,
     flash,
     justAddedEventId,
     now,
@@ -1194,6 +1332,13 @@ export function useAppState() {
     removeTripPhoto,
     loadTrip,
     deleteTrip,
+    startNewTrip,
+    tripName,
+    setTripName,
+    tripDestination,
+    setTripDestination,
+    /** 旅の表示名（未入力なら行き先や日付から作る） */
+    tripTitle: tripName.trim() || defaultTripName(tripDestination, tripDate),
     suggestions,
     areaSuggestions,
     areaSuggestionsLoading,

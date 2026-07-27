@@ -40,7 +40,7 @@ function coverOf(trip: SavedTrip): { uri: string; isPhoto: boolean; credit?: str
 }
 
 /** 1枚のしおりカード（表紙写真＋タイトル＋期間）。 */
-function ShioriCard({ trip, onPress }: { trip: SavedTrip; onPress: () => void }) {
+function ShioriCard({ trip, onPress, active }: { trip: SavedTrip; onPress: () => void; active?: boolean }) {
   // 上部に墨のグラデを重ねて白文字を可読にする。
   const cover = coverOf(trip);
   // 墨の半透明を上から下へ段階的に薄くして擬似グラデにする（追加ライブラリなし）。
@@ -54,12 +54,18 @@ function ShioriCard({ trip, onPress }: { trip: SavedTrip; onPress: () => void })
           {trip.name}
         </Text>
         <View className="mt-1 h-px w-full bg-white/40" />
-        <Text className="mt-1 font-gothic-400 text-[10px] text-white/90">{dateRange(trip)}</Text>
+        <Text className="mt-1 font-gothic-400 text-[11px] text-white/90">{dateRange(trip)}</Text>
       </View>
     </View>
   );
   return (
     <Pressable onPress={onPress} className="mb-3 w-[48%] overflow-hidden rounded-[14px] border border-black/[.08] bg-surface" style={{ aspectRatio: 0.82 }}>
+      {/* いま開いている旅が一覧の中で分かるようにする */}
+      {active && (
+        <View className="absolute bottom-2 left-2 z-10 rounded-full bg-highlight/90 px-2 py-[3px]">
+          <Text className="font-gothic-700 text-[10px] text-ink">編集中</Text>
+        </View>
+      )}
       <ImageBackground
         source={{ uri: cover.uri }}
         resizeMode="cover"
@@ -76,6 +82,7 @@ function ShioriCard({ trip, onPress }: { trip: SavedTrip; onPress: () => void })
 /** 旅のしおり一覧（写真つきカードのグリッド）。 */
 export function ShioriScreen({
   trips,
+  activeTripId,
   canCreate,
   onCreate,
   onNavigatePlan,
@@ -87,9 +94,11 @@ export function ShioriScreen({
   onRemovePhoto,
 }: {
   trips: SavedTrip[];
+  /** いま開いている旅（一覧の中で「編集中」と分かるようにする） */
+  activeTripId: string | null;
   canCreate: boolean;
   onCreate: (name: string, coverPhoto?: string) => void;
-  /** 「計画を立てにいく」導線（計画タブへ移動） */
+  /** 行き先を決めにいく導線（旅タブへ移動） */
   onNavigatePlan: () => void;
   /** 下タブから外したので、マイページへ戻る導線を置く */
   onBack: () => void;
@@ -119,8 +128,8 @@ export function ShioriScreen({
           <View className="mt-14 items-center">
             <Illustration name="empty-suitcase" size="lg" alt="" />
             <Text className="mt-3 font-mincho-600 text-[16px] text-ink">まだしおりがありません</Text>
-            <Text className="mt-1.5 text-center font-gothic-400 text-[11px] leading-[18px] text-muted">
-              しおりは「計画」で立てた旅程から作ります。{"\n"}まず計画タブで行き先を決めて、{"\n"}ここに登録しましょう。
+            <Text className="mt-1.5 text-center font-gothic-400 text-[12px] leading-[20px] text-muted">
+              しおりは、作った旅がそのまま並びます。{"\n"}まず「旅」タブで行き先を決めましょう。
             </Text>
             {canCreate ? (
               <Pressable onPress={() => setCreateOpen(true)} className="mt-5 rounded-[12px] bg-ink px-6 py-3">
@@ -135,13 +144,13 @@ export function ShioriScreen({
         ) : (
           <View className="flex-row flex-wrap justify-between">
             {trips.map((t) => (
-              <ShioriCard key={t.id} trip={t} onPress={() => setDetailId(t.id)} />
+              <ShioriCard key={t.id} trip={t} active={t.id === activeTripId} onPress={() => setDetailId(t.id)} />
             ))}
           </View>
         )}
       </ScrollView>
 
-      {/* ＋ 今の計画をしおりに登録（計画が無ければ計画タブへ誘導） */}
+      {/* ＋ 今の旅に表紙と名前を付ける（行き先が無ければ旅タブへ誘導） */}
       <Pressable
         onPress={() => (canCreate ? setCreateOpen(true) : onNavigatePlan())}
         accessibilityRole="button"
@@ -235,14 +244,14 @@ function CreateShioriSheet({
                   <PhotoPicker onPicked={setCover} maxSize={800} label={cover ? "写真を変更" : "表紙写真を選ぶ"} />
                   {cover && (
                     <Pressable onPress={() => setCover(undefined)} className="rounded-full border border-black/[.15] px-3 py-1.5">
-                      <Text className="font-gothic-400 text-[11px] text-muted">写真を外す</Text>
+                      <Text className="font-gothic-400 text-[12px] text-muted">写真を外す</Text>
                     </Pressable>
                   )}
                 </View>
               </View>
 
               <View className="mt-5 gap-1">
-                <Text className="font-gothic-400 text-[10px] text-muted">タイトル（絵文字も使えます）</Text>
+                <Text className="font-gothic-400 text-[11px] text-muted">タイトル（絵文字も使えます）</Text>
                 <TextInput
                   value={name}
                   onChangeText={setName}
@@ -258,10 +267,10 @@ function CreateShioriSheet({
                 className={`mt-5 rounded-[12px] px-4 py-3 ${canCreate ? "bg-ink" : "bg-ink/30"}`}
               >
                 <Text className="text-center font-gothic-500 text-[12px] text-kinari">
-                  {canCreate ? "今の旅程をしおりにする" : "先に計画で行き先を追加してください"}
+                  {canCreate ? "今の旅に表紙と名前を付ける" : "先に行き先を追加してください"}
                 </Text>
               </Pressable>
-              <Text className="mt-2 text-center font-gothic-400 text-[10px] text-muted-light">
+              <Text className="mt-2 text-center font-gothic-400 text-[11px] text-muted-light">
                 今の「行き先リスト」の内容がこのしおりに保存されます。
               </Text>
             </ScrollView>
@@ -333,9 +342,9 @@ function ShioriDetail({
               >
                 <View className="bg-ink/45 p-4">
                   <Text className="font-mincho-700 text-[22px] text-white">{trip.name}</Text>
-                  <Text className="mt-1 font-gothic-400 text-[11px] text-white/90">{dateRange(trip)}</Text>
+                  <Text className="mt-1 font-gothic-400 text-[12px] text-white/90">{dateRange(trip)}</Text>
                   {detailCover.credit && (
-                    <Text className="mt-1 font-gothic-400 text-[9px] text-white/70">{detailCover.credit}</Text>
+                    <Text className="mt-1 font-gothic-400 text-[10px] text-white/70">{detailCover.credit}</Text>
                   )}
                 </View>
               </ImageBackground>
@@ -345,7 +354,7 @@ function ShioriDetail({
               {byDay.map(([day, list]) => (
                 <View key={day} className="mb-4">
                   {trip.tripDayCount > 1 && (
-                    <Text className="mb-1.5 font-gothic-500 text-[11px] text-ink">{day}日目</Text>
+                    <Text className="mb-1.5 font-gothic-500 text-[12px] text-ink">{day}日目</Text>
                   )}
                   <View className="gap-2">
                     {list.map((e) => (
@@ -355,7 +364,7 @@ function ShioriDetail({
                         </Text>
                         <View className="flex-1">
                           <Text className="font-mincho-600 text-[14px] text-ink">{e.title}</Text>
-                          <Text className="font-gothic-400 text-[10px] text-muted-light">
+                          <Text className="font-gothic-400 text-[11px] text-muted-light">
                             {MODE_LABEL[e.mode]}
                             {e.place ? ` · ${e.place}` : ""}
                           </Text>
@@ -372,15 +381,15 @@ function ShioriDetail({
               {/* 思い出写真（最大30枚） */}
               <View className="mt-2 border-t border-black/[.08] pt-3">
                 <View className="flex-row items-center justify-between">
-                  <Text className="font-gothic-500 text-[11px] text-ink">
-                    旅の思い出 <Text className="font-gothic-400 text-[10px] text-muted">{photos.length}/{MAX_TRIP_PHOTOS}</Text>
+                  <Text className="font-gothic-500 text-[12px] text-ink">
+                    旅の思い出 <Text className="font-gothic-400 text-[11px] text-muted">{photos.length}/{MAX_TRIP_PHOTOS}</Text>
                   </Text>
                   {photos.length < MAX_TRIP_PHOTOS && (
                     <PhotoPicker onPickedMany={onAddPhotos} multiple maxSize={1000} label="＋ 写真を追加" />
                   )}
                 </View>
                 {photos.length === 0 ? (
-                  <Text className="mt-2 font-gothic-400 text-[10px] text-muted-light">
+                  <Text className="mt-2 font-gothic-400 text-[11px] text-muted-light">
                     旅の写真を追加して、思い出のしおりにできます（最大{MAX_TRIP_PHOTOS}枚）。
                   </Text>
                 ) : (
@@ -406,7 +415,7 @@ function ShioriDetail({
 
             {/* 操作 */}
             {confirmOpen && (
-              <Text className="px-6 pb-1 text-center font-gothic-400 text-[10px] leading-[15px] text-ink">
+              <Text className="px-6 pb-1 text-center font-gothic-400 text-[11px] leading-[17px] text-ink">
                 今の「行き先リスト」はこのしおりの内容に置き換わります。先に計画を保存していなければ戻せません。
               </Text>
             )}
