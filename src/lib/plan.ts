@@ -265,6 +265,17 @@ export function orderEntriesBySchedule(entries: PlanEntry[], slots: ScheduleSlot
   });
 }
 
+/**
+ * ParsedEvent の id から、元になった PlanEntry の id を取り出す。
+ * 旅程画面から「その予定の元の行き先」を直接編集するために使う。
+ * id は `evt-{entryId}` で、宿泊だけ `-in` / `-out` / `-stayN` が付く。
+ */
+export function entryIdFromEventId(eventId: string): string | null {
+  if (!eventId.startsWith("evt-")) return null;
+  const body = eventId.slice(4).replace(/-(in|out|stay\d+)$/, "");
+  return body || null;
+}
+
 /** 1件の PlanEntry を、種別に応じた ParsedEvent（複数になる場合あり）へ変換する。 */
 function entryToEvents(entry: PlanEntry, slot: ScheduleSlot): ParsedEvent[] {
   const base = {

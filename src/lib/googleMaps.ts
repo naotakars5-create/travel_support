@@ -300,6 +300,40 @@ export async function placeAutocomplete(input: string): Promise<PlacePrediction[
 }
 
 /**
+ * 中心とズームを指定した静的地図（Static Maps API）の画像URLを組み立てる。
+ * 地図タブの「指で動かせる地図」で使う。経路の線は引かず、候補地点だけを打つ。
+ */
+export function staticAreaMapUrl(
+  center: GeoPoint,
+  zoom: number,
+  width: number,
+  height: number,
+  markers: { p: GeoPoint; label?: string }[] = [],
+  me?: GeoPoint | null
+): string | null {
+  if (!Number.isFinite(center.lat) || !Number.isFinite(center.lng)) return null;
+  const url = new URL("https://maps.googleapis.com/maps/api/staticmap");
+  url.searchParams.set("size", `${width}x${height}`);
+  url.searchParams.set("scale", "2");
+  url.searchParams.set("language", "ja");
+  url.searchParams.set("maptype", "roadmap");
+  url.searchParams.set("center", `${center.lat.toFixed(5)},${center.lng.toFixed(5)}`);
+  url.searchParams.set("zoom", String(Math.max(1, Math.min(20, Math.round(zoom)))));
+
+  for (const { p, label } of markers) {
+    if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
+    // Static Maps のラベルは英数字1文字のみ。入らない番号は小さいマーカーにする。
+    const usable = label && /^[0-9A-Za-z]$/.test(label) ? `label:${label}|` : "size:small|";
+    url.searchParams.append("markers", `color:0x23201D|${usable}${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
+  }
+  if (me && Number.isFinite(me.lat) && Number.isFinite(me.lng)) {
+    url.searchParams.append("markers", `color:0xD96F4C|${me.lat.toFixed(5)},${me.lng.toFixed(5)}`);
+  }
+  url.searchParams.set("key", apiKey());
+  return url.toString();
+}
+
+/**
  * 旅程の全地点を結ぶ経路を描いた静的地図（Static Maps API）の画像URLを組み立てる。
  * APIキーはサーバー側にのみ埋め込む（クライアントへは露出させない）。
  */

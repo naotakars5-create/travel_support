@@ -5,8 +5,9 @@ import { RailItem, computeStats, formatDurationMin } from "@/lib/itinerary";
 import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
 import { dayOfIso, formatJstHeadingJa, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { GeoPoint, PlanEntry } from "@/lib/types";
-import { isClosedOn, closedDaysLabel, PRIORITY_META } from "@/lib/plan";
+import { isClosedOn, closedDaysLabel, entryIdFromEventId, PRIORITY_META } from "@/lib/plan";
 import { pickBenchIllustration } from "@/lib/illustrations";
+import { dayColor, tint } from "@/lib/palette";
 import { directionsUrl } from "@/lib/mapsLink";
 import { placePhotoImageUrl } from "@/lib/placePhoto";
 import { Illustration } from "./Illustration";
@@ -109,12 +110,15 @@ interface DayGroup {
 
 export function ItineraryScreen({
   rail,
+  entries,
   unplaced,
   currentNodeKey,
   justAddedEventId,
   liveLocation,
   now,
   tripDate,
+  tripDayCount,
+  readOnly,
   canUndoCompose,
   suggestOptimize,
   composing,
@@ -122,8 +126,15 @@ export function ItineraryScreen({
   onUndoCompose,
   onNavigatePlan,
   onBumpPriority,
+  onEditEntry,
+  onRemoveEntry,
+  onMoveEntry,
+  onSetEntryDay,
+  onAddToDay,
 }: {
   rail: RailItem[];
+  /** 旅程の元になっている行き先一覧（この画面から直接編集するために引く） */
+  entries: PlanEntry[];
   /** AIが時間内に収まらないと判断して外した予定 */
   unplaced: PlanEntry[];
   currentNodeKey: string | null;
@@ -131,6 +142,9 @@ export function ItineraryScreen({
   liveLocation: GeoPoint | null;
   now: Date;
   tripDate: string;
+  tripDayCount: number;
+  /** 共有された旅程を見ているだけの状態（編集操作を出さない） */
+  readOnly: boolean;
   /** 直前のAI組み直しを取り消せるか（スナップショットがあるか） */
   canUndoCompose: boolean;
   /** 行き先が最後の最適化から変わっている（AI最適化の提案チップを出す） */
@@ -140,8 +154,17 @@ export function ItineraryScreen({
   onUndoCompose: () => void;
   onNavigatePlan: () => void;
   onBumpPriority: (id: string) => void;
+  onEditEntry: (id: string) => void;
+  onRemoveEntry: (id: string) => void;
+  onMoveEntry: (id: string, dir: -1 | 1) => void;
+  onSetEntryDay: (id: string, day: number) => void;
+  /** その日に新しい行き先を足す（空き時間の「＋」から） */
+  onAddToDay: (day: number) => void;
 }) {
   const insets = useSafeAreaInsets();
+  // タップして開いている地点（そこだけ操作バーを出す）。もう一度押すと閉じる。
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const entryById = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
   // 「最適化しますか？」チップを閉じたか。行き先がさらに変わったら（suggestOptimize が立ち直したら）また出す
   const [optimizeDismissed, setOptimizeDismissed] = useState(false);
   if (!suggestOptimize && optimizeDismissed) setOptimizeDismissed(false);
@@ -235,6 +258,11 @@ export function ItineraryScreen({
         <Text className="mt-1 font-gothic-400 text-[11px] text-muted" style={TNUM}>
           {subLine}
         </Text>
+        {rail.length > 0 && !readOnly && (
+          <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted-light">
+            地点をタップすると、順番・日・内容をその場で変えられます
+          </Text>
+        )}
       </View>
       <View className="h-px w-full bg-black/[.08]" />
 
@@ -270,7 +298,10 @@ export function ItineraryScreen({
           <View key={`day-${g.day}-${gi}`}>
             {/* 日の見出し（複数日程では塗りのバンドで目立たせる） */}
             {dayGroups.length > 1 && (
-              <View className={`mb-1.5 flex-row items-baseline justify-between rounded-[10px] bg-ink px-4 py-1.5 ${gi > 0 ? "mt-2.5" : "mt-0.5"}`}>
+              <View
+                className={`mb-1.5 flex-row items-baseline justify-between rounded-[10px] px-4 py-1.5 ${gi > 0 ? "mt-2.5" : "mt-0.5"}`}
+                style={{ backgroundColor: dayColor(g.day) }}
+              >
                 <Text className="font-gothic-700 text-[14px] text-kinari">{g.day}日目</Text>
                 <Text className="font-gothic-400 text-[11px] text-kinari/80">{g.dateLabel}</Text>
               </View>
@@ -289,6 +320,8 @@ export function ItineraryScreen({
             )}
             {g.items.map((item, i) => {
               if (item.type === "node") {
+                const entryId = entryIdFromEventId(item.event.id);
+                const entry = entryId ? entryById.get(entryId) ?? null : null;
                 return (
                   <NodeRow
                     key={item.key}
@@ -298,6 +331,22 @@ export function ItineraryScreen({
                     isNext={item.key === nextUpcomingKey}
                     isPast={item.nodeIndex < currentIndex && item.key !== currentNodeKey}
                     justAdded={item.event.id === justAddedEventId}
+                    entry={entry}
+                    editable={!readOnly && Boolean(entry)}
+                    open={openKey === item.key}
+                    onToggleOpen={() => setOpenKey((k) => (k === item.key ? null : item.key))}
+                    tripDayCount={tripDayCount}
+                    dayNumber={g.day}
+                    onEditEntry={onEditEntry}
+                    onRemoveEntry={(id) => {
+                      setOpenKey(null);
+                      onRemoveEntry(id);
+                    }}
+                    onMoveEntry={onMoveEntry}
+                    onSetEntryDay={(id, d) => {
+                      setOpenKey(null);
+                      onSetEntryDay(id, d);
+                    }}
                   />
                 );
               }
@@ -387,6 +436,18 @@ export function ItineraryScreen({
                             空き時間 · {formatDurationMin(item.durationMin)}
                           </Text>
                         </View>
+                        {/* 空いている所にその場で行き先を足せるようにする（この日が初期選択される） */}
+                        {!readOnly && (
+                          <Pressable
+                            onPress={() => onAddToDay(g.day)}
+                            hitSlop={6}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${g.day}日目のこの時間に行き先を追加`}
+                            className="rounded-full border border-accent/45 bg-accent/[.08] px-2.5 py-1"
+                          >
+                            <Text className="font-gothic-500 text-[11px] text-accent">＋ ここに追加</Text>
+                          </Pressable>
+                        )}
                       </View>
                     )}
                   </View>
@@ -399,7 +460,10 @@ export function ItineraryScreen({
         {/* AIが時間内に収まらないと判断して外した予定 */}
         {unplaced.length > 0 && (
           <View className="mt-7">
-            <Text className="mb-2 font-gothic-500 text-[10px] tracking-[.15em] text-ink">旅程に入らなかった予定</Text>
+            <View className="mb-2 flex-row items-center gap-1.5">
+              <View className="h-[11px] w-[3px] rounded-full bg-accent" />
+              <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-ink">旅程に入らなかった予定</Text>
+            </View>
             <View className="rounded-[16px] border border-ink/25">
               {unplaced.map((e, i) => (
                 <View key={e.id} className={`flex-row items-center justify-between px-4 py-3 ${i > 0 ? "border-t border-black/[.06]" : ""}`}>
@@ -425,6 +489,40 @@ export function ItineraryScreen({
   );
 }
 
+/** 地点カードを開いた時に出す操作ボタン。 */
+function ActionChip({
+  label,
+  onPress,
+  disabled,
+  tone = "plain",
+  accessibilityLabel,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  tone?: "plain" | "accent" | "danger";
+  accessibilityLabel?: string;
+}) {
+  const cls =
+    tone === "accent"
+      ? "border-accent/50 bg-accent/[.1]"
+      : tone === "danger"
+        ? "border-ink/25 bg-transparent"
+        : "border-ink/20 bg-white/70";
+  const textCls = tone === "accent" ? "text-accent" : tone === "danger" ? "text-muted" : "text-ink";
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      className={`rounded-full border px-2.5 py-1 ${cls} ${disabled ? "opacity-35" : ""}`}
+    >
+      <Text className={`font-gothic-500 text-[11px] ${textCls}`}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function NodeRow({
   item,
   stopNumber,
@@ -432,6 +530,16 @@ function NodeRow({
   isNext,
   isPast,
   justAdded,
+  entry,
+  editable,
+  open,
+  onToggleOpen,
+  tripDayCount,
+  dayNumber,
+  onEditEntry,
+  onRemoveEntry,
+  onMoveEntry,
+  onSetEntryDay,
 }: {
   item: Extract<RailItem, { type: "node" }>;
   stopNumber?: number;
@@ -440,9 +548,24 @@ function NodeRow({
   isNext: boolean;
   isPast: boolean;
   justAdded: boolean;
+  /** この地点の元になっている行き先（無い場合は編集できない） */
+  entry: PlanEntry | null;
+  editable: boolean;
+  open: boolean;
+  onToggleOpen: () => void;
+  tripDayCount: number;
+  dayNumber: number;
+  onEditEntry: (id: string) => void;
+  onRemoveEntry: (id: string) => void;
+  onMoveEntry: (id: string, dir: -1 | 1) => void;
+  onSetEntryDay: (id: string, day: number) => void;
 }) {
   const nodeInStyle = useNodeInStyle(justAdded);
-  const markerBg = isCurrent ? "#D96F4C" : isPast ? "#6E675C" : "#23201D";
+  // 宿泊・レンタカーは並び順が時刻で決まるため、上下移動はさせない（内容の編集だけ）
+  const reorderable = Boolean(entry && entry.mode !== "stay" && entry.mode !== "rental");
+  // その日の色。番号とカードの縁に薄く効かせて、日ごとのまとまりを分かりやすくする
+  const dc = dayColor(dayNumber);
+  const markerBg = isCurrent ? "#D96F4C" : isPast ? "#6E675C" : dayColor(dayNumber);
   // 時刻は「開始〜終了」の1行にまとめる（滞在時間を別行に出さずに済み、情報が密になる）
   const start = new Date(item.time);
   const timeLabel =
@@ -461,10 +584,22 @@ function NodeRow({
       {/* 溝は空ける（番号はカードの中に入れる。縦線はカードとカードの間だけ通る） */}
       <View style={{ width: GUTTER_W }} />
       <View className="flex-1 pb-1 pl-1">
-        <View
-          className={`rounded-[12px] border px-2.5 py-1.5 ${isCurrent ? "border-accent/50 bg-accent/[.06]" : "border-black/[.07] bg-white/60"}`}
-          // 次に向かう予定：左に3pxのテラコッタ縦ボーダー（今・進行中の合図）
-          style={isNext && !isCurrent ? { borderLeftWidth: 3, borderLeftColor: "#D96F4C" } : undefined}
+        <Pressable
+          disabled={!editable}
+          onPress={onToggleOpen}
+          accessibilityRole={editable ? "button" : undefined}
+          accessibilityLabel={editable ? `${item.event.title || item.place}の予定を変更する` : undefined}
+          className={`rounded-[12px] border px-2.5 py-1.5 ${
+            open ? "border-accent bg-accent/[.09]" : isCurrent ? "border-accent/50 bg-accent/[.06]" : ""
+          }`}
+          style={[
+            // 平常時はその日の色を縁と下地にごく薄く効かせる（日ごとのまとまりが出る）
+            open || isCurrent
+              ? null
+              : { borderColor: tint(dc, isPast ? 0.14 : 0.28), backgroundColor: tint(dc, isPast ? 0.03 : 0.06) },
+            // 次に向かう予定：左に3pxのテラコッタ縦ボーダー（今・進行中の合図）
+            isNext && !isCurrent ? { borderLeftWidth: 3, borderLeftColor: "#D96F4C" } : null,
+          ]}
         >
           {/* 番号・時刻・行き先を1行に。番号がカードの中に入るので、地点の区切りが分かりやすい */}
           <View className="flex-row items-center gap-2">
@@ -515,7 +650,47 @@ function NodeRow({
               ) : null}
             </View>
           )}
-        </View>
+
+          {/* タップで開く操作バー。旅程の画面から直接、順番・日・内容を変えられる。 */}
+          {open && entry && (
+            <View className="mt-1.5 border-t border-accent/25 pt-1.5" style={{ paddingLeft: 30 }}>
+              <View className="flex-row flex-wrap items-center gap-1.5">
+                <ActionChip label="内容を編集" tone="accent" onPress={() => onEditEntry(entry.id)} />
+                {reorderable && (
+                  <>
+                    <ActionChip label="↑ 前へ" accessibilityLabel="この地点を一つ前にする" onPress={() => onMoveEntry(entry.id, -1)} />
+                    <ActionChip label="↓ 後へ" accessibilityLabel="この地点を一つ後にする" onPress={() => onMoveEntry(entry.id, 1)} />
+                  </>
+                )}
+                <ActionChip label="削除" tone="danger" accessibilityLabel={`${entry.title || "この地点"}を削除`} onPress={() => onRemoveEntry(entry.id)} />
+              </View>
+              {tripDayCount > 1 && reorderable && (
+                <View className="mt-1.5 flex-row flex-wrap items-center gap-1.5">
+                  <Text className="font-gothic-400 text-[10px] text-muted">日を移す</Text>
+                  {Array.from({ length: tripDayCount }, (_, k) => k + 1).map((d) => (
+                    <Pressable
+                      key={d}
+                      disabled={d === dayNumber}
+                      onPress={() => onSetEntryDay(entry.id, d)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${d}日目へ移す`}
+                      className="rounded-full border px-2 py-[3px]"
+                      style={
+                        d === dayNumber
+                          ? { backgroundColor: dayColor(d), borderColor: dayColor(d) }
+                          : { backgroundColor: "rgba(255,255,255,.7)", borderColor: tint(dayColor(d), 0.3) }
+                      }
+                    >
+                      <Text className={`font-gothic-500 text-[10px] ${d === dayNumber ? "text-kinari" : "text-ink"}`} style={TNUM}>
+                        {d}日目
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+        </Pressable>
       </View>
     </Animated.View>
   );

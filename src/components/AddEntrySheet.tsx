@@ -7,7 +7,7 @@ import { TransportMode } from "@/lib/types";
 import { SlideUp } from "./animations";
 
 type Mode = "manual" | "bulk" | "mail";
-const MUTED = "#6E675C";
+const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 export function AddEntrySheet({
   onClose,
@@ -17,6 +17,7 @@ export function AddEntrySheet({
   tripDate,
   tripDayCount,
   fixedMode,
+  initialDay,
   title = "行き先を追加",
 }: {
   onClose: () => void;
@@ -28,6 +29,8 @@ export function AddEntrySheet({
   tripDayCount: number;
   /** 種別を固定する（宿泊先の専用入力など）。指定時はメール取込を隠す。 */
   fixedMode?: TransportMode;
+  /** 何日目を初期選択にするか（旅程の空き時間から開いた場合） */
+  initialDay?: number;
   title?: string;
 }) {
   const insets = useSafeAreaInsets();
@@ -104,7 +107,13 @@ export function AddEntrySheet({
                   onSubmit={onAdd}
                   tripDate={tripDate}
                   tripDayCount={tripDayCount}
-                  initial={fixedMode ? { title: "", mode: fixedMode, priority: "must" } : undefined}
+                  initial={
+                    fixedMode
+                      ? { title: "", mode: fixedMode, priority: "must", day: initialDay }
+                      : initialDay
+                        ? { title: "", mode: "activity", priority: "want", stayMin: 60, day: initialDay }
+                        : undefined
+                  }
                   lockMode={Boolean(fixedMode)}
                   submitLabel={
                     fixedMode === "stay" ? "宿泊先を追加" : fixedMode === "rental" ? "レンタカーを登録" : "行き先を追加"
@@ -123,7 +132,7 @@ export function AddEntrySheet({
                       numberOfLines={6}
                       textAlignVertical="top"
                       placeholder={"例: 大阪城、海遊館、道頓堀で夕食。\n2日目はUSJに1日いる"}
-                      placeholderTextColor={MUTED}
+                      placeholderTextColor={PLACEHOLDER}
                       className="min-h-[120px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[13px] leading-[20px] text-ink"
                     />
                   </View>
@@ -150,7 +159,7 @@ export function AddEntrySheet({
                       value={source}
                       onChangeText={setSource}
                       placeholder="例: JAL / 一休.com"
-                      placeholderTextColor={MUTED}
+                      placeholderTextColor={PLACEHOLDER}
                       className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
                     />
                   </View>
@@ -163,7 +172,7 @@ export function AddEntrySheet({
                       numberOfLines={10}
                       textAlignVertical="top"
                       placeholder="メール本文をここに貼り付け"
-                      placeholderTextColor={MUTED}
+                      placeholderTextColor={PLACEHOLDER}
                       className="min-h-[160px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[12px] leading-[18px] text-ink"
                     />
                   </View>

@@ -100,7 +100,10 @@ export function ProfileScreen({
         </View>
 
         {/* しおり・持ち物は下タブから外したので、ここが入口になる */}
-        <Text className="mb-2 mt-8 font-gothic-500 text-[10px] tracking-[.15em] text-muted">旅の道具</Text>
+        <View className="mb-2 mt-8 flex-row items-center gap-1.5">
+          <View className="h-[11px] w-[3px] rounded-full bg-accent" />
+          <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">旅の道具</Text>
+        </View>
         <View className="overflow-hidden rounded-[16px] border border-ink/10">
           <Pressable
             onPress={onOpenShiori}
@@ -129,7 +132,10 @@ export function ProfileScreen({
         </View>
 
         {/* 各種設定 */}
-        <Text className="mb-2 mt-8 font-gothic-500 text-[10px] tracking-[.15em] text-muted">設定</Text>
+        <View className="mb-2 mt-8 flex-row items-center gap-1.5">
+          <View className="h-[11px] w-[3px] rounded-full bg-accent" />
+          <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">設定</Text>
+        </View>
         <View className="overflow-hidden rounded-[16px] border border-ink/10">
           {MENU.map((m, i) => (
             <Pressable

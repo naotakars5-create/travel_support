@@ -12,6 +12,14 @@ module.exports = {
         muted: "#6E675C", // 補助テキスト（ink-muted）
         accent: "#D96F4C", // テラコッタ：今・進行中だけ
         highlight: "#F0B429", // マスタード：完了・達成だけ
+        // ===== 日ごとの色（伝統色・落ち着いた一族。1日目/2日目…の見分けだけに使う）=====
+        // 生成り(#F4EFE5)の文字を載せてコントラスト比4.5以上になる濃さに揃えてある。
+        // 実際の割り当ては src/lib/palette.ts の DAY_COLORS を使う。
+        ai: "#4A6B8A", // 藍
+        matsuba: "#55704F", // 松葉
+        ume: "#96536B", // 梅
+        kuchiba: "#7D5F36", // 朽葉
+        namari: "#4F5D6B", // 鉛
         // ===== 旧トークン名のエイリアス（値は上の6トークンに統一）=====
         kinari: "#F4EFE5", // = base
         "muted-light": "#6E675C", // = muted

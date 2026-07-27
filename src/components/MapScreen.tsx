@@ -1,19 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GeoPoint } from "@/lib/types";
 import { createSpotProvider, Spot } from "@/lib/spots";
 import { haversineMeters } from "@/lib/geo";
-import { RouteMap } from "./RouteMap";
+import { clampZoom, viewRadiusMeters } from "@/lib/mercator";
+import { MapMarker, PannableMap } from "./PannableMap";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 
-/** 探すジャンル。Places の検索半径だけを変え、種別は「観光」で統一して結果のばらつきを抑える。 */
-const RANGES: { label: string; meters: number }[] = [
-  { label: "すぐ近く", meters: 1200 },
-  { label: "この街", meters: 5000 },
-  { label: "広めに", meters: 15000 },
-];
+/** 最初に開いた時のズーム（街の広がりがひと目で分かるくらい）。 */
+const INITIAL_ZOOM = 13;
+/** 地図に打てるピンの数（Static Maps のURL長に収まる範囲）。 */
+const MAX_PINS = 12;
 
 /** 距離（メートル）の表示。 */
 function formatDistance(meters: number): string {
@@ -22,7 +21,7 @@ function formatDistance(meters: number): string {
 }
 
 /**
- * 地図タブ。旅の周辺スポットを探して、タップで計画へ足せる。
+ * 地図タブ。画面いっぱいの地図を指で動かし、見えている範囲からスポットを探して計画へ足す。
  * 基点は「登録した行き先の中心」→無ければ現在地。
  */
 export function MapScreen({
@@ -41,146 +40,219 @@ export function MapScreen({
   onNavigatePlan: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const [rangeIndex, setRangeIndex] = useState(1);
+  const origin = center ?? liveLocation;
+
+  const [mapCenter, setMapCenter] = useState<GeoPoint | null>(origin);
+  const [zoom, setZoom] = useState(INITIAL_ZOOM);
   const [spots, setSpots] = useState<Spot[]>([]);
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<string | null>(null);
+  // 探した時の中心。ここから離れたら「この範囲で探す」を出す
+  const [searchedAt, setSearchedAt] = useState<GeoPoint | null>(null);
+  const [viewSize, setViewSize] = useState({ width: 320, height: 420 });
 
-  const origin = center ?? liveLocation;
-  const radius = RANGES[rangeIndex].meters;
-  const originKey = origin ? `${origin.lat.toFixed(3)},${origin.lng.toFixed(3)}|${radius}` : null;
-
-  /* eslint-disable react-hooks/set-state-in-effect -- 外部API（周辺スポット）取得のため意図的 */
+  // 行き先が後から登録された場合に、まだ動かしていなければ基点へ寄せる
+  const started = useRef(false);
   useEffect(() => {
-    if (!origin) {
-      setSpots([]);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    createSpotProvider(true)
-      .nearby(origin.lat, origin.lng, 120, false, radius)
-      .then((res) => {
-        if (!cancelled) setSpots(res);
-      })
-      .catch(() => {
-        if (!cancelled) setSpots([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // 基点と範囲が変わった時だけ取り直す
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [originKey]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+    if (started.current || !origin) return;
+    started.current = true;
+    setMapCenter(origin);
+  }, [origin]);
 
-  const fresh = spots.filter((s) => !existingTitles.has(s.name));
-  const mapPoints = fresh.filter((s) => s.lat != null && s.lng != null).slice(0, 10).map((s) => ({ lat: s.lat!, lng: s.lng! }));
+  const search = useCallback(
+    (at: GeoPoint, z: number) => {
+      const radius = Math.max(500, Math.min(20000, viewRadiusMeters(at, z, viewSize.width, viewSize.height)));
+      setLoading(true);
+      setSearchedAt(at);
+      createSpotProvider(true)
+        .nearby(at.lat, at.lng, 120, false, radius)
+        .then((res) => setSpots(res))
+        .catch(() => setSpots([]))
+        .finally(() => setLoading(false));
+    },
+    [viewSize.width, viewSize.height]
+  );
+
+  // 最初の1回だけ自動で探す（あとは指で動かして「この範囲で探す」）
+  const autoSearched = useRef(false);
+  useEffect(() => {
+    if (autoSearched.current || !mapCenter) return;
+    autoSearched.current = true;
+    search(mapCenter, zoom);
+  }, [mapCenter, zoom, search]);
+
+  const fresh = useMemo(() => spots.filter((s) => !existingTitles.has(s.name)), [spots, existingTitles]);
+  const pins: MapMarker[] = useMemo(
+    () =>
+      fresh
+        .filter((s) => s.lat != null && s.lng != null)
+        .slice(0, MAX_PINS)
+        .map((s, i) => ({ p: { lat: s.lat!, lng: s.lng! }, label: String(i + 1) })),
+    [fresh]
+  );
+
+  // 中心が表示の1/4以上動いたら、探し直しを促す
+  const moved = useMemo(() => {
+    if (!mapCenter || !searchedAt) return false;
+    const shownRadius = viewRadiusMeters(mapCenter, zoom, viewSize.width, viewSize.height);
+    return haversineMeters(mapCenter, searchedAt) > shownRadius * 0.5;
+  }, [mapCenter, searchedAt, zoom, viewSize.width, viewSize.height]);
+
+  if (!origin || !mapCenter) {
+    return (
+      <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
+        <View className="px-[26px] pb-2 pt-3">
+          <Text className="font-mincho-600 text-[26px] text-ink">地図で探す</Text>
+        </View>
+        <View className="h-px w-full bg-black/[.08]" />
+        <Pressable onPress={onNavigatePlan} className="mt-10 self-center rounded-[12px] border border-ink/25 px-5 py-3">
+          <Text className="text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
+            まだ基点がありません。{"\n"}「計画」で行き先をひとつ追加してください。
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
-      <View className="px-[26px] pb-2 pt-3">
-        <Text className="font-mincho-600 text-[26px] text-ink">地図で探す</Text>
-        <Text className="mt-1 font-gothic-400 text-[11px] text-muted">
-          {origin ? "タップすると計画の行き先リストに追加します" : "行き先を1つ登録すると、その周辺から探せます"}
-        </Text>
+      {/* 見出しは1行だけ。地図に高さを譲る */}
+      <View className="flex-row items-baseline justify-between px-[26px] pb-2 pt-2">
+        <Text className="font-mincho-600 text-[20px] text-ink">地図で探す</Text>
+        <Text className="font-gothic-400 text-[10px] text-muted">指で動かして、見えている範囲から探せます</Text>
       </View>
-      <View className="h-px w-full bg-black/[.08]" />
 
-      <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 10, paddingBottom: 90 }}>
-        {!origin ? (
-          <Pressable onPress={onNavigatePlan} className="mt-10 self-center rounded-[12px] border border-ink/25 px-5 py-3">
-            <Text className="text-center font-gothic-400 text-[12px] text-muted">
-              まだ基点がありません。{"\n"}「計画」で行き先をひとつ追加してください。
-            </Text>
-          </Pressable>
-        ) : (
-          <>
-            {/* 探す範囲 */}
-            <View className="mb-2.5 flex-row gap-2">
-              {RANGES.map((r, i) => {
-                const active = i === rangeIndex;
-                return (
-                  <Pressable
-                    key={r.label}
-                    onPress={() => setRangeIndex(i)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    className={`rounded-full border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.12] bg-white/50"}`}
-                  >
-                    <Text className={`font-gothic-400 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>{r.label}</Text>
-                  </Pressable>
-                );
-              })}
+      <View
+        className="flex-1"
+        onLayout={(e) => {
+          const { width, height } = e.nativeEvent.layout;
+          setViewSize((prev) =>
+            Math.abs(prev.width - width) < 1 && Math.abs(prev.height - height) < 1 ? prev : { width, height }
+          );
+        }}
+      >
+        <PannableMap
+          center={mapCenter}
+          zoom={zoom}
+          markers={pins}
+          me={liveLocation}
+          onCenterChange={setMapCenter}
+          onZoomChange={(z) => setZoom(clampZoom(z))}
+        >
+          {/* 現在地へ戻る */}
+          {liveLocation && (
+            <Pressable
+              onPress={() => setMapCenter(liveLocation)}
+              accessibilityRole="button"
+              accessibilityLabel="現在地へ移動"
+              className="absolute right-3 top-[104px] h-9 w-9 items-center justify-center rounded-[12px] border border-ink/15 bg-kinari/95"
+            >
+              <Text className="font-gothic-500 text-[13px] text-accent">◎</Text>
+            </Pressable>
+          )}
+
+          {/* この範囲で探す（動かした時だけ出す） */}
+          {(moved || loading) && (
+            <View className="absolute left-0 right-0 top-3 items-center">
+              <Pressable
+                disabled={loading}
+                onPress={() => search(mapCenter, zoom)}
+                accessibilityRole="button"
+                accessibilityLabel="この範囲でスポットを探す"
+                className={`flex-row items-center gap-2 rounded-full px-4 py-2 ${loading ? "bg-ink/70" : "bg-accent"}`}
+              >
+                {loading && <ActivityIndicator size="small" color="#F4EFE5" />}
+                <Text className="font-gothic-500 text-[12px] text-kinari">
+                  {loading ? "探しています…" : "この範囲で探す"}
+                </Text>
+              </Pressable>
             </View>
+          )}
 
-            {/* 候補の位置関係が分かる地図 */}
-            <RouteMap points={mapPoints} me={liveLocation} caption={`この辺の候補 · ${fresh.length}件`} />
-
-            {loading && (
-              <View className="flex-row items-center gap-2 py-3">
-                <ActivityIndicator size="small" color="#6E675C" />
-                <Text className="font-gothic-400 text-[11px] text-muted">近くのスポットを探しています…</Text>
+          {/* 候補カード（横に流す）。地図の上に重ねて、地図を隠しすぎないようにする */}
+          <View className="absolute bottom-0 left-0 right-0 pb-2">
+            {!loading && fresh.length === 0 ? (
+              <View className="mx-4 rounded-[14px] border border-ink/12 bg-kinari/95 px-4 py-3">
+                <Text className="text-center font-gothic-400 text-[11px] leading-[17px] text-muted">
+                  この範囲では候補が見つかりませんでした。{"\n"}地図を動かすか「−」で広げて探してみてください。
+                </Text>
               </View>
-            )}
-
-            {!loading && fresh.length === 0 && (
-              <Text className="mt-6 text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
-                この範囲では新しい候補が見つかりませんでした。{"\n"}範囲を広げてみてください。
-              </Text>
-            )}
-
-            <View className="overflow-hidden rounded-[14px] border border-ink/10">
-              {fresh.map((s, i) => {
-                const isAdded = added.has(s.name);
-                const distance =
-                  origin && s.lat != null && s.lng != null ? haversineMeters(origin, { lat: s.lat, lng: s.lng }) : null;
-                return (
-                  <View key={s.name} className={`flex-row items-center gap-2 px-4 py-2.5 ${i > 0 ? "border-t border-ink/10" : ""}`}>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 14, gap: 10 }}
+              >
+                {fresh.slice(0, MAX_PINS).map((s, i) => {
+                  const isAdded = added.has(s.name);
+                  const distance =
+                    s.lat != null && s.lng != null ? haversineMeters(mapCenter, { lat: s.lat, lng: s.lng }) : null;
+                  const isSelected = selected === s.name;
+                  return (
                     <Pressable
+                      key={s.name}
                       onPress={() => {
-                        if (s.lat != null && s.lng != null) {
-                          void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`);
-                        }
+                        setSelected(s.name);
+                        if (s.lat != null && s.lng != null) setMapCenter({ lat: s.lat, lng: s.lng });
                       }}
                       accessibilityRole="button"
-                      accessibilityLabel={`${s.name}を地図で見る`}
-                      className="flex-1"
+                      accessibilityLabel={`${s.name}を地図の中心にする`}
+                      className={`w-[228px] rounded-[14px] border bg-kinari/97 px-3.5 py-2.5 ${
+                        isSelected ? "border-accent" : "border-ink/12"
+                      }`}
                     >
-                      <Text className="font-mincho-600 text-[14px] text-ink">{s.name}</Text>
-                      <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
-                        {[s.category, distance != null ? formatDistance(distance) : null, s.note].filter(Boolean).join(" · ")}
-                      </Text>
-                      {s.address && (
-                        <Text numberOfLines={1} className="mt-0.5 font-gothic-400 text-[10px] text-muted-light">
-                          {s.address}
+                      <View className="flex-row items-center gap-2">
+                        <View className="h-[18px] w-[18px] items-center justify-center rounded-full bg-ink">
+                          <Text className="font-gothic-500 text-[10px] text-kinari" style={TNUM}>
+                            {i + 1}
+                          </Text>
+                        </View>
+                        <Text numberOfLines={1} className="flex-1 font-mincho-600 text-[14px] text-ink">
+                          {s.name}
                         </Text>
-                      )}
-                    </Pressable>
-                    <Pressable
-                      disabled={isAdded}
-                      onPress={() => {
-                        onAddSpot(s);
-                        setAdded((prev) => new Set(prev).add(s.name));
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${s.name}を計画に追加`}
-                      className={`rounded-full px-3 py-1.5 ${isAdded ? "border border-ink/20" : "bg-ink"}`}
-                    >
-                      <Text className={`font-gothic-500 text-[11px] ${isAdded ? "text-muted-light" : "text-kinari"}`}>
-                        {isAdded ? "追加済み" : "＋ 計画へ"}
+                      </View>
+                      <Text numberOfLines={1} className="mt-1 font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                        {[s.category, distance != null ? formatDistance(distance) : null, s.note]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </Text>
+                      <View className="mt-2 flex-row items-center gap-2">
+                        <Pressable
+                          disabled={isAdded}
+                          onPress={() => {
+                            onAddSpot(s);
+                            setAdded((prev) => new Set(prev).add(s.name));
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${s.name}を計画に追加`}
+                          className={`flex-1 items-center rounded-full py-1.5 ${isAdded ? "border border-ink/20" : "bg-accent"}`}
+                        >
+                          <Text className={`font-gothic-500 text-[11px] ${isAdded ? "text-muted-light" : "text-kinari"}`}>
+                            {isAdded ? "追加済み" : "＋ 計画へ"}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            const q = s.lat != null && s.lng != null ? `${s.lat},${s.lng}` : s.name;
+                            void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`);
+                          }}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${s.name}をGoogleマップで見る`}
+                          className="rounded-full border border-ink/20 px-2.5 py-1.5"
+                        >
+                          <Text className="font-gothic-400 text-[10px] text-muted">詳しく</Text>
+                        </Pressable>
+                      </View>
                     </Pressable>
-                  </View>
-                );
-              })}
-            </View>
-          </>
-        )}
-      </ScrollView>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </PannableMap>
+      </View>
     </View>
   );
 }

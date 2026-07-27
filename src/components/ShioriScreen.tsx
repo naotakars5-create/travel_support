@@ -9,7 +9,7 @@ import { PhotoPicker } from "./PhotoPicker";
 import { Illustration, illustrationUri } from "./Illustration";
 import { SlideUp } from "./animations";
 
-const MUTED = "#6E675C";
+const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 /** "2023-09-01" → "2023.09.01" */
 function dot(dateStr: string): string {
@@ -247,7 +247,7 @@ function CreateShioriSheet({
                   value={name}
                   onChangeText={setName}
                   placeholder="例: 沖縄弾丸旅行 ✈️"
-                  placeholderTextColor={MUTED}
+                  placeholderTextColor={PLACEHOLDER}
                   className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
                 />
               </View>

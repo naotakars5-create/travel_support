@@ -7,7 +7,7 @@ import { illustrationUri } from "./Illustration";
 import { PhotoPicker } from "./PhotoPicker";
 import { SlideUp } from "./animations";
 
-const MUTED = "#6E675C";
+const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 /** 名前・アイコン（絵文字/写真）を登録/編集するプロフィール画面（半モーダル）。 */
 export function ProfileSheet({
@@ -83,7 +83,7 @@ export function ProfileSheet({
                   value={name}
                   onChangeText={setName}
                   placeholder="例: なおたか"
-                  placeholderTextColor={MUTED}
+                  placeholderTextColor={PLACEHOLDER}
                   className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
                 />
               </View>
