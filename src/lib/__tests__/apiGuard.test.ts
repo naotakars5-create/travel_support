@@ -11,6 +11,32 @@ describe("guardRequest", () => {
     expect(guardRequest(req("/api/b"), 100)).toBeNull();
   });
 
+  it("プロキシ内側で request.url が内部アドレスでも、転送ヘッダで同一オリジンと判定する", () => {
+    // EAS Hosting 等では request.url が内部ホストになる。これだけで判定すると
+    // 同一オリジンの正当なPOSTまで403になり、住所補完や地図が静かに壊れる。
+    const r = new Request("http://localhost:8081/api/geocode", {
+      method: "POST",
+      headers: { origin: "https://travel-support.expo.app", "x-forwarded-host": "travel-support.expo.app" },
+    });
+    expect(guardRequest(r, 100)).toBeNull();
+  });
+
+  it("host ヘッダだけでも同一オリジンと判定できる", () => {
+    const r = new Request("http://127.0.0.1:3000/api/geocode", {
+      method: "POST",
+      headers: { origin: "https://travel-support.expo.app", host: "travel-support.expo.app" },
+    });
+    expect(guardRequest(r, 100)).toBeNull();
+  });
+
+  it("転送ヘッダがあっても別オリジンは通さない", () => {
+    const r = new Request("http://localhost:8081/api/geocode", {
+      method: "POST",
+      headers: { origin: "https://evil.example.net", "x-forwarded-host": "travel-support.expo.app" },
+    });
+    expect(guardRequest(r, 100)?.status).toBe(403);
+  });
+
   it("別オリジンのブラウザリクエストは 403", () => {
     const res = guardRequest(req("/api/c", { origin: "https://evil.example.net" }), 100);
     expect(res?.status).toBe(403);

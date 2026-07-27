@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Animated, Easing } from "react-native";
+import { Animated, Easing, StyleProp, ViewStyle } from "react-native";
 
 /** CSS `animate-spin`相当：一定速度で回転し続けるリング */
 export function Spinner({ size = 20, color = "#6E675C" }: { size?: number; color?: string }) {
@@ -141,7 +141,16 @@ export function FlashFade({
 }
 
 /** CSS `animate-sheetup` 相当：下からスライドインする半モーダル用ラッパー */
-export function SlideUp({ children, trigger }: { children: React.ReactNode; trigger: unknown }) {
+export function SlideUp({
+  children,
+  trigger,
+  style,
+}: {
+  children: React.ReactNode;
+  trigger: unknown;
+  /** 高さを制限したいシートで maxHeight などを渡す */
+  style?: StyleProp<ViewStyle>;
+}) {
   const [translateY] = useState(() => new Animated.Value(40));
   const [fadeIn] = useState(() => new Animated.Value(0));
 
@@ -155,7 +164,7 @@ export function SlideUp({ children, trigger }: { children: React.ReactNode; trig
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trigger]);
 
-  return <Animated.View style={{ transform: [{ translateY }], opacity: fadeIn }}>{children}</Animated.View>;
+  return <Animated.View style={[{ transform: [{ translateY }], opacity: fadeIn }, style]}>{children}</Animated.View>;
 }
 
 /** CSS `animate-nodein` 相当：新規追加ノードのフェード＋わずかな下降 */

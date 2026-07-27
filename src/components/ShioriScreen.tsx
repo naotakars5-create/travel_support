@@ -203,10 +203,10 @@ function CreateShioriSheet({
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <View className="flex-1">
-        <Pressable className="flex-1 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
-        <SlideUp trigger="create-shiori">
-          <View className="max-h-[88%] rounded-t-sheet bg-sheet px-6 pt-3" style={{ paddingBottom: insets.bottom + 24 }}>
+      <View className="flex-1 justify-end">
+        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <SlideUp trigger="create-shiori" style={{ maxHeight: "90%" }}>
+          <View className="rounded-t-sheet bg-sheet px-6 pt-3" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />
             <View className="mb-4 flex-row items-center justify-between">
               <Pressable onPress={onClose} hitSlop={8} className="rounded-full border border-black/[.15] px-3 py-1">
@@ -216,7 +216,7 @@ function CreateShioriSheet({
               <View className="w-[52px]" />
             </View>
 
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
               {/* 表紙プレビュー */}
               <View className="items-center gap-3">
                 <View className="h-40 w-full overflow-hidden rounded-[14px] border border-black/[.1] bg-surface">
@@ -311,10 +311,10 @@ function ShioriDetail({
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <View className="flex-1">
-        <Pressable className="flex-1 bg-[rgba(28,25,21,.4)]" onPress={onClose} />
-        <SlideUp trigger={trip.id}>
-          <View className="max-h-[90%] rounded-t-sheet bg-sheet" style={{ paddingBottom: insets.bottom + 20 }}>
+      <View className="flex-1 justify-end">
+        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.4)]" onPress={onClose} />
+        <SlideUp trigger={trip.id} style={{ maxHeight: "90%" }}>
+          <View className="rounded-t-sheet bg-sheet" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 20 }}>
             {/* 表紙 */}
             <View className="h-44 overflow-hidden rounded-t-sheet">
               {/* 戻るボタン */}
@@ -341,7 +341,7 @@ function ShioriDetail({
               </ImageBackground>
             </View>
 
-            <ScrollView className="px-6" contentContainerStyle={{ paddingTop: 14, paddingBottom: 14 }}>
+            <ScrollView className="px-6" style={{ flexShrink: 1 }} contentContainerStyle={{ paddingTop: 14, paddingBottom: 14 }}>
               {byDay.map(([day, list]) => (
                 <View key={day} className="mb-4">
                   {trip.tripDayCount > 1 && (

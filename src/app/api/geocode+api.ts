@@ -4,7 +4,7 @@ import { geocodeAddress, hasGoogleMapsKey } from "@/lib/googleMaps";
 const cache = new LruCache<{ lat: number; lng: number } | null>(1000);
 
 export async function POST(request: Request): Promise<Response> {
-  const denied = guardRequest(request, 60);
+  const denied = guardRequest(request, 150);
   if (denied) return denied;
 
   let payload: { query?: string };

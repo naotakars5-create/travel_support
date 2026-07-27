@@ -6,7 +6,7 @@ import { hasGoogleMapsKey, placeAutocomplete } from "@/lib/googleMaps";
  * キー未設定・エラー時は空配列を返し、フォームは通常どおり手入力できる。
  */
 export async function POST(request: Request): Promise<Response> {
-  const denied = guardRequest(request, 60);
+  const denied = guardRequest(request, 150);
   if (denied) return denied;
 
   let payload: { input?: string };
