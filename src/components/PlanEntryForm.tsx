@@ -42,12 +42,12 @@ function OpenHoursNote({
   closedDays?: number[];
 }) {
   if (loading) {
-    return <Text className="font-gothic-400 text-[10px] text-muted-light">営業時間を取得中…</Text>;
+    return <Text className="font-gothic-400 text-[11px] text-muted-light">営業時間を取得中…</Text>;
   }
   if (openFrom || openTo) {
     const closed = closedDaysLabel({ closedDays });
     return (
-      <Text className="font-gothic-400 text-[10px] text-muted">
+      <Text className="font-gothic-400 text-[11px] text-muted">
         営業時間 {openFrom ?? "?"}〜{openTo ?? "?"}
         {closed ? `・${closed}` : ""}（自動取得・AIがこの時間内に組みます）
       </Text>
@@ -59,7 +59,7 @@ function OpenHoursNote({
 function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} className={`rounded-full border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.12] bg-white/50"}`}>
-      <Text className={`font-gothic-400 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>{label}</Text>
+      <Text className={`font-gothic-400 text-[12px] ${active ? "text-kinari" : "text-ink"}`}>{label}</Text>
     </Pressable>
   );
 }
@@ -274,7 +274,7 @@ export function PlanEntryForm({
   return (
     <View className="gap-3">
       <View className="gap-1">
-        <Text className="font-gothic-400 text-[10px] text-muted">
+        <Text className="font-gothic-400 text-[11px] text-muted">
           {rental
             ? "レンタカー会社・営業所（任意）"
             : stay
@@ -303,7 +303,7 @@ export function PlanEntryForm({
             {predictions.map((p, i) => (
               <Pressable key={p.placeId} onPress={() => selectPrediction(p)} className={`px-3 py-2 ${i > 0 ? "border-t border-black/[.06]" : ""}`}>
                 <Text className="font-mincho-400 text-[13px] text-ink">{p.mainText}</Text>
-                {p.secondaryText ? <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{p.secondaryText}</Text> : null}
+                {p.secondaryText ? <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted">{p.secondaryText}</Text> : null}
               </Pressable>
             ))}
           </View>
@@ -312,7 +312,7 @@ export function PlanEntryForm({
 
       {!lockMode && (
         <View className="gap-1.5">
-          <Text className="font-gothic-400 text-[10px] text-muted">種別</Text>
+          <Text className="font-gothic-400 text-[11px] text-muted">種別</Text>
           <View className="flex-row flex-wrap gap-2">
             {MODE_OPTIONS.map((o) => (
               <Chip key={o.value} active={o.value === mode} label={o.label} onPress={() => setMode(o.value)} />
@@ -323,7 +323,7 @@ export function PlanEntryForm({
 
       {tripDayCount > 1 && !rental && (
         <View className="gap-1.5">
-          <Text className="font-gothic-400 text-[10px] text-muted">何日目</Text>
+          <Text className="font-gothic-400 text-[11px] text-muted">何日目</Text>
           <View className="flex-row flex-wrap gap-2">
             {Array.from({ length: tripDayCount }, (_, i) => i + 1).map((d) => (
               <Chip key={d} active={day === d} label={`${d}日目`} onPress={() => setDay(d)} />
@@ -336,7 +336,7 @@ export function PlanEntryForm({
       {rental ? (
         <>
           <View className="gap-1">
-            <Text className="font-gothic-400 text-[10px] text-muted">営業所・住所（任意）</Text>
+            <Text className="font-gothic-400 text-[11px] text-muted">営業所・住所（任意）</Text>
             <TextInput
               value={place}
               onChangeText={onPlaceChange}
@@ -347,7 +347,7 @@ export function PlanEntryForm({
           </View>
           {tripDayCount > 1 && (
             <View className="gap-1.5">
-              <Text className="font-gothic-400 text-[10px] text-muted">借りる日</Text>
+              <Text className="font-gothic-400 text-[11px] text-muted">借りる日</Text>
               <View className="flex-row flex-wrap gap-2">
                 {Array.from({ length: tripDayCount }, (_, i) => i + 1).map((d) => (
                   <Chip key={d} active={day === d} label={`${d}日目`} onPress={() => setDay(d)} />
@@ -357,7 +357,7 @@ export function PlanEntryForm({
           )}
           {tripDayCount > 1 && (
             <View className="gap-1.5">
-              <Text className="font-gothic-400 text-[10px] text-muted">返す日</Text>
+              <Text className="font-gothic-400 text-[11px] text-muted">返す日</Text>
               <View className="flex-row flex-wrap gap-2">
                 {Array.from({ length: tripDayCount }, (_, i) => i + 1).map((d) => (
                   <Chip key={d} active={returnDay === d} label={`${d}日目`} onPress={() => setReturnDay(d)} />
@@ -369,7 +369,7 @@ export function PlanEntryForm({
             <TimeField label="借りる時刻" value={departTime} onChange={setDepartTime} />
             <TimeField label="返す時刻" value={arriveTime} onChange={setArriveTime} />
           </View>
-          <Text className="font-gothic-400 text-[10px] leading-[15px] text-muted">
+          <Text className="font-gothic-400 text-[11px] leading-[17px] text-muted">
             この期間の移動は「車」で計算します。期間外は近ければ徒歩、離れていれば電車・バスとして計算します。
           </Text>
         </>
@@ -377,7 +377,7 @@ export function PlanEntryForm({
         <>
           <View className="flex-row gap-3">
             <View className="flex-1 gap-1">
-              <Text className="font-gothic-400 text-[10px] text-muted">出発地</Text>
+              <Text className="font-gothic-400 text-[11px] text-muted">出発地</Text>
               <TextInput
                 value={placeFrom}
                 onChangeText={setPlaceFrom}
@@ -387,7 +387,7 @@ export function PlanEntryForm({
               />
             </View>
             <View className="flex-1 gap-1">
-              <Text className="font-gothic-400 text-[10px] text-muted">到着地</Text>
+              <Text className="font-gothic-400 text-[11px] text-muted">到着地</Text>
               <TextInput
                 value={placeTo}
                 onChangeText={setPlaceTo}
@@ -405,7 +405,7 @@ export function PlanEntryForm({
       ) : stay ? (
         <>
           <View className="gap-1">
-            <Text className="font-gothic-400 text-[10px] text-muted">住所（宿泊先候補から選ぶと番地まで自動入力）</Text>
+            <Text className="font-gothic-400 text-[11px] text-muted">住所（宿泊先候補から選ぶと番地まで自動入力）</Text>
             <TextInput
               value={place}
               onChangeText={onPlaceChange}
@@ -416,7 +416,7 @@ export function PlanEntryForm({
             <OpenHoursNote loading={loadingDetails} openFrom={openFrom} openTo={openTo} closedDays={closedDays} />
           </View>
           <View className="gap-1.5">
-            <Text className="font-gothic-400 text-[10px] text-muted">泊数（同じ宿に連泊する場合）</Text>
+            <Text className="font-gothic-400 text-[11px] text-muted">泊数（同じ宿に連泊する場合）</Text>
             <View className="flex-row flex-wrap gap-2">
               {[1, 2, 3, 4].map((n) => (
                 <Chip key={n} active={nights === n} label={`${n}泊`} onPress={() => setNights(n)} />
@@ -431,7 +431,7 @@ export function PlanEntryForm({
       ) : (
         <>
           <View className="gap-1">
-            <Text className="font-gothic-400 text-[10px] text-muted">住所（候補から選ぶと番地まで自動入力）</Text>
+            <Text className="font-gothic-400 text-[11px] text-muted">住所（候補から選ぶと番地まで自動入力）</Text>
             <TextInput
               value={place}
               onChangeText={onPlaceChange}
@@ -442,7 +442,7 @@ export function PlanEntryForm({
             <OpenHoursNote loading={loadingDetails} openFrom={openFrom} openTo={openTo} closedDays={closedDays} />
           </View>
           <View className="gap-1.5">
-            <Text className="font-gothic-400 text-[10px] text-muted">滞在時間の目安</Text>
+            <Text className="font-gothic-400 text-[11px] text-muted">滞在時間の目安</Text>
             <View className="flex-row flex-wrap gap-2">
               {STAY_OPTIONS.map((m) => (
                 <Chip key={m} active={stayMin === m} label={`${m}分`} onPress={() => setStayMin(m)} />
@@ -454,7 +454,7 @@ export function PlanEntryForm({
             <TimeField label="到着時刻（任意）" value={arriveTime} onChange={setArriveTime} />
           </View>
           <View className="gap-1">
-            <Text className="font-gothic-400 text-[10px] text-muted">費用（円・任意）</Text>
+            <Text className="font-gothic-400 text-[11px] text-muted">費用（円・任意）</Text>
             <TextInput
               value={cost}
               onChangeText={setCost}
@@ -470,7 +470,7 @@ export function PlanEntryForm({
               <View className={`h-[18px] w-[18px] items-center justify-center rounded-[5px] border ${fixedTime ? "border-ink bg-ink" : "border-black/[.25]"}`}>
                 {fixedTime && <View className="h-[8px] w-[8px] rounded-[2px] bg-kinari" />}
               </View>
-              <Text className="font-gothic-400 text-[11px] text-muted">この時刻は固定（予約など。AIが動かしません）</Text>
+              <Text className="font-gothic-400 text-[12px] text-muted">この時刻は固定（予約など。AIが動かしません）</Text>
             </Pressable>
           )}
         </>
@@ -479,7 +479,7 @@ export function PlanEntryForm({
       {/* 重要度は宿泊/移動/レンタカー以外で表示（これらは必ず組み込む・並べない想定） */}
       {!transit && !stay && !rental && (
         <View className="gap-1.5">
-          <Text className="font-gothic-400 text-[10px] text-muted">重要度（時間が足りない時、AIが優先度の低い予定から外します）</Text>
+          <Text className="font-gothic-400 text-[11px] text-muted">重要度（時間が足りない時、AIが優先度の低い予定から外します）</Text>
           <View className="flex-row gap-2">
             {PRIORITY_OPTIONS.map((o) => (
               <Chip key={o.value} active={o.value === priority} label={o.label} onPress={() => setPriority(o.value)} />
@@ -491,7 +491,7 @@ export function PlanEntryForm({
       {/* 費用（移動・宿泊・レンタカーはこちらに） */}
       {(transit || stay || rental) && (
         <View className="gap-1">
-          <Text className="font-gothic-400 text-[10px] text-muted">
+          <Text className="font-gothic-400 text-[11px] text-muted">
             費用（円・任意）{stay ? "／宿泊は1泊分" : rental ? "／レンタル料金の合計" : ""}
           </Text>
           <TextInput
@@ -507,7 +507,7 @@ export function PlanEntryForm({
       )}
 
       <View className="gap-1">
-        <Text className="font-gothic-400 text-[10px] text-muted">メモ（任意）</Text>
+        <Text className="font-gothic-400 text-[11px] text-muted">メモ（任意）</Text>
         <TextInput
           value={detail}
           onChangeText={setDetail}

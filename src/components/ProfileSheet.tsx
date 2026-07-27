@@ -53,14 +53,14 @@ export function ProfileSheet({
                   <PhotoPicker onPicked={setPhoto} maxSize={256} label="写真を選ぶ" />
                   {photo && (
                     <Pressable onPress={() => setPhoto(undefined)} className="rounded-full border border-black/[.15] px-3 py-1.5">
-                      <Text className="font-gothic-400 text-[11px] text-muted">写真を外す</Text>
+                      <Text className="font-gothic-400 text-[12px] text-muted">写真を外す</Text>
                     </Pressable>
                   )}
                 </View>
               </View>
 
               <View className="mt-5 gap-1.5">
-                <Text className="font-gothic-400 text-[10px] text-muted">アイコン（写真が無いとき使われます）</Text>
+                <Text className="font-gothic-400 text-[11px] text-muted">アイコン（写真が無いとき使われます）</Text>
                 <View className="flex-row gap-3">
                   {AVATAR_CHOICES.map((a) => {
                     const active = normalizeAvatar(avatar) === a;
@@ -78,7 +78,7 @@ export function ProfileSheet({
               </View>
 
               <View className="mt-4 gap-1">
-                <Text className="font-gothic-400 text-[10px] text-muted">名前・ニックネーム</Text>
+                <Text className="font-gothic-400 text-[11px] text-muted">名前・ニックネーム</Text>
                 <TextInput
                   value={name}
                   onChangeText={setName}

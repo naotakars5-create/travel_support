@@ -51,7 +51,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
       <View className="h-10 flex-row items-center justify-end px-[26px]">
         {!isLast && (
           <Pressable onPress={onDone} hitSlop={8} accessibilityRole="button" accessibilityLabel="紹介をとばす">
-            <Text className="font-gothic-400 text-[11px] text-muted-light">とばす</Text>
+            <Text className="font-gothic-400 text-[12px] text-muted-light">とばす</Text>
           </Pressable>
         )}
       </View>
@@ -61,7 +61,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
         <View className="items-center justify-center rounded-full p-6" style={{ backgroundColor: tint(card.color, 0.1) }}>
           <Illustration name={card.illustration} size="lg" alt="" />
         </View>
-        <Text className="mt-6 font-gothic-500 text-[10px] tracking-[.2em]" style={{ color: card.color }}>
+        <Text className="mt-6 font-gothic-500 text-[11px] tracking-[.2em]" style={{ color: card.color }}>
           {card.eyebrow}
         </Text>
         <Text className="mt-2 text-center font-mincho-700 text-[26px] leading-[38px] text-ink">{card.title}</Text>
@@ -90,7 +90,7 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
         </Pressable>
         {index > 0 && (
           <Pressable onPress={() => setIndex((i) => i - 1)} hitSlop={8} accessibilityRole="button" className="mt-3 self-center">
-            <Text className="font-gothic-400 text-[11px] text-muted-light">‹ 戻る</Text>
+            <Text className="font-gothic-400 text-[12px] text-muted-light">‹ 戻る</Text>
           </Pressable>
         )}
       </View>

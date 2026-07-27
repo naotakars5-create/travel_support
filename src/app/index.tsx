@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useAppState } from "@/hooks/useAppState";
 import { railNodes } from "@/lib/itinerary";
 import { BottomNav } from "@/components/BottomNav";
-import { PlanScreen } from "@/components/PlanScreen";
-import { ItineraryScreen } from "@/components/ItineraryScreen";
+import { TripScreen } from "@/components/TripScreen";
 import { DayOfScreen } from "@/components/DayOfScreen";
 import { PackingScreen } from "@/components/PackingScreen";
 import { AddEntrySheet } from "@/components/AddEntrySheet";
@@ -15,6 +14,7 @@ import { ProfileSheet } from "@/components/ProfileSheet";
 import { ShioriScreen } from "@/components/ShioriScreen";
 import { MapScreen } from "@/components/MapScreen";
 import { GeneratePlanSheet } from "@/components/GeneratePlanSheet";
+import { TripSwitcherSheet } from "@/components/TripSwitcherSheet";
 import { FlashOverlay } from "@/components/FlashOverlay";
 import { OnboardingScreen } from "@/components/OnboardingScreen";
 import { hasSeenOnboarding, markOnboardingSeen } from "@/lib/onboarding";
@@ -27,10 +27,17 @@ export default function Home() {
   const [addLodgingOpen, setAddLodgingOpen] = useState(false);
   const [addRentalOpen, setAddRentalOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [tripSettingsOpen, setTripSettingsOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const dark = app.tab === "today";
   const editingEntry = editId ? app.entries?.find((e) => e.id === editId) ?? null : null;
+
+  // 見出しの背景に敷く写真。いま編集中の旅のしおり表紙を使う
+  const coverUri = useMemo(() => {
+    const trip = app.activeTripId ? app.savedTrips.find((t) => t.id === app.activeTripId) : undefined;
+    return trip?.coverPhoto ?? trip?.autoCover?.url;
+  }, [app.activeTripId, app.savedTrips]);
 
   // 初回だけ紹介カードを出す（null = 判定中で、ちらつかせないため何も描かない）
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
@@ -60,78 +67,26 @@ export default function Home() {
       {/* オフライン表示（地図・AI・住所検索が使えないことを黙らせない） */}
       {!app.isOnline && (
         <View className="bg-ink px-4 py-1.5">
-          <Text className="text-center font-gothic-500 text-[10px] text-kinari">
+          <Text className="text-center font-gothic-500 text-[11px] text-kinari">
             オフラインです · 地図・AI・住所検索は再接続後に使えます
           </Text>
         </View>
       )}
 
-      {app.tab === "plan" && (
-        <PlanScreen
-          entries={app.entries}
-          totals={app.totals}
-          scheduleByEntry={app.scheduleByEntry}
-          suggestions={app.suggestions}
-          areaSuggestions={app.areaSuggestions}
-          areaSuggestionsLoading={app.areaSuggestionsLoading}
-          hasGeoReference={app.hasGeoReference}
-          planNotes={app.planNotes}
-          composing={app.composing}
-          composeError={app.composeError}
-          readOnly={app.readOnly}
-          tripEnded={app.tripEnded}
-          tripDate={app.tripDate}
-          onSetTripDate={app.setTripDate}
-          tripDayCount={app.tripDayCount}
-          onSetTripDayCount={app.setTripDayCount}
-          baseMode={app.baseMode}
-          onSetBaseMode={app.setBaseMode}
+      {app.tab === "trip" && (
+        <TripScreen
+          app={app}
+          coverUri={coverUri}
           onOpenAdd={() => setAddOpen(true)}
           onOpenAddLodging={() => setAddLodgingOpen(true)}
           onOpenAddRental={() => setAddRentalOpen(true)}
-          onGoShiori={() => app.setTab("shiori")}
           onOpenGenerate={() => setGenerateOpen(true)}
-          planRequest={app.planRequest}
-          onSetPlanRequest={app.setPlanRequest}
-          onCompose={app.composeWithAi}
-          onRemoveEntry={app.removeEntry}
           onEditEntry={(id) => setEditId(id)}
-          onSetEntryDay={app.setEntryDay}
-          onToggleFixed={app.toggleEntryFixed}
-          onMoveEntry={app.moveEntry}
-          onMoveEntryToEdge={app.moveEntryToEdge}
-          onAddSuggestions={app.addSuggestions}
-          onShare={app.shareCurrentPlan}
-          onImportShared={app.importSharedToOwn}
-        />
-      )}
-      {app.tab === "itin" && (
-        <ItineraryScreen
-          rail={app.rail}
-          entries={app.entries}
-          unplaced={app.unplacedEntries}
-          currentNodeKey={app.currentNodeKey}
-          justAddedEventId={app.justAddedEventId}
-          liveLocation={app.liveLocation}
-          now={app.now}
-          tripDate={app.tripDate}
-          tripDayCount={app.tripDayCount}
-          readOnly={app.readOnly}
-          canUndoCompose={app.canUndoCompose}
-          suggestOptimize={app.suggestOptimize}
-          composing={app.composing}
-          onCompose={app.composeWithAi}
-          onUndoCompose={app.undoCompose}
-          onNavigatePlan={() => app.setTab("plan")}
-          onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
-          onEditEntry={(id) => setEditId(id)}
-          onRemoveEntry={app.removeEntry}
-          onMoveEntry={app.moveEntry}
-          onSetEntryDay={app.setEntryDay}
           onAddToDay={(day) => {
             setAddDay(day);
             setAddOpen(true);
           }}
+          onOpenTripSettings={() => setTripSettingsOpen(true)}
         />
       )}
       {app.tab === "today" && (
@@ -142,7 +97,7 @@ export default function Home() {
           currentNodeKey={app.currentNodeKey}
           liveLocation={app.liveLocation}
           locationPermission={app.locationPermission}
-          onNavigatePlan={() => app.setTab("plan")}
+          onNavigatePlan={() => app.openTrip("list")}
           onRecordArrival={app.recordArrival}
         />
       )}
@@ -158,9 +113,10 @@ export default function Home() {
       {app.tab === "shiori" && (
         <ShioriScreen
           trips={app.savedTrips}
+          activeTripId={app.activeTripId}
           canCreate={(app.entries?.length ?? 0) > 0}
           onCreate={app.saveCurrentTrip}
-          onNavigatePlan={() => app.setTab("plan")}
+          onNavigatePlan={() => app.openTrip("list")}
           onBack={() => app.setTab("profile")}
           onOpen={(id) => {
             app.loadTrip(id);
@@ -176,8 +132,9 @@ export default function Home() {
           center={app.areaRefGeo}
           liveLocation={app.liveLocation}
           existingTitles={new Set((app.entries ?? []).map((e) => e.title))}
+          readOnly={app.readOnly}
           onAddSpot={app.addSpot}
-          onNavigatePlan={() => app.setTab("plan")}
+          onNavigatePlan={() => app.openTrip("list")}
         />
       )}
       {app.tab === "profile" && (
@@ -203,13 +160,13 @@ export default function Home() {
           onAdd={(input) => {
             app.addEntry(input);
             setAddOpen(false);
-            // 旅程の空き時間から足した時は、そのまま旅程に留まる
-            app.setTab(addDay ? "itin" : "plan");
+            // 旅程の空き時間から足した時は、そのままタイムラインに留まる
+            app.openTrip(addDay ? "timeline" : "list");
             setAddDay(undefined);
           }}
           onBulkAdd={async (text) => {
             const res = await app.bulkAddFromText(text);
-            if (res.ok) app.setTab("plan");
+            if (res.ok) app.openTrip("list");
             return res;
           }}
           onImportMail={app.importFromMail}
@@ -226,7 +183,7 @@ export default function Home() {
           onAdd={(input) => {
             app.addEntry(input);
             setAddLodgingOpen(false);
-            app.setTab("plan");
+            app.openTrip("list");
           }}
           onImportMail={app.importFromMail}
         />
@@ -242,7 +199,7 @@ export default function Home() {
           onAdd={(input) => {
             app.addEntry(input);
             setAddRentalOpen(false);
-            app.setTab("plan");
+            app.openTrip("list");
           }}
           onImportMail={app.importFromMail}
         />
@@ -251,8 +208,30 @@ export default function Home() {
       {generateOpen && (
         <GeneratePlanSheet
           initialDayCount={app.tripDayCount}
+          initialDestination={app.tripDestination}
           onClose={() => setGenerateOpen(false)}
-          onGenerate={app.generatePlanFromBrief}
+          onGenerate={async (brief) => {
+            const res = await app.generatePlanFromBrief(brief);
+            // 入力した行き先は旅の見出しにも残す（毎回入れ直させない）
+            if (res.ok && brief.destination.trim()) app.setTripDestination(brief.destination.trim());
+            return res;
+          }}
+        />
+      )}
+
+      {tripSettingsOpen && (
+        <TripSwitcherSheet
+          trips={app.savedTrips}
+          activeTripId={app.activeTripId}
+          name={app.tripName}
+          destination={app.tripDestination}
+          tripDate={app.tripDate}
+          tripDayCount={app.tripDayCount}
+          onClose={() => setTripSettingsOpen(false)}
+          onSetName={app.setTripName}
+          onSetDestination={app.setTripDestination}
+          onOpenTrip={app.loadTrip}
+          onNewTrip={app.startNewTrip}
         />
       )}
 

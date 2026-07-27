@@ -29,7 +29,7 @@ function pad2(n: number): string {
 
 function Label({ label, required }: { label: string; required?: boolean }) {
   return (
-    <Text className="font-gothic-400 text-[10px] text-muted">
+    <Text className="font-gothic-400 text-[11px] text-muted">
       {label}
       {required ? " *" : ""}
     </Text>

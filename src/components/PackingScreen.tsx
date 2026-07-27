@@ -38,7 +38,7 @@ export function PackingScreen({
           <Text className="font-gothic-400 text-[12px] text-muted">‹ マイページ</Text>
         </Pressable>
         <Text className="mt-1 font-mincho-600 text-[26px] text-ink">持ち物</Text>
-        <Text className="mt-1 font-gothic-400 text-[11px] text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+        <Text className="mt-1 font-gothic-400 text-[12px] text-muted" style={{ fontVariant: ["tabular-nums"] }}>
           {done} / {total} 準備済み
         </Text>
         {/* 進捗バー：準備完了（全チェック）でマスタード、それまでは墨 */}

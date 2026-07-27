@@ -5,8 +5,7 @@ import { Tab } from "@/hooks/useAppState";
 // 下タブは毎日の導線だけに絞る。しおり・持ち物は旅の前後にしか使わないので
 // マイページの中から開く（タブが多すぎて押し間違えるのを防ぐ）。
 const ITEMS: { id: Tab; label: string }[] = [
-  { id: "plan", label: "計画" },
-  { id: "itin", label: "旅程" },
+  { id: "trip", label: "旅" },
   { id: "map", label: "地図" },
   { id: "today", label: "当日" },
   { id: "profile", label: "マイページ" },
@@ -35,7 +34,7 @@ export function BottomNav({ tab, onChange, dark }: { tab: Tab; onChange: (t: Tab
               {/* 今いるタブの印。明るい画面ではテラコッタ（＝今）で示す */}
               <View className={`h-[2px] w-[18px] rounded-full ${active ? (dark ? "bg-day-text" : "bg-accent") : "bg-transparent"}`} />
               <Text
-                className={`font-gothic-400 text-[11px] ${
+                className={`font-gothic-400 text-[12px] ${
                   active ? (dark ? "text-day-text font-gothic-500" : "text-ink font-gothic-500") : dark ? "text-day-text3" : "text-muted-light"
                 }`}
               >

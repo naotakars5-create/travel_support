@@ -14,7 +14,7 @@ function Chip({ active, label, onPress }: { active: boolean; label: string; onPr
       accessibilityState={{ selected: active }}
       className={`rounded-full border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.12] bg-white/50"}`}
     >
-      <Text className={`font-gothic-400 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>{label}</Text>
+      <Text className={`font-gothic-400 text-[12px] ${active ? "text-kinari" : "text-ink"}`}>{label}</Text>
     </Pressable>
   );
 }
@@ -27,13 +27,16 @@ export function GeneratePlanSheet({
   onClose,
   onGenerate,
   initialDayCount,
+  initialDestination = "",
 }: {
   onClose: () => void;
   onGenerate: (brief: TripBrief) => Promise<{ ok: boolean; message?: string }>;
   initialDayCount: number;
+  /** すでに分かっている行き先（旅の設定で入れてあれば引き継ぐ） */
+  initialDestination?: string;
 }) {
   const insets = useSafeAreaInsets();
-  const [destination, setDestination] = useState("");
+  const [destination, setDestination] = useState(initialDestination);
   const [dayCount, setDayCount] = useState(Math.max(1, Math.min(7, initialDayCount)));
   const [companion, setCompanion] = useState<Companion>("solo");
   const [headcount, setHeadcount] = useState(1);
@@ -83,12 +86,12 @@ export function GeneratePlanSheet({
 
             <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
               <View className="gap-4">
-                <Text className="-mt-1 font-gothic-400 text-[11px] leading-[18px] text-muted">
+                <Text className="-mt-1 font-gothic-400 text-[12px] leading-[20px] text-muted">
                   行き先だけ決まっていれば大丈夫。条件を選ぶと、AIが行き先を選んで日ごとに割り振ります。
                 </Text>
 
                 <View className="gap-1">
-                  <Text className="font-gothic-400 text-[10px] text-muted">どこへ行く？ *</Text>
+                  <Text className="font-gothic-400 text-[11px] text-muted">どこへ行く？ *</Text>
                   <TextInput
                     value={destination}
                     onChangeText={setDestination}
@@ -99,7 +102,7 @@ export function GeneratePlanSheet({
                 </View>
 
                 <View className="gap-1.5">
-                  <Text className="font-gothic-400 text-[10px] text-muted">何日間</Text>
+                  <Text className="font-gothic-400 text-[11px] text-muted">何日間</Text>
                   <View className="flex-row flex-wrap gap-2">
                     {[1, 2, 3, 4, 5, 6, 7].map((n) => (
                       <Chip key={n} active={dayCount === n} label={`${n}日`} onPress={() => setDayCount(n)} />
@@ -108,7 +111,7 @@ export function GeneratePlanSheet({
                 </View>
 
                 <View className="gap-1.5">
-                  <Text className="font-gothic-400 text-[10px] text-muted">誰と行く</Text>
+                  <Text className="font-gothic-400 text-[11px] text-muted">誰と行く</Text>
                   <View className="flex-row flex-wrap gap-2">
                     {COMPANION_OPTIONS.map((o) => (
                       <Chip
@@ -127,7 +130,7 @@ export function GeneratePlanSheet({
                 </View>
 
                 <View className="gap-1.5">
-                  <Text className="font-gothic-400 text-[10px] text-muted">何人</Text>
+                  <Text className="font-gothic-400 text-[11px] text-muted">何人</Text>
                   <View className="flex-row flex-wrap gap-2">
                     {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
                       <Chip key={n} active={headcount === n} label={`${n}人`} onPress={() => setHeadcount(n)} />
@@ -136,7 +139,7 @@ export function GeneratePlanSheet({
                 </View>
 
                 <View className="gap-1.5">
-                  <Text className="font-gothic-400 text-[10px] text-muted">旅の目的（いくつでも）</Text>
+                  <Text className="font-gothic-400 text-[11px] text-muted">旅の目的（いくつでも）</Text>
                   <View className="flex-row flex-wrap gap-2">
                     {PURPOSE_OPTIONS.map((o) => (
                       <Chip
@@ -150,7 +153,7 @@ export function GeneratePlanSheet({
                 </View>
 
                 <View className="gap-1">
-                  <Text className="font-gothic-400 text-[10px] text-muted">そのほかの希望（任意）</Text>
+                  <Text className="font-gothic-400 text-[11px] text-muted">そのほかの希望（任意）</Text>
                   <TextInput
                     value={freeText}
                     onChangeText={setFreeText}
@@ -159,11 +162,11 @@ export function GeneratePlanSheet({
                     textAlignVertical="top"
                     placeholder={"例: 予算は控えめに。歩きすぎない範囲で。\nうどんは絶対に食べたい"}
                     placeholderTextColor={PLACEHOLDER}
-                    className="min-h-[76px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[12px] leading-[19px] text-ink"
+                    className="min-h-[76px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[12px] leading-[21px] text-ink"
                   />
                 </View>
 
-                {error && <Text className="font-gothic-400 text-[11px] text-ink">{error}</Text>}
+                {error && <Text className="font-gothic-400 text-[12px] text-ink">{error}</Text>}
 
                 <Pressable
                   disabled={!canSubmit}
@@ -176,7 +179,7 @@ export function GeneratePlanSheet({
                     {running ? "旅程を考えています…" : "この条件で旅程を作る"}
                   </Text>
                 </Pressable>
-                <Text className="text-center font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+                <Text className="text-center font-gothic-400 text-[11px] leading-[17px] text-muted-light">
                   作られた旅程は、あとから自由に足したり並び替えたりできます。
                 </Text>
               </View>

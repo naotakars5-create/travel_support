@@ -122,13 +122,47 @@ export function getDayOfState(
 
 export interface Countdown {
   totalSec: number;
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
   mm: string;
   ss: string;
+  /**
+   * 桁の見せ方。1時間以上先なら分:秒の大時計は意味を持たないので、
+   * 「あと◯日◯時間」の形に切り替える。
+   * - "soon": 1時間未満（分:秒の大時計）
+   * - "hours": 24時間未満（◯時間◯分）
+   * - "days": それ以上（◯日◯時間）
+   */
+  scale: "soon" | "hours" | "days";
 }
 
 export function computeCountdown(targetIso: string, now: Date): Countdown {
   const totalSec = Math.max(0, Math.round((new Date(targetIso).getTime() - now.getTime()) / 1000));
-  const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
-  const ss = String(totalSec % 60).padStart(2, "0");
-  return { totalSec, mm, ss };
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  const scale = days > 0 ? "days" : totalSec >= 3600 ? "hours" : "soon";
+  return {
+    totalSec,
+    days,
+    hours,
+    minutes,
+    seconds,
+    // 1時間未満のときだけ意味がある大時計用の値（60分以上は頭打ちにしない）
+    mm: String(Math.floor(totalSec / 60)).padStart(2, "0"),
+    ss: String(seconds).padStart(2, "0"),
+    scale,
+  };
+}
+
+/** カウントダウンを一言で表す（「あと3日7時間」「あと2時間15分」「あと8分」）。 */
+export function countdownLabel(c: Countdown): string {
+  if (c.totalSec <= 0) return "まもなく";
+  if (c.scale === "days") return c.hours > 0 ? `${c.days}日${c.hours}時間` : `${c.days}日`;
+  if (c.scale === "hours") return c.minutes > 0 ? `${c.hours}時間${c.minutes}分` : `${c.hours}時間`;
+  if (c.minutes > 0) return `${c.minutes}分`;
+  return `${c.seconds}秒`;
 }

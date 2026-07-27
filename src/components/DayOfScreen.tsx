@@ -54,7 +54,7 @@ function NearbySpots({
   };
   return (
     <View className="mt-4 w-full">
-      <Text className="mb-1.5 font-gothic-400 text-[10px] tracking-[.15em] text-day-text3">
+      <Text className="mb-1.5 font-gothic-400 text-[11px] tracking-[.15em] text-day-text3">
         {preferIndoor ? "近くの屋内スポット（雨のため）" : "近くの観光スポット"}
         {live ? "（現在地から）" : ""} · タップで地図
       </Text>
@@ -67,10 +67,10 @@ function NearbySpots({
           >
             <View className="flex-1 pr-2">
               <Text className="font-mincho-400 text-[14px] text-day-text">{s.name}</Text>
-              <Text className="mt-0.5 font-gothic-400 text-[10px] text-day-text2">{[s.category, s.note].filter(Boolean).join(" · ")}</Text>
-              {s.address && <Text className="mt-0.5 font-gothic-400 text-[10px] text-day-text3">{s.address}</Text>}
+              <Text className="mt-0.5 font-gothic-400 text-[11px] text-day-text2">{[s.category, s.note].filter(Boolean).join(" · ")}</Text>
+              {s.address && <Text className="mt-0.5 font-gothic-400 text-[11px] text-day-text3">{s.address}</Text>}
             </View>
-            <Text className="mt-0.5 font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
+            <Text className="mt-0.5 font-gothic-400 text-[12px] text-day-text2" style={TNUM}>
               徒歩 {s.walkMin}分 ›
             </Text>
           </Pressable>
@@ -126,7 +126,7 @@ function CurrentNodePicker({
         accessibilityLabel="現在地を選び直す"
         className="self-center rounded-full border border-day-text/25 px-4 py-1.5"
       >
-        <Text className="font-gothic-400 text-[11px] text-day-text2">{open ? "閉じる" : "いまいる場所を選び直す"}</Text>
+        <Text className="font-gothic-400 text-[12px] text-day-text2">{open ? "閉じる" : "いまいる場所を選び直す"}</Text>
       </Pressable>
       {open && (
         <View className="mt-2 rounded-[16px] border border-day-text/10">
@@ -143,13 +143,17 @@ function CurrentNodePicker({
                 accessibilityLabel={`${nodeName(n)}にいる`}
                 className={`flex-row items-center gap-3 px-4 py-2 ${i > 0 ? "border-t border-day-text/10" : ""}`}
               >
-                <Text className="w-11 font-gothic-400 text-[11px] text-day-text3" style={TNUM}>
+                <Text className="w-11 font-gothic-400 text-[12px] text-day-text3" style={TNUM}>
                   {formatJstTime(new Date(n.time))}
                 </Text>
                 <Text className={`flex-1 font-mincho-400 text-[13px] ${active ? "text-day-text" : "text-day-text2"}`}>
                   {nodeName(n)}
                 </Text>
-                {active && <Text className="font-gothic-500 text-[10px] text-day-text2">✓ いまここ</Text>}
+                {active && (
+                  <View className="rounded-full bg-highlight/25 px-2 py-[2px]">
+                    <Text className="font-gothic-700 text-[11px] text-highlight">✓ いまここ</Text>
+                  </View>
+                )}
               </Pressable>
             );
           })}
@@ -201,11 +205,11 @@ export function DayOfScreen({
   return (
     <View className="flex-1 bg-day-bg" style={{ paddingTop: insets.top }}>
       <View className="flex-row items-baseline justify-between px-[26px] pb-4 pt-4">
-        <Text className="font-gothic-400 text-[11px] text-day-text2">
+        <Text className="font-gothic-400 text-[12px] text-day-text2">
           {formatJstMonthDayJa(now)}
           {weather ? ` · ${weather.summary}${weather.temperature !== null ? ` ${Math.round(weather.temperature)}℃` : ""}` : ""}
         </Text>
-        <Text className="font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
+        <Text className="font-gothic-400 text-[12px] text-day-text2" style={TNUM}>
           現在 {formatJstTime(now)}
         </Text>
       </View>
@@ -227,7 +231,7 @@ export function DayOfScreen({
 
 function GpsHint({ active }: { active: boolean }) {
   if (!active) return null;
-  return <Text className="mt-3 font-gothic-400 text-[10px] text-day-text3">GPSでこの場所に近づくと自動で到着を記録します</Text>;
+  return <Text className="mt-3 font-gothic-400 text-[11px] text-day-text3">GPSでこの場所に近づくと自動で到着を記録します</Text>;
 }
 
 function OutlineButton({ label, onPress }: { label: string; onPress: () => void }) {
@@ -241,14 +245,14 @@ function OutlineButton({ label, onPress }: { label: string; onPress: () => void 
 function LockedHero({ onNavigatePlan }: { onNavigatePlan: () => void }) {
   return (
     <View className="items-center">
-      <Text className="font-gothic-400 text-[11px] tracking-[.08em] text-day-text2">まだ旅程がありません</Text>
+      <Text className="font-gothic-400 text-[12px] tracking-[.08em] text-day-text2">まだ旅程がありません</Text>
       <Text className="mt-4 text-center font-mincho-700 text-[30px] leading-[36px] text-day-text">
         次の行き先が{"\n"}まだ決まっていません
       </Text>
-      <Text className="mt-4 text-center font-gothic-400 text-[12px] leading-[19px] text-day-text2">
-        「計画」で行き先を追加すると、{"\n"}旅程がつながり出発時刻を計算します。
+      <Text className="mt-4 text-center font-gothic-400 text-[12px] leading-[21px] text-day-text2">
+        「旅」で行き先を追加すると、{"\n"}旅程がつながり出発時刻を計算します。
       </Text>
-      <OutlineButton label="計画で行き先を追加する" onPress={onNavigatePlan} />
+      <OutlineButton label="行き先を追加する" onPress={onNavigatePlan} />
     </View>
   );
 }
@@ -268,7 +272,7 @@ function MoveHero({
   weather: WeatherInfo | null;
   onRecordArrival: (nodeKey: string, place: string) => void;
 }) {
-  const { mm, ss } = computeCountdown(state.targetDepartAt, now);
+  const countdown = computeCountdown(state.targetDepartAt, now);
   const modeColor = MODE_COLOR[state.transitMode];
   // 予定より遅れ（出発時刻を過ぎた分）。3分以上でお知らせ。
   const lateMin = Math.round((now.getTime() - new Date(state.targetDepartAt).getTime()) / 60000);
@@ -277,26 +281,60 @@ function MoveHero({
   const geoForSpots = liveLocation ?? state.currentNode?.geo ?? state.nextNode.geo ?? null;
   return (
     <View className="items-center">
-      <Text className="font-gothic-400 text-[11px] tracking-[.08em] text-day-text2">次の移動まで</Text>
-      <View className="mt-3 flex-row">
-        <Text className="font-mincho-900 text-[90px] leading-[81px] text-accent" style={TNUM}>
-          {mm}
-        </Text>
-        <Blinker>
-          <Text className="font-mincho-900 text-[90px] leading-[81px] text-accent">:</Text>
-        </Blinker>
-        <Text className="font-mincho-900 text-[90px] leading-[81px] text-accent" style={TNUM}>
-          {ss}
-        </Text>
-      </View>
-      <Text className="mt-2 font-gothic-400 text-[10px] tracking-[.15em] text-day-text3">分 秒</Text>
+      <Text className="font-gothic-400 text-[12px] tracking-[.08em] text-day-text2">
+        {countdown.scale === "soon" ? "次の移動まで" : "出発まで"}
+      </Text>
+      {countdown.scale === "soon" ? (
+        <>
+          {/* 1時間を切ったら分:秒の大時計。急ぐ感覚が要る場面 */}
+          <View className="mt-3 flex-row">
+            <Text className="font-mincho-900 text-[90px] leading-[81px] text-accent" style={TNUM}>
+              {countdown.mm}
+            </Text>
+            <Blinker>
+              <Text className="font-mincho-900 text-[90px] leading-[81px] text-accent">:</Text>
+            </Blinker>
+            <Text className="font-mincho-900 text-[90px] leading-[81px] text-accent" style={TNUM}>
+              {countdown.ss}
+            </Text>
+          </View>
+          <Text className="mt-2 font-gothic-400 text-[12px] tracking-[.15em] text-day-text3">分 秒</Text>
+        </>
+      ) : (
+        // まだ先なら「◯日◯時間」。秒まで出しても意味が無く、数字が桁あふれする
+        <View className="mt-3 flex-row items-baseline">
+          {countdown.scale === "days" ? (
+            <>
+              <Text className="font-mincho-900 text-[76px] leading-[76px] text-accent" style={TNUM}>
+                {countdown.days}
+              </Text>
+              <Text className="ml-1 mr-3 font-gothic-500 text-[18px] text-day-text2">日</Text>
+              <Text className="font-mincho-900 text-[46px] leading-[46px] text-accent" style={TNUM}>
+                {countdown.hours}
+              </Text>
+              <Text className="ml-1 font-gothic-500 text-[15px] text-day-text2">時間</Text>
+            </>
+          ) : (
+            <>
+              <Text className="font-mincho-900 text-[76px] leading-[76px] text-accent" style={TNUM}>
+                {countdown.hours}
+              </Text>
+              <Text className="ml-1 mr-3 font-gothic-500 text-[18px] text-day-text2">時間</Text>
+              <Text className="font-mincho-900 text-[46px] leading-[46px] text-accent" style={TNUM}>
+                {countdown.minutes}
+              </Text>
+              <Text className="ml-1 font-gothic-500 text-[15px] text-day-text2">分</Text>
+            </>
+          )}
+        </View>
+      )}
 
       {lateMin >= 3 && (
         <View className="mt-6 w-full rounded-[12px] border border-accent/50 bg-accent/[.08] px-4 py-3">
           <Text className="font-gothic-500 text-[12px] text-accent" style={TNUM}>
             予定より {formatDurationMin(lateMin)} 遅れています
           </Text>
-          <Text className="mt-1 font-gothic-400 text-[11px] leading-[17px] text-day-text2">
+          <Text className="mt-1 font-gothic-400 text-[12px] leading-[19px] text-day-text2">
             このままだと後の予定も同じくらい後ろへずれます。急ぐか、任意の予定を1つ省くと取り戻せます。
           </Text>
         </View>
@@ -305,11 +343,11 @@ function MoveHero({
       <View className="mt-8 w-full rounded-[16px] border border-day-text/10 bg-day-text/[.04] p-4">
         <Text className="font-mincho-600 text-[23px] text-day-text">{nodeName(state.nextNode)}</Text>
         {nodeAddress(state.nextNode) && (
-          <Text className="mt-1 font-gothic-400 text-[11px] text-day-text3">{nodeAddress(state.nextNode)}</Text>
+          <Text className="mt-1 font-gothic-400 text-[12px] text-day-text3">{nodeAddress(state.nextNode)}</Text>
         )}
         <View className="mt-2 flex-row items-center gap-2">
           <View className="h-2 w-2 rounded-full" style={{ backgroundColor: modeColor }} />
-          <Text className="font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
+          <Text className="font-gothic-400 text-[12px] text-day-text2" style={TNUM}>
             {state.currentNode ? nodeName(state.currentNode) : "現在地"} → {nodeName(state.nextNode)} · {MODE_LABEL[state.transitMode]}
             {state.transitMin > 0 ? formatDurationMin(state.transitMin) : ""}
           </Text>
@@ -349,15 +387,15 @@ function FreeHero({
 
   return (
     <View className="items-center">
-      <Text className="font-gothic-400 text-[11px] tracking-[.08em] text-day-text2">空き時間 · 予定より早く回れています</Text>
+      <Text className="font-gothic-400 text-[12px] tracking-[.08em] text-day-text2">空き時間 · 予定より早く回れています</Text>
       <Text className="mt-3 font-mincho-900 text-[62px] leading-[56px] text-highlight" style={TNUM}>
         {formatDurationMin(state.freeMin)}
       </Text>
-      <Text className="mt-2 font-gothic-400 text-[11px] text-day-text2" style={TNUM}>
+      <Text className="mt-2 font-gothic-400 text-[12px] text-day-text2" style={TNUM}>
         次の予約 {formatJstTime(new Date(state.nextNode.time))} {nodeName(state.nextNode)} まで
       </Text>
       {state.freeMin >= 30 && (
-        <Text className="mt-2 text-center font-gothic-400 text-[11px] leading-[17px] text-day-text3">
+        <Text className="mt-2 text-center font-gothic-400 text-[12px] leading-[19px] text-day-text3">
           この時間で近くのスポットへ寄り道できます。下のおすすめからどうぞ。
         </Text>
       )}
@@ -376,20 +414,24 @@ function DoneHero({ totalReservations }: { totalReservations: number }) {
   if (totalReservations === 0) {
     return (
       <View className="items-center">
-        <Text className="font-gothic-400 text-[11px] tracking-[.08em] text-day-text2">本日の予定</Text>
+        <Text className="font-gothic-400 text-[12px] tracking-[.08em] text-day-text2">本日の予定</Text>
         <Text className="mt-4 text-center font-mincho-700 text-[26px] text-day-text">まだ予定がありません</Text>
-        <Text className="mt-4 text-center font-gothic-400 text-[12px] leading-[19px] text-day-text2">
-          「計画」で行き先を追加すると、{"\n"}ここに旅程が表示されます。
+        <Text className="mt-4 text-center font-gothic-400 text-[12px] leading-[21px] text-day-text2">
+          「旅」で行き先を追加すると、{"\n"}ここに旅程が表示されます。
         </Text>
       </View>
     );
   }
   return (
     <View className="items-center">
-      <Text className="font-gothic-400 text-[11px] tracking-[.08em] text-day-text2">本日の予定</Text>
-      <Text className="mt-4 font-mincho-700 text-[30px] text-day-text">すべて完了</Text>
-      <Text className="mt-4 text-center font-gothic-400 text-[12px] leading-[19px] text-day-text2">
-        {totalReservations}件の予約を、途切れなく巡りました。{"\n"}お疲れさまでした。
+      <Text className="font-gothic-400 text-[12px] tracking-[.08em] text-day-text2">本日の予定</Text>
+      {/* 達成の瞬間。ここはマスタード（完了の色）をはっきり使う */}
+      <View className="mt-4 h-[76px] w-[76px] items-center justify-center rounded-full bg-highlight/25">
+        <Text className="font-mincho-700 text-[34px] text-highlight">✓</Text>
+      </View>
+      <Text className="mt-4 font-mincho-700 text-[30px] text-highlight">すべて完了</Text>
+      <Text className="mt-4 text-center font-gothic-400 text-[13px] leading-[22px] text-day-text2">
+        {totalReservations}件の予定を、途切れなく巡りました。{"\n"}お疲れさまでした。
       </Text>
     </View>
   );

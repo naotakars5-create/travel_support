@@ -21,6 +21,7 @@ import { DateOnlyField } from "./PlainFields";
 import { Illustration, illustrationUri } from "./Illustration";
 import { dayColor, tint } from "@/lib/palette";
 import { Floater } from "./animations";
+import { Button, SectionHeading } from "./ui";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
@@ -71,6 +72,9 @@ export function PlanScreen({
   onAddSuggestions,
   onShare,
   onImportShared,
+  embedded = false,
+  canUndoCompose,
+  onUndoCompose,
 }: {
   entries: PlanEntry[];
   totals: PlanTotals;
@@ -111,6 +115,11 @@ export function PlanScreen({
   onAddSuggestions: (list: SpotSuggestion[]) => void;
   onShare: () => void;
   onImportShared: () => void;
+  /** 「旅」タブの中に埋め込まれているか（見出しは TripHero が持つので出さない） */
+  embedded?: boolean;
+  /** AIの組み直しを取り消せるか。取り消しは組み直した直後の画面に出す */
+  canUndoCompose: boolean;
+  onUndoCompose: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -169,36 +178,38 @@ export function PlanScreen({
   };
 
   return (
-    <View className="flex-1 bg-kinari" style={{ paddingTop: insets.top }}>
-      <View className="px-[26px] pb-2 pt-3">
-        <View className="flex-row items-start justify-between">
-          <View className="flex-1">
-            <Text className="font-mincho-600 text-[26px] text-ink">{readOnly ? "共有された旅程" : "行き先リスト"}</Text>
-          </View>
-          {!readOnly && (
-            <View className="mt-1 flex-row items-center gap-2">
-              <Pressable onPress={onShare} accessibilityRole="button" className="h-7 items-center justify-center rounded-[8px] border border-ink/25 px-3">
-                <Text className="font-gothic-500 text-[11px] text-ink">共有</Text>
-              </Pressable>
-              <Pressable
-                onPress={onOpenAdd}
-                accessibilityRole="button"
-                accessibilityLabel="行き先を追加"
-                className="h-7 w-7 items-center justify-center rounded-[8px] border border-ink/25"
-              >
-                <View className="relative h-[10px] w-[10px]">
-                  <View className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-ink" />
-                  <View className="absolute left-0 top-1/2 h-[1.5px] w-full -translate-y-1/2 bg-ink" />
-                </View>
-              </Pressable>
+    <View className="flex-1 bg-kinari" style={embedded ? undefined : { paddingTop: insets.top }}>
+      {!embedded && (
+        <View className="px-[26px] pb-2 pt-3">
+          <View className="flex-row items-start justify-between">
+            <View className="flex-1">
+              <Text className="font-mincho-600 text-[26px] text-ink">{readOnly ? "共有された旅程" : "行き先リスト"}</Text>
             </View>
-          )}
+            {!readOnly && (
+              <View className="mt-1 flex-row items-center gap-2">
+                <Pressable onPress={onShare} accessibilityRole="button" className="h-8 items-center justify-center rounded-[8px] border border-ink/25 px-3">
+                  <Text className="font-gothic-500 text-[12px] text-ink">共有</Text>
+                </Pressable>
+                <Pressable
+                  onPress={onOpenAdd}
+                  accessibilityRole="button"
+                  accessibilityLabel="行き先を追加"
+                  className="h-8 w-8 items-center justify-center rounded-[8px] border border-ink/25"
+                >
+                  <View className="relative h-[11px] w-[11px]">
+                    <View className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2 bg-ink" />
+                    <View className="absolute left-0 top-1/2 h-[1.5px] w-full -translate-y-1/2 bg-ink" />
+                  </View>
+                </Pressable>
+              </View>
+            )}
+          </View>
+          <Text className="mt-1 font-gothic-400 text-[12px] text-muted" style={TNUM}>
+            行き先 {totals.entryCount}件{totals.totalCost > 0 ? ` · 予算 ${formatYen(totals.totalCost)}` : ""}
+          </Text>
         </View>
-        <Text className="mt-1 font-gothic-400 text-[11px] text-muted" style={TNUM}>
-          行き先 {totals.entryCount}件{totals.totalCost > 0 ? ` · 予算 ${formatYen(totals.totalCost)}` : ""}
-        </Text>
-      </View>
-      <View className="h-px w-full bg-black/[.08]" />
+      )}
+      {!embedded && <View className="h-px w-full bg-black/[.08]" />}
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 90 }}>
         {/* 旅行が終わったら、しおりに残す導線を出す（作った思い出機能へ辿り着けるように） */}
@@ -206,7 +217,7 @@ export function PlanScreen({
           <View className="mb-3 flex-row items-center gap-3 rounded-[12px] border border-ink/15 bg-surface/60 px-4 py-2.5">
             <View className="flex-1">
               <Text className="font-gothic-500 text-[12px] text-ink">旅はいかがでしたか？</Text>
-              <Text className="mt-0.5 font-gothic-400 text-[10px] leading-[15px] text-muted">
+              <Text className="mt-0.5 font-gothic-400 text-[11px] leading-[17px] text-muted">
                 この旅程をしおりに保存して、写真と一緒に残せます。
               </Text>
             </View>
@@ -216,7 +227,7 @@ export function PlanScreen({
               accessibilityLabel="しおりに保存する"
               className="rounded-full bg-ink px-3 py-1.5"
             >
-              <Text className="font-gothic-500 text-[11px] text-kinari">しおりへ</Text>
+              <Text className="font-gothic-500 text-[12px] text-kinari">しおりへ</Text>
             </Pressable>
           </View>
         )}
@@ -225,9 +236,9 @@ export function PlanScreen({
             <View className="flex-row flex-wrap items-end justify-between gap-2">
               <DateOnlyField label="開始日" value={tripDate} onChange={onSetTripDate} />
               <View className="gap-1">
-                <Text className="font-gothic-400 text-[10px] text-muted">日数</Text>
+                <Text className="font-gothic-400 text-[11px] text-muted">日数</Text>
                 <View className="flex-row gap-2">
-                  {[1, 2, 3, 4, 5].map((n) => {
+                  {[1, 2, 3, 4, 5, 6, 7].map((n) => {
                     const active = tripDayCount === n;
                     return (
                       <Pressable
@@ -235,7 +246,7 @@ export function PlanScreen({
                         onPress={() => onSetTripDayCount(n)}
                         className={`rounded-full border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.12] bg-white/50"}`}
                       >
-                        <Text className={`font-gothic-400 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>{n}日</Text>
+                        <Text className={`font-gothic-400 text-[12px] ${active ? "text-kinari" : "text-ink"}`}>{n}日</Text>
                       </Pressable>
                     );
                   })}
@@ -258,7 +269,7 @@ export function PlanScreen({
             </View>
             <View className="flex-1">
               <Text className="font-gothic-700 text-[13px] text-accent">ゼロから旅程を作ってもらう</Text>
-              <Text className="mt-0.5 font-gothic-400 text-[10px] leading-[15px] text-muted">
+              <Text className="mt-0.5 font-gothic-400 text-[11px] leading-[17px] text-muted">
                 行き先・日数・同伴者・目的を選ぶだけ。いまの行き先リストは置き換わります。
               </Text>
             </View>
@@ -267,25 +278,25 @@ export function PlanScreen({
         )}
         {readOnly && (
           <View className="mb-4 rounded-[12px] border border-ink/15 bg-white/50 px-4 py-3">
-            <Text className="font-gothic-500 text-[11px] text-ink">共有された旅程（閲覧のみ）</Text>
-            <Text className="mt-1 font-gothic-400 text-[10px] leading-[16px] text-muted">
+            <Text className="font-gothic-500 text-[12px] text-ink">共有された旅程（閲覧のみ）</Text>
+            <Text className="mt-1 font-gothic-400 text-[11px] leading-[18px] text-muted">
               旅程・当日ビュー（残り時間・近くのスポット）を見られます。編集はできません。
             </Text>
             <Pressable onPress={onImportShared} className="mt-2 self-start rounded-full bg-ink px-3 py-1.5">
-              <Text className="font-gothic-500 text-[11px] text-kinari">自分のプランに保存して編集</Text>
+              <Text className="font-gothic-500 text-[12px] text-kinari">自分のプランに保存して編集</Text>
             </Pressable>
           </View>
         )}
         {/* 費用が1件も入っていないと予算ブロックは出ない。消えているのか未入力なのか分かるよう一言だけ添える */}
         {!readOnly && totals.totalCost === 0 && entries.length > 0 && (
-          <Text className="mb-2 font-gothic-400 text-[10px] text-muted-light">
+          <Text className="mb-2 font-gothic-400 text-[11px] text-muted-light">
             予算のめやす：行き先に費用を入れると、ここに交通・宿泊・食事・観光の内訳が出ます。
           </Text>
         )}
         {totals.totalCost > 0 && (
           <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
             <View className="flex-row items-baseline justify-between">
-              <Text className="font-gothic-500 text-[10px] tracking-[.1em] text-muted">予算のめやす</Text>
+              <Text className="font-gothic-500 text-[11px] tracking-[.1em] text-muted">予算のめやす</Text>
               <Text className="font-mincho-600 text-[16px] text-ink" style={TNUM}>
                 {formatYen(totals.totalCost)}
               </Text>
@@ -296,11 +307,11 @@ export function PlanScreen({
                 const pct = Math.round((amount / totals.totalCost) * 100);
                 return (
                   <View key={c} className="flex-row items-center gap-2">
-                    <Text className="w-8 font-gothic-400 text-[11px] text-muted">{COST_CATEGORY_LABEL[c]}</Text>
+                    <Text className="w-8 font-gothic-400 text-[12px] text-muted">{COST_CATEGORY_LABEL[c]}</Text>
                     <View className="h-[6px] flex-1 overflow-hidden rounded-full bg-black/[.06]">
                       <View className="h-full rounded-full bg-ink/60" style={{ width: `${Math.max(4, pct)}%` }} />
                     </View>
-                    <Text className="w-16 text-right font-gothic-400 text-[11px] text-muted" style={TNUM}>
+                    <Text className="w-16 text-right font-gothic-400 text-[12px] text-muted" style={TNUM}>
                       {formatYen(amount)}
                     </Text>
                   </View>
@@ -313,15 +324,15 @@ export function PlanScreen({
         {!readOnly && (
           <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
             <View className="flex-row items-center justify-between">
-              <Text className="font-gothic-500 text-[11px] text-ink">宿泊先（固定）</Text>
+              <Text className="font-gothic-500 text-[12px] text-ink">宿泊先（固定）</Text>
               <Pressable onPress={onOpenAddLodging} className="rounded-full border border-ink/25 px-3 py-1">
-                <Text className="font-gothic-500 text-[10px] text-ink">＋ 宿泊先</Text>
+                <Text className="font-gothic-500 text-[11px] text-ink">＋ 宿泊先</Text>
               </Pressable>
             </View>
             {lodging.length === 0 ? (
               <View className="mt-1 flex-row items-center gap-3">
                 <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
-                <Text className="flex-1 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+                <Text className="flex-1 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
                   ホテル等はここで固定登録します。旅程の並び替え対象にはなりません。
                 </Text>
               </View>
@@ -333,13 +344,13 @@ export function PlanScreen({
                     <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
                     <Pressable onPress={() => onEditEntry(e.id)} className="flex-1">
                       <Text className="font-mincho-600 text-[13px] text-ink">{e.title}</Text>
-                      <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                      <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted" style={TNUM}>
                         {tripDayCount > 1 ? `${e.day ?? 1}日目 · ` : ""}
                         {e.arriveBy ? `IN ${formatJstTime(new Date(e.arriveBy))}` : ""}
                         {e.checkOut ? ` → OUT ${formatJstTime(new Date(e.checkOut))}` : ""}
                       </Text>
                       {e.place && (
-                        <Text numberOfLines={1} className="font-gothic-400 text-[10px] text-muted-light">
+                        <Text numberOfLines={1} className="font-gothic-400 text-[11px] text-muted-light">
                           {e.place}
                         </Text>
                       )}
@@ -358,10 +369,10 @@ export function PlanScreen({
         {!readOnly && (
           <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
             <View className="flex-row items-center justify-between">
-              <Text className="font-gothic-500 text-[11px] text-ink">車の移動</Text>
+              <Text className="font-gothic-500 text-[12px] text-ink">車の移動</Text>
               {baseMode === "walk" && (
                 <Pressable onPress={onOpenAddRental} className="rounded-full border border-ink/25 px-3 py-1">
-                  <Text className="font-gothic-500 text-[10px] text-ink">＋ レンタカー</Text>
+                  <Text className="font-gothic-500 text-[11px] text-ink">＋ レンタカー</Text>
                 </Pressable>
               )}
             </View>
@@ -374,7 +385,7 @@ export function PlanScreen({
                     onPress={() => onSetBaseMode(m)}
                     className={`rounded-full border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.12] bg-white/50"}`}
                   >
-                    <Text className={`font-gothic-400 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>
+                    <Text className={`font-gothic-400 text-[12px] ${active ? "text-kinari" : "text-ink"}`}>
                       {m === "car" ? "ずっと車（マイカー）" : "徒歩・電車が基本"}
                     </Text>
                   </Pressable>
@@ -382,11 +393,11 @@ export function PlanScreen({
               })}
             </View>
             {baseMode === "car" ? (
-              <Text className="mt-1.5 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+              <Text className="mt-1.5 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
                 旅行中ずっと車で移動する前提で、区間の所要時間を計算します。
               </Text>
             ) : rentals.length === 0 ? (
-              <Text className="mt-1.5 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+              <Text className="mt-1.5 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
                 近い区間は徒歩、離れた区間は電車・バスとして計算します。途中でレンタカーを借りるなら「＋レンタカー」で借りる〜返す時間を登録すると、その期間だけ車で計算します。
               </Text>
             ) : (
@@ -395,12 +406,12 @@ export function PlanScreen({
                   <View key={e.id} className="flex-row items-center gap-2">
                     <Pressable onPress={() => onEditEntry(e.id)} className="flex-1">
                       <Text className="font-mincho-600 text-[13px] text-ink">{e.title || "レンタカー"}</Text>
-                      <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                      <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted" style={TNUM}>
                         {e.departAt ? `借 ${formatJstMonthDayJa(new Date(e.departAt))} ${formatJstTime(new Date(e.departAt))}` : ""}
                         {e.arriveBy ? ` → 返 ${formatJstMonthDayJa(new Date(e.arriveBy))} ${formatJstTime(new Date(e.arriveBy))}` : ""}
                       </Text>
                       {e.place && (
-                        <Text numberOfLines={1} className="font-gothic-400 text-[10px] text-muted-light">
+                        <Text numberOfLines={1} className="font-gothic-400 text-[11px] text-muted-light">
                           {e.place}
                         </Text>
                       )}
@@ -410,7 +421,7 @@ export function PlanScreen({
                     </Pressable>
                   </View>
                 ))}
-                <Text className="font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+                <Text className="font-gothic-400 text-[11px] leading-[17px] text-muted-light">
                   この期間の移動は車、期間外は徒歩・電車として計算します。
                 </Text>
               </View>
@@ -425,7 +436,7 @@ export function PlanScreen({
               onPress={() => setSelectedDay("all")}
               className={`rounded-[10px] border px-3 py-1.5 ${activeDay === "all" ? "border-ink bg-ink" : "border-black/[.15] bg-white/50"}`}
             >
-              <Text className={`font-gothic-500 text-[11px] ${activeDay === "all" ? "text-kinari" : "text-ink"}`}>全日</Text>
+              <Text className={`font-gothic-500 text-[12px] ${activeDay === "all" ? "text-kinari" : "text-ink"}`}>全日</Text>
             </Pressable>
             {Array.from({ length: tripDayCount }, (_, i) => i + 1).map((d) => {
               const active = activeDay === d;
@@ -441,8 +452,8 @@ export function PlanScreen({
                       : { backgroundColor: tint(dayColor(d), 0.08), borderColor: tint(dayColor(d), 0.35) }
                   }
                 >
-                  <Text className={`font-gothic-500 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>Day{d}</Text>
-                  <Text className={`font-gothic-400 text-[9px] ${active ? "text-kinari/80" : "text-muted"}`}>{dateStr}</Text>
+                  <Text className={`font-gothic-500 text-[12px] ${active ? "text-kinari" : "text-ink"}`}>Day{d}</Text>
+                  <Text className={`font-gothic-400 text-[10px] ${active ? "text-kinari/80" : "text-muted"}`}>{dateStr}</Text>
                 </Pressable>
               );
             })}
@@ -450,23 +461,22 @@ export function PlanScreen({
         )}
 
         {entries.length === 0 && !readOnly && (
-          <View className="mt-6 items-center">
-            {/* 行き先ゼロの時こそ、いちばん強い導線を置く */}
-            <Illustration name="loading-map" size="md" alt="" />
-            <Text className="mt-3 font-mincho-600 text-[16px] text-ink">どこへ行きましょうか</Text>
-            <Text className="mt-2 text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
+          <View className="mt-4 items-center">
+            {/* 行き先ゼロの時こそ、いちばん強い導線を置く。
+                以前はデモの行き先が入っていたので、この画面は誰にも見えていなかった。 */}
+            <Illustration name="loading-map" size="lg" alt="" />
+            <Text className="mt-4 text-center font-mincho-700 text-[22px] leading-[32px] text-ink">
+              どこへ行きましょうか
+            </Text>
+            <Text className="mt-2.5 text-center font-gothic-400 text-[13px] leading-[22px] text-muted">
               行き先だけ決まっていれば、{"\n"}あとはAIが旅程をまるごと組み立てます。
             </Text>
-            <Pressable
-              onPress={onOpenGenerate}
-              accessibilityRole="button"
-              accessibilityLabel="AIに旅程を作ってもらう"
-              className="mt-5 rounded-[12px] bg-ink px-6 py-3.5"
-            >
-              <Text className="font-gothic-500 text-[13px] text-kinari">AIに旅程を作ってもらう</Text>
-            </Pressable>
-            <Text className="mt-4 text-center font-gothic-400 text-[11px] leading-[18px] text-muted-light">
-              自分で決めたい場合は、右上の＋から{"\n"}行きたい場所を追加してください。
+            <View className="mt-6 w-full gap-2.5">
+              <Button label="AIに旅程を作ってもらう" size="lg" accent onPress={onOpenGenerate} />
+              <Button label="自分で行き先を追加する" tone="secondary" onPress={onOpenAdd} />
+            </View>
+            <Text className="mt-4 text-center font-gothic-400 text-[12px] leading-[19px] text-muted-light">
+              日程・同伴者・目的を選ぶだけ。{"\n"}住所や営業時間はあとから自動で埋まります。
             </Text>
           </View>
         )}
@@ -483,7 +493,7 @@ export function PlanScreen({
                 <View className="mb-1 mt-3 flex-row items-center gap-2">
                   {/* 日の印は「角ラベル」。スポットの丸番号と見分けが付くようにする */}
                   <View className="rounded-[4px] px-1.5 py-[2px]" style={{ backgroundColor: dayColor(day) }}>
-                    <Text className="font-gothic-700 text-[9px] tracking-[.05em] text-kinari" style={TNUM}>DAY {day}</Text>
+                    <Text className="font-gothic-700 text-[10px] tracking-[.05em] text-kinari" style={TNUM}>DAY {day}</Text>
                   </View>
                   <Text className="font-gothic-500 text-[12px] text-ink">
                     {formatJstMonthDayJa(new Date(`${dateForDay(tripDate, day)}T00:00`))}
@@ -496,7 +506,7 @@ export function PlanScreen({
                 {/* 番号 */}
                 <View className="w-[22px] items-center pt-0.5">
                   <View className="h-[20px] w-[20px] items-center justify-center rounded-full" style={{ backgroundColor: dayColor(day) }}>
-                    <Text className="font-gothic-500 text-[10px] text-kinari" style={TNUM}>{num}</Text>
+                    <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>{num}</Text>
                   </View>
                 </View>
                 <View className="flex-1">
@@ -505,7 +515,7 @@ export function PlanScreen({
                       {range ? (
                         <Text className="font-mincho-600 text-[13px] text-ink" style={TNUM}>{range}</Text>
                       ) : (
-                        <Text className="font-gothic-400 text-[10px] text-muted-light">時刻未定</Text>
+                        <Text className="font-gothic-400 text-[11px] text-muted-light">時刻未定</Text>
                       )}
                     </Pressable>
                     {/* 時刻を固定（AIに動かされたくない予定）。時刻が入っている時だけ有効 */}
@@ -517,44 +527,44 @@ export function PlanScreen({
                           e.fixedTime ? "border-ink bg-ink" : "border-black/[.2]"
                         }`}
                       >
-                        <Text className={`font-gothic-500 text-[9px] ${e.fixedTime ? "text-kinari" : "text-muted"}`}>
+                        <Text className={`font-gothic-500 text-[10px] ${e.fixedTime ? "text-kinari" : "text-muted"}`}>
                           {e.fixedTime ? "✓ 時刻固定" : "時刻を固定"}
                         </Text>
                       </Pressable>
                     )}
-                    {readOnly && e.fixedTime && <Text className="font-gothic-400 text-[9px] text-ink">固定</Text>}
+                    {readOnly && e.fixedTime && <Text className="font-gothic-400 text-[10px] text-ink">固定</Text>}
                   </View>
                   <Pressable disabled={readOnly} onPress={() => onEditEntry(e.id)}>
                     <View className="mt-0.5 flex-row items-center gap-1.5">
                       <Text className="font-mincho-600 text-[15px] text-ink">{e.title}</Text>
-                      {!readOnly && <Text className="font-gothic-400 text-[10px] text-muted-light">編集 ›</Text>}
+                      {!readOnly && <Text className="font-gothic-400 text-[11px] text-muted-light">編集 ›</Text>}
                     </View>
                     {e.place && (
-                      <Text numberOfLines={1} className="mt-0.5 font-gothic-400 text-[10px] text-muted-light">
+                      <Text numberOfLines={1} className="mt-0.5 font-gothic-400 text-[11px] text-muted-light">
                         {e.place}
                       </Text>
                     )}
                     <View className="mt-1 flex-row flex-wrap items-center gap-1.5">
                       <View className={`rounded-full border px-2 py-[1px] ${ps.border}`}>
-                        <Text className={`font-gothic-400 text-[9px] ${ps.text}`}>{PRIORITY_META[e.priority].label}</Text>
+                        <Text className={`font-gothic-400 text-[10px] ${ps.text}`}>{PRIORITY_META[e.priority].label}</Text>
                       </View>
-                      <Text className="font-gothic-400 text-[10px] text-muted">{MODE_LABEL[e.mode]}</Text>
-                      <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                      <Text className="font-gothic-400 text-[11px] text-muted">{MODE_LABEL[e.mode]}</Text>
+                      <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>
                         · 滞在{formatDurationMin(effectiveStayMin(e))}
                       </Text>
                       {typeof e.cost === "number" && e.cost > 0 && (
-                        <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                        <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>
                           · {formatYen(e.cost)}
                         </Text>
                       )}
                       {(e.openFrom || e.openTo) && (
-                        <Text className="font-gothic-400 text-[10px] text-muted" style={TNUM}>
+                        <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>
                           · 営業{e.openFrom ?? "?"}〜{e.openTo ?? "?"}
                         </Text>
                       )}
                       {isClosedOn(e, new Date(`${dateForDay(tripDate, day)}T00:00`)) && (
                         <View className="rounded-full border border-ink bg-surface px-1.5 py-[1px]">
-                          <Text className="font-gothic-500 text-[9px] text-ink">{closedDaysLabel(e)}・この日は休み</Text>
+                          <Text className="font-gothic-500 text-[10px] text-ink">{closedDaysLabel(e)}・この日は休み</Text>
                         </View>
                       )}
                     </View>
@@ -602,7 +612,7 @@ export function PlanScreen({
               {/* 複数日程では、行き先を何日目に置くか切り替えられる */}
               {!readOnly && tripDayCount > 1 && (
                 <View className="mt-1.5 flex-row flex-wrap items-center gap-1.5 pl-[30px]">
-                  <Text className="font-gothic-400 text-[9px] text-muted-light">日:</Text>
+                  <Text className="font-gothic-400 text-[10px] text-muted-light">日:</Text>
                   {Array.from({ length: tripDayCount }, (_, i) => i + 1).map((d) => {
                     const active = (e.day ?? 1) === d;
                     return (
@@ -616,7 +626,7 @@ export function PlanScreen({
                             : { backgroundColor: "rgba(255,255,255,.5)", borderColor: tint(dayColor(d), 0.3) }
                         }
                       >
-                        <Text className={`font-gothic-400 text-[10px] ${active ? "text-kinari" : "text-muted"}`}>{d}日目</Text>
+                        <Text className={`font-gothic-400 text-[11px] ${active ? "text-kinari" : "text-muted"}`}>{d}日目</Text>
                       </Pressable>
                     );
                   })}
@@ -628,14 +638,14 @@ export function PlanScreen({
         })}
 
         {!readOnly && ordered.length > 1 && (
-          <Text className="mt-2 font-gothic-400 text-[10px] text-muted-light">▲▼で並び替え（長押しで先頭・末尾へ）。順番から時刻を自動計算します。</Text>
+          <Text className="mt-2 font-gothic-400 text-[11px] text-muted-light">▲▼で並び替え（長押しで先頭・末尾へ）。順番から時刻を自動計算します。</Text>
         )}
 
         {!readOnly && entries.length > 0 && (
           <View className="mt-5">
             {/* AIへのお願い（自由文）。並び順や時間配分のニュアンスを言葉で伝える。 */}
             <View className="mb-2 gap-1">
-              <Text className="font-gothic-400 text-[10px] text-muted">AIへのお願い（任意・入れたままにできます）</Text>
+              <Text className="font-gothic-400 text-[11px] text-muted">AIへのお願い（任意・入れたままにできます）</Text>
               <TextInput
                 value={planRequest}
                 onChangeText={onSetPlanRequest}
@@ -645,25 +655,30 @@ export function PlanScreen({
                 placeholder={"例: 1日目はホテルに着いたら、そのあとは予定を入れない\n朝はゆっくりめ / 移動は少なめに"}
                 placeholderTextColor={PLACEHOLDER}
                 accessibilityLabel="AIへのお願い"
-                className="min-h-[56px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2 font-gothic-400 text-[12px] leading-[18px] text-ink"
+                className="min-h-[56px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2 font-gothic-400 text-[12px] leading-[20px] text-ink"
               />
             </View>
-            <Pressable
-              disabled={composing}
+            <Button
+              label={composing ? "AIが予定を組んでいます…" : "AIで予定を組む"}
+              size="lg"
+              loading={composing}
               onPress={onCompose}
-              className={`flex-row items-center justify-center gap-2 rounded-[12px] py-3.5 ${composing ? "bg-ink/40" : "bg-ink"}`}
-            >
-              {composing && <ActivityIndicator size="small" color="#F4EFE5" />}
-              <Text className="font-gothic-500 text-[12px] text-kinari">{composing ? "AIが予定を組んでいます…" : "AIで予定を組む"}</Text>
-            </Pressable>
-            <Text className="mt-2 text-center font-gothic-400 text-[10px] text-muted-light">
+            />
+            {/* 組み直した直後に取り消したくなるので、取り消しはこの場に置く
+                （以前はタイムライン側にしか無く、押した画面から見えなかった） */}
+            {canUndoCompose && !composing && (
+              <View className="mt-2">
+                <Button label="組む前に戻す" tone="ghost" size="sm" onPress={onUndoCompose} />
+              </View>
+            )}
+            <Text className="mt-2 text-center font-gothic-400 text-[12px] leading-[19px] text-muted-light">
               旅程は並び順から自動で組まれています。押すとAIが移動効率・営業時間・定休日を見て、順番と時間配分を組み直します。
             </Text>
-            {composeError && <Text className="mt-2 text-center font-gothic-400 text-[11px] text-ink">{composeError}</Text>}
+            {composeError && <Text className="mt-2 text-center font-gothic-400 text-[12px] text-ink">{composeError}</Text>}
             {planNotes && (
               <View className="mt-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
-                <Text className="font-gothic-500 text-[10px] tracking-[.1em] text-muted">AIのメモ</Text>
-                <Text className="mt-1 font-mincho-400 text-[13px] leading-[20px] text-ink">{planNotes}</Text>
+                <Text className="font-gothic-500 text-[11px] tracking-[.1em] text-muted">AIのメモ</Text>
+                <Text className="mt-1 font-mincho-400 text-[13px] leading-[21px] text-ink">{planNotes}</Text>
               </View>
             )}
           </View>
@@ -672,17 +687,14 @@ export function PlanScreen({
         {/* この辺のおすすめ（AIのおすすめ＋周辺スポットを統合・選んでまとめて追加） */}
         {!readOnly && entries.length > 0 && combinedSuggestions.length === 0 && (
           <View className="mt-6">
-            <View className="mb-1 flex-row items-center gap-1.5">
-              <View className="h-[11px] w-[3px] rounded-full bg-accent" />
-              <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ</Text>
-            </View>
+<SectionHeading label="この辺のおすすめ" className="mb-1.5" />
             {areaSuggestionsLoading ? (
               <View className="flex-row items-center gap-2">
                 <ActivityIndicator size="small" color="#6E675C" />
-                <Text className="font-gothic-400 text-[11px] text-muted-light">周辺のおすすめを探しています…</Text>
+                <Text className="font-gothic-400 text-[12px] text-muted-light">周辺のおすすめを探しています…</Text>
               </View>
             ) : (
-              <Text className="font-gothic-400 text-[11px] leading-[17px] text-muted-light">
+              <Text className="font-gothic-400 text-[12px] leading-[19px] text-muted-light">
                 {hasGeoReference
                   ? "近くのおすすめが見つかりませんでした。"
                   : "行き先や宿泊先を住所候補から選ぶと、その周辺のおすすめが出ます。"}
@@ -694,10 +706,7 @@ export function PlanScreen({
         {!readOnly && combinedSuggestions.length > 0 && (
           <View className="mt-7">
             <View className="mb-2 flex-row items-center justify-between">
-              <View className="flex-row items-center gap-1.5">
-                <View className="h-[11px] w-[3px] rounded-full bg-accent" />
-                <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ · 選んでまとめて追加</Text>
-              </View>
+<SectionHeading label="この辺のおすすめ" />
               <Pressable
                 onPress={() =>
                   setPicked((prev) =>
@@ -707,7 +716,7 @@ export function PlanScreen({
                 hitSlop={6}
                 className="rounded-full border border-ink/25 px-2.5 py-1"
               >
-                <Text className="font-gothic-400 text-[10px] text-ink">
+                <Text className="font-gothic-400 text-[11px] text-ink">
                   {picked.size === combinedSuggestions.length ? "選択を解除" : "すべて選択"}
                 </Text>
               </Pressable>
@@ -727,7 +736,7 @@ export function PlanScreen({
                     <View className="flex-1">
                       <Text className="font-mincho-400 text-[14px] text-ink">{s.title}</Text>
                       {(s.area || s.note) && (
-                        <Text className="mt-0.5 font-gothic-400 text-[10px] text-muted">{[s.area, s.note].filter(Boolean).join(" · ")}</Text>
+                        <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted">{[s.area, s.note].filter(Boolean).join(" · ")}</Text>
                       )}
                     </View>
                   </Pressable>
@@ -757,7 +766,7 @@ export function PlanScreen({
             <Illustration name="loading-map" size="md" alt="" />
           </Floater>
           <Text className="mt-4 font-mincho-600 text-[15px] text-ink">旅程を組み立てています</Text>
-          <Text className="mt-1.5 font-gothic-400 text-[11px] text-muted">少しお待ちください</Text>
+          <Text className="mt-1.5 font-gothic-400 text-[12px] text-muted">少しお待ちください</Text>
         </View>
       )}
     </View>

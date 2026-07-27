@@ -88,15 +88,15 @@ export function AddEntrySheet({
             {!fixedMode && (
               <View className="mb-5 flex-row gap-2">
                 <Pressable onPress={() => setMode("manual")} className={`flex-1 rounded-[10px] py-2 ${mode === "manual" ? "bg-ink" : "border border-black/[.1]"}`}>
-                  <Text className={`text-center font-gothic-500 text-[11px] ${mode === "manual" ? "text-kinari" : "text-muted"}`}>1件ずつ</Text>
+                  <Text className={`text-center font-gothic-500 text-[12px] ${mode === "manual" ? "text-kinari" : "text-muted"}`}>1件ずつ</Text>
                 </Pressable>
                 {onBulkAdd && (
                   <Pressable onPress={() => setMode("bulk")} className={`flex-1 rounded-[10px] py-2 ${mode === "bulk" ? "bg-ink" : "border border-black/[.1]"}`}>
-                    <Text className={`text-center font-gothic-500 text-[11px] ${mode === "bulk" ? "text-kinari" : "text-muted"}`}>まとめて</Text>
+                    <Text className={`text-center font-gothic-500 text-[12px] ${mode === "bulk" ? "text-kinari" : "text-muted"}`}>まとめて</Text>
                   </Pressable>
                 )}
                 <Pressable onPress={() => setMode("mail")} className={`flex-1 rounded-[10px] py-2 ${mode === "mail" ? "bg-ink" : "border border-black/[.1]"}`}>
-                  <Text className={`text-center font-gothic-500 text-[11px] ${mode === "mail" ? "text-kinari" : "text-muted"}`}>メールから</Text>
+                  <Text className={`text-center font-gothic-500 text-[12px] ${mode === "mail" ? "text-kinari" : "text-muted"}`}>メールから</Text>
                 </Pressable>
               </View>
             )}
@@ -121,7 +121,7 @@ export function AddEntrySheet({
                 />
               ) : mode === "bulk" ? (
                 <View className="gap-3">
-                  <Text className="-mt-2 font-gothic-400 text-[11px] leading-[18px] text-muted">
+                  <Text className="-mt-2 font-gothic-400 text-[12px] leading-[20px] text-muted">
                     行きたい場所を思いつくまま書くだけでOK。AIが読み取って一括で登録します。{"\n"}住所・営業時間・定休日は自動で補完されます。
                   </Text>
                   <View className="gap-1">
@@ -133,10 +133,10 @@ export function AddEntrySheet({
                       textAlignVertical="top"
                       placeholder={"例: 大阪城、海遊館、道頓堀で夕食。\n2日目はUSJに1日いる"}
                       placeholderTextColor={PLACEHOLDER}
-                      className="min-h-[120px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[13px] leading-[20px] text-ink"
+                      className="min-h-[120px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[13px] leading-[21px] text-ink"
                     />
                   </View>
-                  {error && <Text className="font-gothic-400 text-[11px] text-ink">{error}</Text>}
+                  {error && <Text className="font-gothic-400 text-[12px] text-ink">{error}</Text>}
                   <Pressable
                     disabled={!bulkText.trim() || importing}
                     onPress={runBulk}
@@ -150,11 +150,11 @@ export function AddEntrySheet({
                 </View>
               ) : (
                 <View className="gap-3">
-                  <Text className="-mt-2 font-gothic-400 text-[11px] leading-[18px] text-muted">
+                  <Text className="-mt-2 font-gothic-400 text-[12px] leading-[20px] text-muted">
                     航空券・ホテル等の予約確認メールを貼り付けると、AIが読み取って確定予定（固定時刻）として取り込みます。
                   </Text>
                   <View className="gap-1">
-                    <Text className="font-gothic-400 text-[10px] text-muted">送信元（任意）</Text>
+                    <Text className="font-gothic-400 text-[11px] text-muted">送信元（任意）</Text>
                     <TextInput
                       value={source}
                       onChangeText={setSource}
@@ -164,7 +164,7 @@ export function AddEntrySheet({
                     />
                   </View>
                   <View className="gap-1">
-                    <Text className="font-gothic-400 text-[10px] text-muted">メール本文 *</Text>
+                    <Text className="font-gothic-400 text-[11px] text-muted">メール本文 *</Text>
                     <TextInput
                       value={body}
                       onChangeText={setBody}
@@ -173,10 +173,10 @@ export function AddEntrySheet({
                       textAlignVertical="top"
                       placeholder="メール本文をここに貼り付け"
                       placeholderTextColor={PLACEHOLDER}
-                      className="min-h-[160px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[12px] leading-[18px] text-ink"
+                      className="min-h-[160px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[12px] leading-[20px] text-ink"
                     />
                   </View>
-                  {error && <Text className="font-gothic-400 text-[11px] text-ink">{error}</Text>}
+                  {error && <Text className="font-gothic-400 text-[12px] text-ink">{error}</Text>}
                   <Pressable
                     disabled={!body.trim() || importing}
                     onPress={runImport}
