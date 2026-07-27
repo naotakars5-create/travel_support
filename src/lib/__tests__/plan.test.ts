@@ -1,4 +1,12 @@
-import { sequentialSchedule, computePlanTotals, costCategoryOf, fillIntoGaps, isClosedOn, closedDaysLabel } from "../plan";
+import {
+  sequentialSchedule,
+  computePlanTotals,
+  costCategoryOf,
+  entryIdFromEventId,
+  fillIntoGaps,
+  isClosedOn,
+  closedDaysLabel,
+} from "../plan";
 import { PlanEntry } from "../types";
 
 const REF = new Date("2026-07-25T09:00:00.000Z"); // 各日の起点（テストは差分で検証しTZ非依存）
@@ -215,5 +223,22 @@ describe("computePlanTotals / costCategoryOf", () => {
     expect(totals.totalCost).toBe(11500);
     expect(totals.costedCount).toBe(4);
     expect(totals.byCategory).toEqual({ transit: 1000, stay: 8000, dining: 2000, sightseeing: 500 });
+  });
+});
+
+describe("entryIdFromEventId", () => {
+  it("普通の地点イベントから行き先IDを取り出せる", () => {
+    expect(entryIdFromEventId("evt-e-123")).toBe("e-123");
+  });
+
+  it("宿泊のチェックイン・チェックアウト・連泊も同じ行き先に戻る", () => {
+    expect(entryIdFromEventId("evt-e-9-in")).toBe("e-9");
+    expect(entryIdFromEventId("evt-e-9-out")).toBe("e-9");
+    expect(entryIdFromEventId("evt-e-9-stay2")).toBe("e-9");
+  });
+
+  it("行き先由来でないIDは null", () => {
+    expect(entryIdFromEventId("something-else")).toBeNull();
+    expect(entryIdFromEventId("evt-")).toBeNull();
   });
 });

@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Illustration } from "./Illustration";
 import { IllustrationName } from "@/lib/illustrations";
+import { DAY_COLORS, tint } from "@/lib/palette";
 
 /** 初回だけ出す3枚のカード。旅の準備が楽しみになるトーンで、次に何をすればいいかを示す。 */
 interface Card {
@@ -10,6 +11,8 @@ interface Card {
   eyebrow: string;
   title: string;
   body: string;
+  /** そのカードの色（藍→松葉→テラコッタ。最後だけ「今から始まる」色にする） */
+  color: string;
 }
 
 const CARDS: Card[] = [
@@ -18,18 +21,21 @@ const CARDS: Card[] = [
     eyebrow: "ようこそ",
     title: "旅ナビは、\n旅のしおりを作るアプリ",
     body: "行きたい場所を並べるだけ。\n住所も営業時間もAIが調べて、\n回りやすい順番の旅程に組み上げます。",
+    color: DAY_COLORS[0],
   },
   {
     illustration: "loading-map",
     eyebrow: "みんなで作る",
     title: "作ったしおりは、\nかんたんに共有できる",
     body: "リンクをひとつ送るだけ。\n一緒に行く人と予定を見ながら、\n行き先を足して計画を育てましょう。",
+    color: DAY_COLORS[1],
   },
   {
     illustration: "packed-done",
     eyebrow: "はじめよう",
     title: "さっそく、\n最初の行き先を決めよう",
     body: "目的地をひとつ入れるだけで始められます。\n迷ったら、AIにゼロから\n旅程を作ってもらうこともできます。",
+    color: "#D96F4C",
   },
 ];
 
@@ -51,8 +57,13 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
       </View>
 
       <View className="flex-1 items-center justify-center px-[34px]">
-        <Illustration name={card.illustration} size="lg" alt="" />
-        <Text className="mt-6 font-gothic-500 text-[10px] tracking-[.2em] text-muted">{card.eyebrow}</Text>
+        {/* 絵の後ろに、そのカードの色をごく薄く敷く */}
+        <View className="items-center justify-center rounded-full p-6" style={{ backgroundColor: tint(card.color, 0.1) }}>
+          <Illustration name={card.illustration} size="lg" alt="" />
+        </View>
+        <Text className="mt-6 font-gothic-500 text-[10px] tracking-[.2em]" style={{ color: card.color }}>
+          {card.eyebrow}
+        </Text>
         <Text className="mt-2 text-center font-mincho-700 text-[26px] leading-[38px] text-ink">{card.title}</Text>
         <Text className="mt-4 text-center font-gothic-400 text-[12px] leading-[21px] text-muted">{card.body}</Text>
       </View>
@@ -63,7 +74,8 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
           {CARDS.map((c, i) => (
             <View
               key={c.eyebrow}
-              className={`h-[6px] rounded-full ${i === index ? "w-[18px] bg-ink" : "w-[6px] bg-ink/20"}`}
+              className={`h-[6px] rounded-full ${i === index ? "w-[18px]" : "w-[6px]"}`}
+              style={{ backgroundColor: i === index ? c.color : tint(c.color, 0.25) }}
             />
           ))}
         </View>
@@ -71,7 +83,8 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
           onPress={() => (isLast ? onDone() : setIndex((i) => i + 1))}
           accessibilityRole="button"
           accessibilityLabel={isLast ? "はじめる" : "次へ"}
-          className="rounded-[12px] bg-ink py-3.5"
+          className="rounded-[12px] py-3.5"
+          style={{ backgroundColor: card.color }}
         >
           <Text className="text-center font-gothic-500 text-[13px] text-kinari">{isLast ? "はじめる" : "次へ"}</Text>
         </Pressable>

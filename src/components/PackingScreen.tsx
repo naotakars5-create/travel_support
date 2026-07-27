@@ -5,7 +5,7 @@ import { PackingItem } from "@/lib/types";
 import { packingProgress } from "@/lib/packing";
 import { Illustration } from "./Illustration";
 
-const MUTED = "#6E675C";
+const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 export function PackingScreen({
   items,
@@ -86,7 +86,7 @@ export function PackingScreen({
             onSubmitEditing={submit}
             returnKeyType="done"
             placeholder="持ち物を追加"
-            placeholderTextColor={MUTED}
+            placeholderTextColor={PLACEHOLDER}
             className="min-w-0 flex-1 rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
           />
           <Pressable

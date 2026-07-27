@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Companion, COMPANION_OPTIONS, Purpose, PURPOSE_OPTIONS, TripBrief } from "@/lib/tripBrief";
 import { SlideUp } from "./animations";
 
-const MUTED = "#6E675C";
+const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
   return (
@@ -93,7 +93,7 @@ export function GeneratePlanSheet({
                     value={destination}
                     onChangeText={setDestination}
                     placeholder="例: 香川県 / 高松・小豆島 / 京都の東山あたり"
-                    placeholderTextColor={MUTED}
+                    placeholderTextColor={PLACEHOLDER}
                     className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
                   />
                 </View>
@@ -158,7 +158,7 @@ export function GeneratePlanSheet({
                     numberOfLines={3}
                     textAlignVertical="top"
                     placeholder={"例: 予算は控えめに。歩きすぎない範囲で。\nうどんは絶対に食べたい"}
-                    placeholderTextColor={MUTED}
+                    placeholderTextColor={PLACEHOLDER}
                     className="min-h-[76px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[12px] leading-[19px] text-ink"
                   />
                 </View>

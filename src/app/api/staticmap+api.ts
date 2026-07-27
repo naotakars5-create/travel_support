@@ -1,6 +1,6 @@
 import { guardRequest } from "@/lib/apiGuard";
 import { GeoPoint } from "@/lib/types";
-import { hasGoogleMapsKey, staticRouteMapUrl } from "@/lib/googleMaps";
+import { hasGoogleMapsKey, staticAreaMapUrl, staticRouteMapUrl } from "@/lib/googleMaps";
 
 /**
  * 旅程の全地点を結ぶ経路地図（Static Maps API）の画像を返すプロキシ。
@@ -33,14 +33,32 @@ export async function GET(request: Request): Promise<Response> {
     if (Number.isFinite(mlat) && Number.isFinite(mlng)) me = { lat: mlat, lng: mlng };
   }
 
-  if (points.length === 0 && !me) {
+  // c=lat,lng&z=14 が付いていれば「中心とズームを指定した地図」（地図タブの操作用）。
+  // 経路の線は引かず、指定の中心をそのまま使うので、指でずらした位置を正確に再現できる。
+  const centerParam = url.searchParams.get("c");
+  let center: GeoPoint | null = null;
+  if (centerParam) {
+    const [clat, clng] = centerParam.split(",").map(Number);
+    if (Number.isFinite(clat) && Number.isFinite(clng)) center = { lat: clat, lng: clng };
+  }
+
+  if (points.length === 0 && !me && !center) {
     return new Response("no points", { status: 400 });
   }
   if (!hasGoogleMapsKey()) {
     return new Response("no key", { status: 404 });
   }
 
-  const mapUrl = staticRouteMapUrl(points, width, height, me, labels);
+  const mapUrl = center
+    ? staticAreaMapUrl(
+        center,
+        clampInt(url.searchParams.get("z"), 13, 1, 20),
+        width,
+        height,
+        points.map((p, i) => ({ p, label: labels[i] })),
+        me
+      )
+    : staticRouteMapUrl(points, width, height, me, labels);
   if (!mapUrl) return new Response("no map", { status: 400 });
 
   try {

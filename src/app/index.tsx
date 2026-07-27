@@ -22,6 +22,8 @@ import { hasSeenOnboarding, markOnboardingSeen } from "@/lib/onboarding";
 export default function Home() {
   const app = useAppState();
   const [addOpen, setAddOpen] = useState(false);
+  // 旅程の空き時間から追加した時に、その日を初期選択にする
+  const [addDay, setAddDay] = useState<number | undefined>(undefined);
   const [addLodgingOpen, setAddLodgingOpen] = useState(false);
   const [addRentalOpen, setAddRentalOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -106,12 +108,15 @@ export default function Home() {
       {app.tab === "itin" && (
         <ItineraryScreen
           rail={app.rail}
+          entries={app.entries}
           unplaced={app.unplacedEntries}
           currentNodeKey={app.currentNodeKey}
           justAddedEventId={app.justAddedEventId}
           liveLocation={app.liveLocation}
           now={app.now}
           tripDate={app.tripDate}
+          tripDayCount={app.tripDayCount}
+          readOnly={app.readOnly}
           canUndoCompose={app.canUndoCompose}
           suggestOptimize={app.suggestOptimize}
           composing={app.composing}
@@ -119,6 +124,14 @@ export default function Home() {
           onUndoCompose={app.undoCompose}
           onNavigatePlan={() => app.setTab("plan")}
           onBumpPriority={(id) => app.updateEntry(id, { priority: "must" })}
+          onEditEntry={(id) => setEditId(id)}
+          onRemoveEntry={app.removeEntry}
+          onMoveEntry={app.moveEntry}
+          onSetEntryDay={app.setEntryDay}
+          onAddToDay={(day) => {
+            setAddDay(day);
+            setAddOpen(true);
+          }}
         />
       )}
       {app.tab === "today" && (
@@ -182,11 +195,17 @@ export default function Home() {
         <AddEntrySheet
           tripDate={app.tripDate}
           tripDayCount={app.tripDayCount}
-          onClose={() => setAddOpen(false)}
+          initialDay={addDay}
+          onClose={() => {
+            setAddOpen(false);
+            setAddDay(undefined);
+          }}
           onAdd={(input) => {
             app.addEntry(input);
             setAddOpen(false);
-            app.setTab("plan");
+            // 旅程の空き時間から足した時は、そのまま旅程に留まる
+            app.setTab(addDay ? "itin" : "plan");
+            setAddDay(undefined);
           }}
           onBulkAdd={async (text) => {
             const res = await app.bulkAddFromText(text);

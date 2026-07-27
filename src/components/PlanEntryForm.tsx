@@ -24,7 +24,7 @@ const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
 ];
 
 const STAY_OPTIONS = [30, 60, 90, 120];
-const MUTED = "#6E675C";
+const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 const TRANSIT_MODES: TransportMode[] = ["air", "rail", "bus", "car"];
 const isTransit = (m: TransportMode) => TRANSIT_MODES.includes(m);
@@ -295,7 +295,7 @@ export function PlanEntryForm({
                   ? "例: のぞみ / JL105"
                   : "例: 大阪城天守閣"
           }
-          placeholderTextColor={MUTED}
+          placeholderTextColor={PLACEHOLDER}
           className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[14px] text-ink"
         />
         {predictions.length > 0 && !transit && (
@@ -341,7 +341,7 @@ export function PlanEntryForm({
               value={place}
               onChangeText={onPlaceChange}
               placeholder="例: ○○駅前店"
-              placeholderTextColor={MUTED}
+              placeholderTextColor={PLACEHOLDER}
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
             />
           </View>
@@ -382,7 +382,7 @@ export function PlanEntryForm({
                 value={placeFrom}
                 onChangeText={setPlaceFrom}
                 placeholder="例: 東京駅"
-                placeholderTextColor={MUTED}
+                placeholderTextColor={PLACEHOLDER}
                 className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
               />
             </View>
@@ -392,7 +392,7 @@ export function PlanEntryForm({
                 value={placeTo}
                 onChangeText={setPlaceTo}
                 placeholder="例: 新大阪駅"
-                placeholderTextColor={MUTED}
+                placeholderTextColor={PLACEHOLDER}
                 className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
               />
             </View>
@@ -410,7 +410,7 @@ export function PlanEntryForm({
               value={place}
               onChangeText={onPlaceChange}
               placeholder="例: 大阪府大阪市北区梅田3-1-1"
-              placeholderTextColor={MUTED}
+              placeholderTextColor={PLACEHOLDER}
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
             />
             <OpenHoursNote loading={loadingDetails} openFrom={openFrom} openTo={openTo} closedDays={closedDays} />
@@ -436,7 +436,7 @@ export function PlanEntryForm({
               value={place}
               onChangeText={onPlaceChange}
               placeholder="例: 大阪府大阪市中央区大阪城1-1"
-              placeholderTextColor={MUTED}
+              placeholderTextColor={PLACEHOLDER}
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-mincho-400 text-[13px] text-ink"
             />
             <OpenHoursNote loading={loadingDetails} openFrom={openFrom} openTo={openTo} closedDays={closedDays} />
@@ -460,7 +460,7 @@ export function PlanEntryForm({
               onChangeText={setCost}
               keyboardType="number-pad"
               placeholder="例: 1200"
-              placeholderTextColor={MUTED}
+              placeholderTextColor={PLACEHOLDER}
               className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 font-mincho-400 text-[14px] text-ink"
               style={{ height: 42, fontVariant: ["tabular-nums"] }}
             />
@@ -499,7 +499,7 @@ export function PlanEntryForm({
             onChangeText={setCost}
             keyboardType="number-pad"
             placeholder="例: 14000"
-            placeholderTextColor={MUTED}
+            placeholderTextColor={PLACEHOLDER}
             className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 font-mincho-400 text-[14px] text-ink"
             style={{ height: 42, fontVariant: ["tabular-nums"] }}
           />
@@ -512,7 +512,7 @@ export function PlanEntryForm({
           value={detail}
           onChangeText={setDetail}
           placeholder="例: 予約番号 / 座席 など"
-          placeholderTextColor={MUTED}
+          placeholderTextColor={PLACEHOLDER}
           className="rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2.5 font-gothic-400 text-[12px] text-ink"
         />
       </View>

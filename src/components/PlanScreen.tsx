@@ -19,15 +19,15 @@ import { dateForDay, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { formatYen } from "@/lib/format";
 import { DateOnlyField } from "./PlainFields";
 import { Illustration, illustrationUri } from "./Illustration";
+import { dayColor, tint } from "@/lib/palette";
 import { Floater } from "./animations";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
-const MUTED = "#6E675C";
+const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
-// 日ごとの淡い背景色（複数日程で日を見分けやすくする）。1日目は無地。
-// 有彩色は「今・完了」専用のため、日の区別は砂色（surface）の濃淡で行う。
-const DAY_TINTS = ["", "bg-surface/50", "bg-surface/80", "bg-surface/30", "bg-surface/60"];
-const dayTint = (day: number): string => DAY_TINTS[(Math.max(1, day) - 1) % DAY_TINTS.length];
+// 日ごとの淡い背景色（複数日程で日を見分けやすくする）。
+// 色は palette.ts の「日ごとの色」を薄くしたもので、旅程・当日タブと同じ割り当て。
+const dayTintStyle = (day: number) => ({ backgroundColor: tint(dayColor(day), 0.05) });
 
 const PRIORITY_STYLE: Record<Priority, { border: string; text: string }> = {
   must: { border: "border-ink", text: "text-ink" },
@@ -244,6 +244,27 @@ export function PlanScreen({
             </View>
           </View>
         )}
+        {/* ゼロから作り直す入口。日程を決める場所のすぐ下＝「はじめる」流れの頭に置き、
+            テラコッタで他のカード（インクの線）とはっきり見分けが付くようにする。 */}
+        {!readOnly && entries.length > 0 && (
+          <Pressable
+            onPress={onOpenGenerate}
+            accessibilityRole="button"
+            accessibilityLabel="条件を選んでAIにゼロから旅程を作ってもらう"
+            className="mb-3 flex-row items-center gap-3 rounded-[14px] border border-accent/45 bg-accent/[.08] px-4 py-3"
+          >
+            <View className="h-9 w-9 items-center justify-center rounded-full bg-accent">
+              <Text className="font-gothic-700 text-[12px] text-kinari">AI</Text>
+            </View>
+            <View className="flex-1">
+              <Text className="font-gothic-700 text-[13px] text-accent">ゼロから旅程を作ってもらう</Text>
+              <Text className="mt-0.5 font-gothic-400 text-[10px] leading-[15px] text-muted">
+                行き先・日数・同伴者・目的を選ぶだけ。いまの行き先リストは置き換わります。
+              </Text>
+            </View>
+            <Text className="font-gothic-500 text-[16px] text-accent">›</Text>
+          </Pressable>
+        )}
         {readOnly && (
           <View className="mb-4 rounded-[12px] border border-ink/15 bg-white/50 px-4 py-3">
             <Text className="font-gothic-500 text-[11px] text-ink">共有された旅程（閲覧のみ）</Text>
@@ -413,7 +434,12 @@ export function PlanScreen({
                 <Pressable
                   key={d}
                   onPress={() => setSelectedDay(d)}
-                  className={`rounded-[10px] border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.15] bg-white/50"}`}
+                  className="rounded-[10px] border px-3 py-1.5"
+                  style={
+                    active
+                      ? { backgroundColor: dayColor(d), borderColor: dayColor(d) }
+                      : { backgroundColor: tint(dayColor(d), 0.08), borderColor: tint(dayColor(d), 0.35) }
+                  }
                 >
                   <Text className={`font-gothic-500 text-[11px] ${active ? "text-kinari" : "text-ink"}`}>Day{d}</Text>
                   <Text className={`font-gothic-400 text-[9px] ${active ? "text-kinari/80" : "text-muted"}`}>{dateStr}</Text>
@@ -456,7 +482,7 @@ export function PlanScreen({
               {showHeader && (
                 <View className="mb-1 mt-3 flex-row items-center gap-2">
                   {/* 日の印は「角ラベル」。スポットの丸番号と見分けが付くようにする */}
-                  <View className="rounded-[4px] bg-ink px-1.5 py-[2px]">
+                  <View className="rounded-[4px] px-1.5 py-[2px]" style={{ backgroundColor: dayColor(day) }}>
                     <Text className="font-gothic-700 text-[9px] tracking-[.05em] text-kinari" style={TNUM}>DAY {day}</Text>
                   </View>
                   <Text className="font-gothic-500 text-[12px] text-ink">
@@ -465,11 +491,11 @@ export function PlanScreen({
                   <View className="h-px flex-1 bg-black/[.1]" />
                 </View>
               )}
-              <View className={`border-b border-black/[.06] px-2 py-3.5 ${dayTint(day)}`}>
+              <View className="border-b border-black/[.06] px-2 py-3.5" style={dayTintStyle(day)}>
               <View className="flex-row gap-2">
                 {/* 番号 */}
                 <View className="w-[22px] items-center pt-0.5">
-                  <View className="h-[20px] w-[20px] items-center justify-center rounded-full bg-ink">
+                  <View className="h-[20px] w-[20px] items-center justify-center rounded-full" style={{ backgroundColor: dayColor(day) }}>
                     <Text className="font-gothic-500 text-[10px] text-kinari" style={TNUM}>{num}</Text>
                   </View>
                 </View>
@@ -583,7 +609,12 @@ export function PlanScreen({
                       <Pressable
                         key={d}
                         onPress={() => onSetEntryDay(e.id, d)}
-                        className={`rounded-full border px-2.5 py-[3px] ${active ? "border-ink bg-ink" : "border-black/[.15] bg-white/50"}`}
+                        className="rounded-full border px-2.5 py-[3px]"
+                        style={
+                          active
+                            ? { backgroundColor: dayColor(d), borderColor: dayColor(d) }
+                            : { backgroundColor: "rgba(255,255,255,.5)", borderColor: tint(dayColor(d), 0.3) }
+                        }
                       >
                         <Text className={`font-gothic-400 text-[10px] ${active ? "text-kinari" : "text-muted"}`}>{d}日目</Text>
                       </Pressable>
@@ -612,19 +643,11 @@ export function PlanScreen({
                 numberOfLines={2}
                 textAlignVertical="top"
                 placeholder={"例: 1日目はホテルに着いたら、そのあとは予定を入れない\n朝はゆっくりめ / 移動は少なめに"}
-                placeholderTextColor={MUTED}
+                placeholderTextColor={PLACEHOLDER}
                 accessibilityLabel="AIへのお願い"
                 className="min-h-[56px] rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2 font-gothic-400 text-[12px] leading-[18px] text-ink"
               />
             </View>
-            {/* 今の内容を捨てて作り直したい時のための入口（控えめに置く） */}
-            <Pressable
-              onPress={onOpenGenerate}
-              accessibilityRole="button"
-              className="mb-2 self-center rounded-full border border-ink/25 px-3 py-1"
-            >
-              <Text className="font-gothic-400 text-[10px] text-muted">条件を選んでAIにゼロから組み直してもらう</Text>
-            </Pressable>
             <Pressable
               disabled={composing}
               onPress={onCompose}
@@ -649,7 +672,10 @@ export function PlanScreen({
         {/* この辺のおすすめ（AIのおすすめ＋周辺スポットを統合・選んでまとめて追加） */}
         {!readOnly && entries.length > 0 && combinedSuggestions.length === 0 && (
           <View className="mt-6">
-            <Text className="mb-1 font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ</Text>
+            <View className="mb-1 flex-row items-center gap-1.5">
+              <View className="h-[11px] w-[3px] rounded-full bg-accent" />
+              <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ</Text>
+            </View>
             {areaSuggestionsLoading ? (
               <View className="flex-row items-center gap-2">
                 <ActivityIndicator size="small" color="#6E675C" />
@@ -668,7 +694,10 @@ export function PlanScreen({
         {!readOnly && combinedSuggestions.length > 0 && (
           <View className="mt-7">
             <View className="mb-2 flex-row items-center justify-between">
-              <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ · 選んでまとめて追加</Text>
+              <View className="flex-row items-center gap-1.5">
+                <View className="h-[11px] w-[3px] rounded-full bg-accent" />
+                <Text className="font-gothic-500 text-[10px] tracking-[.15em] text-muted">この辺のおすすめ · 選んでまとめて追加</Text>
+              </View>
               <Pressable
                 onPress={() =>
                   setPicked((prev) =>
