@@ -46,9 +46,9 @@ function ShioriCard({ trip, onPress, active }: { trip: SavedTrip; onPress: () =>
   // 墨の半透明を上から下へ段階的に薄くして擬似グラデにする（追加ライブラリなし）。
   const Header = (
     <View>
-      <View className="absolute inset-x-0 top-0 h-[34px] bg-ink/55" />
+      <View className="absolute inset-x-0 top-0 h-[34px] bg-ink/[.55]" />
       <View className="absolute inset-x-0 top-[34px] h-[14px] bg-ink/30" />
-      <View className="absolute inset-x-0 top-[48px] h-[10px] bg-ink/12" />
+      <View className="absolute inset-x-0 top-[48px] h-[10px] bg-ink/[.12]" />
       <View className="px-2.5 pb-4 pt-2.5">
         <Text numberOfLines={1} className="font-mincho-600 text-[14px] text-white">
           {trip.name}
@@ -235,7 +235,7 @@ function CreateShioriSheet({
                     imageStyle={cover ? undefined : { top: undefined, bottom: 0 }}
                     style={{ flex: 1, justifyContent: "flex-start" }}
                   >
-                    <View className="bg-ink/45 p-3">
+                    <View className="bg-ink/[.45] p-3">
                       <Text numberOfLines={1} className="font-mincho-600 text-[16px] text-white">{name || "旅のタイトル"}</Text>
                     </View>
                   </ImageBackground>
@@ -330,7 +330,7 @@ function ShioriDetail({
               <Pressable
                 onPress={onClose}
                 hitSlop={8}
-                className="absolute left-3 top-3 z-10 flex-row items-center rounded-full bg-black/45 px-3 py-1.5"
+                className="absolute left-3 top-3 z-10 flex-row items-center rounded-full bg-black/[.45] px-3 py-1.5"
               >
                 <Text className="font-gothic-500 text-[12px] text-white">‹ 戻る</Text>
               </Pressable>
@@ -340,7 +340,7 @@ function ShioriDetail({
                 imageStyle={detailCover.isPhoto ? undefined : { top: undefined, bottom: 0 }}
                 style={{ flex: 1, justifyContent: "flex-end" }}
               >
-                <View className="bg-ink/45 p-4">
+                <View className="bg-ink/[.45] p-4">
                   <Text className="font-mincho-700 text-[22px] text-white">{trip.name}</Text>
                   <Text className="mt-1 font-gothic-400 text-[12px] text-white/90">{dateRange(trip)}</Text>
                   {detailCover.credit && (
@@ -402,7 +402,7 @@ function ShioriDetail({
                           hitSlop={6}
                           accessibilityRole="button"
                           accessibilityLabel={`写真${i + 1}を削除`}
-                          className="absolute right-1 top-1 h-5 w-5 items-center justify-center rounded-full bg-black/55"
+                          className="absolute right-1 top-1 h-5 w-5 items-center justify-center rounded-full bg-black/[.55]"
                         >
                           <Text className="text-[12px] text-white">×</Text>
                         </Pressable>

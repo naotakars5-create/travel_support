@@ -48,7 +48,7 @@ export function TripHero({
 
   const onPhoto = Boolean(coverUri);
   const titleColor = onPhoto ? "text-white" : "text-ink";
-  const subColor = onPhoto ? "text-white/85" : "text-muted";
+  const subColor = onPhoto ? "text-white/[.85]" : "text-muted";
 
   const body = (
     <View className="px-[26px] pb-3.5 pt-3">
@@ -66,7 +66,7 @@ export function TripHero({
             accessibilityRole="button"
             accessibilityLabel="旅の名前・行き先を変える／ほかの旅に切り替える"
             className={`shrink-0 flex-row items-center gap-1 rounded-full px-2.5 py-1 ${
-              onPhoto ? "bg-white/85" : "border border-ink/25 bg-white/60"
+              onPhoto ? "bg-white/[.85]" : "border border-ink/25 bg-white/60"
             }`}
           >
             <Text className="font-gothic-500 text-[11px] text-ink">✎ 旅の設定</Text>
@@ -125,7 +125,7 @@ export function TripHero({
             onPress={onShare}
             accessibilityRole="button"
             accessibilityLabel="この旅程を共有する"
-            className={`items-center justify-center rounded-[12px] px-4 ${onPhoto ? "bg-white/85" : "border border-ink/25 bg-white/60"}`}
+            className={`items-center justify-center rounded-[12px] px-4 ${onPhoto ? "bg-white/[.85]" : "border border-ink/25 bg-white/60"}`}
           >
             <Text className="font-gothic-500 text-[13px] text-ink">共有</Text>
           </Pressable>
@@ -138,7 +138,7 @@ export function TripHero({
   return (
     <ImageBackground source={{ uri: coverUri }} resizeMode="cover">
       {/* 写真の上でも文字が読めるよう墨を重ねる */}
-      <View className="absolute inset-0 bg-ink/55" />
+      <View className="absolute inset-0 bg-ink/[.55]" />
       {body}
     </ImageBackground>
   );

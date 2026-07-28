@@ -246,7 +246,7 @@ export function PlanScreen({
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 90 }}>
         {/* 旅行が終わったら、しおりに残す導線を出す（作った思い出機能へ辿り着けるように） */}
         {tripEnded && (
-          <View className="mb-3 flex-row items-center gap-3 rounded-[12px] border border-ink/15 bg-surface/60 px-4 py-2.5">
+          <View className="mb-3 flex-row items-center gap-3 rounded-[12px] border border-ink/[.15] bg-surface/60 px-4 py-2.5">
             <View className="flex-1">
               <Text className="font-gothic-500 text-[12px] text-ink">旅はいかがでしたか？</Text>
               <Text className="mt-0.5 font-gothic-400 text-[11px] leading-[17px] text-muted">
@@ -283,7 +283,7 @@ export function PlanScreen({
             onPress={onOpenGenerate}
             accessibilityRole="button"
             accessibilityLabel="条件を選んでAIにゼロから旅程を作ってもらう"
-            className="mb-3 flex-row items-center gap-3 rounded-[14px] border border-accent/45 bg-accent/[.08] px-4 py-3"
+            className="mb-3 flex-row items-center gap-3 rounded-[14px] border border-accent/[.45] bg-accent/[.08] px-4 py-3"
           >
             <View className="h-9 w-9 items-center justify-center rounded-full bg-accent">
               <Text className="font-gothic-700 text-[12px] text-kinari">AI</Text>
@@ -298,7 +298,7 @@ export function PlanScreen({
           </Pressable>
         )}
         {readOnly && (
-          <View className="mb-4 rounded-[12px] border border-ink/15 bg-white/50 px-4 py-3">
+          <View className="mb-4 rounded-[12px] border border-ink/[.15] bg-white/50 px-4 py-3">
             <Text className="font-gothic-500 text-[12px] text-ink">共有された旅程（閲覧のみ）</Text>
             <Text className="mt-1 font-gothic-400 text-[11px] leading-[18px] text-muted">
               旅程・当日ビュー（残り時間・近くのスポット）を見られます。編集はできません。

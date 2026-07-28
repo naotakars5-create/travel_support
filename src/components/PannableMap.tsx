@@ -143,7 +143,7 @@ export function PannableMap({
       </View>
 
       {/* ズーム（地図の上に重ねる） */}
-      <View className="absolute right-3 top-3 overflow-hidden rounded-[12px] border border-ink/15 bg-kinari/95">
+      <View className="absolute right-3 top-3 overflow-hidden rounded-[12px] border border-ink/[.15] bg-kinari/95">
         <Pressable
           disabled={zoom >= MAX_ZOOM}
           onPress={() => onZoomChange(zoom + 1)}
