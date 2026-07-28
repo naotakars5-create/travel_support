@@ -50,4 +50,7 @@ jobs:
         run: npx expo export --platform web
 
       - name: 本番へデプロイ
-        run: npx eas deploy --prod
+        # expo-github-action が `eas` コマンドを PATH に入れる。
+        # `npx eas` だと npm が「eas」という別パッケージを探して
+        # "could not determine executable to run" で落ちるため、直接呼ぶ。
+        run: eas deploy --prod
