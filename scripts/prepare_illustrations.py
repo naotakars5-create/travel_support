@@ -32,7 +32,7 @@
 from __future__ import annotations
 
 import sys
-from collections import deque
+
 from pathlib import Path
 
 from PIL import Image
@@ -72,27 +72,27 @@ def corner_color(im: Image.Image) -> tuple[int, int, int]:
     return tuple(sum(c[i] for c in cs) // 4 for i in range(3))  # type: ignore[return-value]
 
 
-def flood_mask(im: Image.Image, seed: tuple[int, int, int]) -> bytearray:
-    """四隅からつながる地色領域のマスク（1=背景）。"""
+def bg_mask(im: Image.Image, seed: tuple[int, int, int]) -> bytearray:
+    """地色に近いピクセルのマスク（1=背景）。
+
+    四隅からの塗りつぶしではなく全域判定にする。ハンドルの内側や腕のすき間のように
+    「囲まれていて外とつながらない」背景も拾うため。ブランドの他の3色
+    （クリーム・ローズ・黒）はどれもコーラルから十分遠いので、絵は誤爆しない。
+    """
     w, h = im.size
     px = im.load()
     seen = bytearray(w * h)
-    q: deque[tuple[int, int]] = deque([(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)])
-    while q:
-        x, y = q.popleft()
-        if x < 0 or y < 0 or x >= w or y >= h or seen[y * w + x]:
-            continue
-        if not close(px[x, y][:3], seed, FLOOD_TOLERANCE):
-            continue
-        seen[y * w + x] = 1
-        q.extend(((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)))
+    for y in range(h):
+        for x in range(w):
+            if close(px[x, y][:3], seed, FLOOD_TOLERANCE):
+                seen[y * w + x] = 1
     return seen
 
 
 def prepare_square(src: Path, name: str) -> None:
     im = Image.open(src).convert("RGBA")
     bg = corner_color(im)
-    mask = flood_mask(im, bg)
+    mask = bg_mask(im, bg)
     w, h = im.size
     px = im.load()
     for y in range(h):
@@ -112,7 +112,7 @@ def prepare_cover(src: Path) -> None:
     im = Image.open(src).convert("RGBA")
     # 地色をブランドのコーラルへ snap（背景としてつながっている面だけ）
     bg = corner_color(im)
-    mask = flood_mask(im, bg)
+    mask = bg_mask(im, bg)
     w, h = im.size
     px = im.load()
     for y in range(h):
