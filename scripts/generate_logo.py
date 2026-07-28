@@ -10,10 +10,8 @@
 出力:
   public/illustrations/logo-mark.png       マークのみ（透過）
   public/illustrations/logo-wordmark.png   マーク＋「つばめみち」（透過）
-  assets/images/icon.png                   アプリアイコン（生成り地）
-  assets/images/favicon.png                ファビコン
-  assets/images/splash-icon.png            スプラッシュ（透過）
-  assets/images/android-icon-*.png         Android アダプティブアイコン
+
+アプリアイコン等は scripts/generate_app_icon.py（スーツケースのイラスト）が出力する。
 """
 from PIL import Image, ImageDraw, ImageFont
 import pathlib
@@ -142,20 +140,8 @@ def main():
     d.text(((W - (b2[2] - b2[0])) / 2 - b2[0], y2 - b2[1]), "T S U B A M E M I C H I", font=f2, fill=(110, 103, 92, 255))
     save(word, "public/illustrations/logo-wordmark.png")
 
-    # アプリアイコン：生成り地。マークは中央に 60%（角丸マスクで切れない大きさ）
-    icon = centered(mark, 1024, 0.60, bg=KINARI)
-    save(icon.convert("RGB"), "assets/images/icon.png")
-    # ファビコンはタブの中で小さく見えるので、余白を詰めて大きく置く
-    save(centered(mark, 64, 0.80, bg=KINARI).convert("RGB"), "assets/images/favicon.png")
-
-    # スプラッシュ：背景色は app.json 側が持つので透過
-    save(centered(mark, 512, 0.92), "assets/images/splash-icon.png")
-
-    # Android アダプティブアイコン：前景は安全領域（中央66%）に収める
-    save(centered(mark, 1024, 0.46), "assets/images/android-icon-foreground.png")
-    white = trimmed_mark(ink=(255, 255, 255, 255), accent=(255, 255, 255, 255))
-    save(centered(white, 1024, 0.46), "assets/images/android-icon-monochrome.png")
-    save(Image.new("RGB", (1024, 1024), KINARI[:3]), "assets/images/android-icon-background.png")
+    # アプリアイコン・ファビコン・スプラッシュ等は scripts/generate_app_icon.py が
+    # ブランドイラストのスーツケースから生成する（ここでは上書きしない）
 
 
 if __name__ == "__main__":

@@ -22,10 +22,20 @@ python3 scripts/generate_logo.py
 | --- | --- |
 | `public/illustrations/logo-mark.png` | マーク単体（アプリ内） |
 | `public/illustrations/logo-wordmark.png` | マーク＋「つばめみち」（オンボーディング・マイページ） |
-| `assets/images/icon.png` | アプリアイコン |
+
+アプリアイコンはロゴとは別に、ブランドイラストのスーツケース（`assets/brand/app-icon-source.png`）から生成します。
+
+```bash
+python3 scripts/generate_app_icon.py
+```
+
+| ファイル | 用途 |
+| --- | --- |
+| `assets/images/icon.png` | アプリアイコン（コーラル地） |
 | `assets/images/favicon.png` | ブラウザのタブ |
-| `assets/images/splash-icon.png` | 起動画面 |
+| `assets/images/splash-icon.png` | 起動画面（透過） |
 | `assets/images/android-icon-*.png` | Android アダプティブアイコン |
+| `public/apple-touch-icon.png` | iOS「ホーム画面に追加」 |
 
 アプリ内での表示は `src/components/Logo.tsx`（`LogoMark` / `LogoWordmark`）。画像が読めない環境でも名前だけは文字で残ります。
 
