@@ -1,5 +1,5 @@
 import { createElement, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Modal, Platform, Pressable, Text, View } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 /**
@@ -142,6 +142,97 @@ export function DateOnlyField({
             if (d) onChange(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`);
           }}
         />
+      )}
+    </View>
+  );
+}
+
+/**
+ * 選択肢から1つ選ぶ。
+ * 選択肢が多いと横並びのチップは読みづらいので、ここはプルダウンにする。
+ * - Web: ブラウザ標準の <select>
+ * - iOS/Android: 押すと下から選択肢が出る
+ */
+export function SelectField<T extends string | number>({
+  label,
+  value,
+  options,
+  onChange,
+  widthAuto,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+  /** 中身に合わせた幅にする（横並びで使うとき） */
+  widthAuto?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = options.find((o) => o.value === value);
+
+  if (Platform.OS === "web") {
+    const select = createElement(
+      "select",
+      {
+        value: String(value),
+        onChange: (e: { target: { value: string } }) => {
+          const picked = options.find((o) => String(o.value) === e.target.value);
+          if (picked) onChange(picked.value);
+        },
+        style: {
+          ...WEB_INPUT_STYLE,
+          width: widthAuto ? "auto" : "100%",
+          fontFamily: "NotoSansJP_400Regular, sans-serif",
+          appearance: "auto" as const,
+        },
+      },
+      options.map((o) => createElement("option", { key: String(o.value), value: String(o.value) }, o.label))
+    );
+    return (
+      <View className={`gap-1 ${widthAuto ? "" : "flex-1"}`}>
+        <Label label={label} />
+        {select}
+      </View>
+    );
+  }
+
+  return (
+    <View className={`gap-1 ${widthAuto ? "" : "flex-1"}`}>
+      <Label label={label} />
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${current?.label ?? ""}。押すと選べます`}
+        className="flex-row items-center justify-between gap-2 rounded-[10px] border border-black/[.1] bg-white/60 px-3"
+        style={{ height: 42 }}
+      >
+        <Text className="font-mincho-400 text-[14px] text-ink">{current?.label ?? "選択"}</Text>
+        <Text className="font-gothic-400 text-[11px] text-muted">▾</Text>
+      </Pressable>
+      {open && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setOpen(false)} statusBarTranslucent>
+          <Pressable className="flex-1 justify-center bg-[rgba(28,25,21,.28)] px-10" onPress={() => setOpen(false)}>
+            <View className="overflow-hidden rounded-[14px] bg-sheet">
+              <Text className="px-4 pb-2 pt-3 font-gothic-500 text-[12px] text-muted">{label}</Text>
+              {options.map((o, i) => (
+                <Pressable
+                  key={String(o.value)}
+                  onPress={() => {
+                    onChange(o.value);
+                    setOpen(false);
+                  }}
+                  accessibilityRole="button"
+                  className={`px-4 py-3 ${i > 0 ? "border-t border-black/[.06]" : ""} ${o.value === value ? "bg-ink/[.06]" : ""}`}
+                >
+                  <Text className={`font-mincho-400 text-[15px] ${o.value === value ? "text-ink" : "text-muted"}`}>
+                    {o.label}
+                    {o.value === value ? "  ✓" : ""}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Modal>
       )}
     </View>
   );

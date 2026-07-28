@@ -51,52 +51,38 @@ export function TripHero({
   const subColor = onPhoto ? "text-white/85" : "text-muted";
 
   const body = (
-    <View className="px-[26px] pb-4 pt-3">
-      <View className="flex-row items-start justify-between gap-3">
-        <Pressable
-          onPress={onPressTitle}
-          disabled={readOnly}
-          accessibilityRole="button"
-          accessibilityLabel={`${title}。押すと旅を切り替えられます`}
-          className="flex-1"
-        >
-          <View className="flex-row items-center gap-1.5">
-            <Text numberOfLines={1} className={`font-mincho-700 text-[27px] leading-[36px] ${titleColor}`}>
-              {title}
-            </Text>
-            {!readOnly && <Text className={`font-gothic-400 text-[13px] ${subColor}`}>▾</Text>}
-          </View>
-          {destination ? (
-            <Text numberOfLines={1} className={`mt-0.5 font-gothic-500 text-[13px] ${subColor}`}>
-              {destination}
-            </Text>
-          ) : null}
+    <View className="px-[26px] pb-3.5 pt-3">
+      {/* 旅名は押すと設定が開く。「押せる」と分かるよう、
+          隣に用途を書いたボタンを必ず添える（▾ だけでは気づかれなかった） */}
+      <View className="flex-row items-center gap-2">
+        <Pressable onPress={onPressTitle} disabled={readOnly} accessibilityRole="button" className="shrink">
+          <Text numberOfLines={1} className={`font-mincho-700 text-[26px] leading-[35px] ${titleColor}`}>
+            {title}
+          </Text>
         </Pressable>
-
         {!readOnly && (
-          <View className="mt-1 flex-row items-center gap-2">
-            <Pressable
-              onPress={onShare}
-              accessibilityRole="button"
-              accessibilityLabel="この旅程を共有する"
-              className={`h-9 items-center justify-center rounded-[10px] px-3 ${onPhoto ? "bg-white/85" : "border border-ink/25"}`}
-            >
-              <Text className="font-gothic-500 text-[12px] text-ink">共有</Text>
-            </Pressable>
-            <Pressable
-              onPress={onAdd}
-              accessibilityRole="button"
-              accessibilityLabel="行き先を追加"
-              className={`h-9 w-9 items-center justify-center rounded-[10px] ${onPhoto ? "bg-white/85" : "bg-ink"}`}
-            >
-              <View className="relative h-[12px] w-[12px]">
-                <View className={`absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 ${onPhoto ? "bg-ink" : "bg-kinari"}`} />
-                <View className={`absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2 ${onPhoto ? "bg-ink" : "bg-kinari"}`} />
-              </View>
-            </Pressable>
-          </View>
+          <Pressable
+            onPress={onPressTitle}
+            accessibilityRole="button"
+            accessibilityLabel="旅の名前・行き先を変える／ほかの旅に切り替える"
+            className={`shrink-0 flex-row items-center gap-1 rounded-full px-2.5 py-1 ${
+              onPhoto ? "bg-white/85" : "border border-ink/25 bg-white/60"
+            }`}
+          >
+            <Text className="font-gothic-500 text-[11px] text-ink">✎ 旅の設定</Text>
+          </Pressable>
         )}
       </View>
+
+      {destination ? (
+        <Text numberOfLines={1} className={`mt-0.5 font-gothic-500 text-[13px] ${subColor}`}>
+          {destination}
+        </Text>
+      ) : !readOnly ? (
+        <Pressable onPress={onPressTitle} accessibilityRole="button">
+          <Text className={`mt-0.5 font-gothic-400 text-[12px] ${subColor}`}>行き先を入れる ›</Text>
+        </Pressable>
+      ) : null}
 
       <View className="mt-2 flex-row flex-wrap items-center gap-2">
         {/* 旅がいつなのか。ここだけは色を強く出す（旅への高揚をつくる場所） */}
@@ -123,6 +109,28 @@ export function TripHero({
           {meta}
         </Text>
       </View>
+
+      {/* 「＋」だけでは何が足せるのか分からなかったので、文字を入れて主要動作として置く */}
+      {!readOnly && (
+        <View className="mt-3 flex-row gap-2">
+          <Pressable
+            onPress={onAdd}
+            accessibilityRole="button"
+            accessibilityLabel="行き先を追加"
+            className="flex-1 flex-row items-center justify-center gap-1.5 rounded-[12px] bg-ink py-3"
+          >
+            <Text className="font-gothic-700 text-[14px] text-kinari">＋ 行き先を追加</Text>
+          </Pressable>
+          <Pressable
+            onPress={onShare}
+            accessibilityRole="button"
+            accessibilityLabel="この旅程を共有する"
+            className={`items-center justify-center rounded-[12px] px-4 ${onPhoto ? "bg-white/85" : "border border-ink/25 bg-white/60"}`}
+          >
+            <Text className="font-gothic-500 text-[13px] text-ink">共有</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 

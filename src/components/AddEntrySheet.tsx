@@ -35,6 +35,8 @@ export function AddEntrySheet({
 }) {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>("manual");
+  // レンタカー以外はメール取込を出す（宿泊は予約メールからの登録が特に速い）
+  const showTabs = fixedMode !== "rental";
   const [source, setSource] = useState("");
   const [body, setBody] = useState("");
   const [bulkText, setBulkText] = useState("");
@@ -85,24 +87,47 @@ export function AddEntrySheet({
               <View className="w-[52px]" />
             </View>
 
-            {!fixedMode && (
-              <View className="mb-5 flex-row gap-2">
-                <Pressable onPress={() => setMode("manual")} className={`flex-1 rounded-[10px] py-2 ${mode === "manual" ? "bg-ink" : "border border-black/[.1]"}`}>
-                  <Text className={`text-center font-gothic-500 text-[12px] ${mode === "manual" ? "text-kinari" : "text-muted"}`}>1件ずつ</Text>
+            {/* レンタカーだけは入力が特殊なのでタブを出さない。
+                宿泊は予約確認メールから取り込めた方が早いので、メールタブを出す。 */}
+            {showTabs && (
+              <View className="mb-4 flex-row gap-2">
+                <Pressable
+                  onPress={() => setMode("manual")}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: mode === "manual" }}
+                  className={`flex-1 rounded-[10px] py-2.5 ${mode === "manual" ? "bg-ink" : "border border-black/[.12] bg-white/50"}`}
+                >
+                  <Text className={`text-center font-gothic-700 text-[12px] ${mode === "manual" ? "text-kinari" : "text-ink"}`}>
+                    1件ずつ入力
+                  </Text>
                 </Pressable>
                 {onBulkAdd && (
-                  <Pressable onPress={() => setMode("bulk")} className={`flex-1 rounded-[10px] py-2 ${mode === "bulk" ? "bg-ink" : "border border-black/[.1]"}`}>
-                    <Text className={`text-center font-gothic-500 text-[12px] ${mode === "bulk" ? "text-kinari" : "text-muted"}`}>まとめて</Text>
+                  <Pressable
+                    onPress={() => setMode("bulk")}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: mode === "bulk" }}
+                    className={`flex-1 rounded-[10px] py-2.5 ${mode === "bulk" ? "bg-ink" : "border border-black/[.12] bg-white/50"}`}
+                  >
+                    <Text className={`text-center font-gothic-700 text-[12px] ${mode === "bulk" ? "text-kinari" : "text-ink"}`}>
+                      まとめて
+                    </Text>
                   </Pressable>
                 )}
-                <Pressable onPress={() => setMode("mail")} className={`flex-1 rounded-[10px] py-2 ${mode === "mail" ? "bg-ink" : "border border-black/[.1]"}`}>
-                  <Text className={`text-center font-gothic-500 text-[12px] ${mode === "mail" ? "text-kinari" : "text-muted"}`}>メールから</Text>
+                <Pressable
+                  onPress={() => setMode("mail")}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: mode === "mail" }}
+                  className={`flex-1 rounded-[10px] py-2.5 ${mode === "mail" ? "bg-ink" : "border border-black/[.12] bg-white/50"}`}
+                >
+                  <Text className={`text-center font-gothic-700 text-[12px] ${mode === "mail" ? "text-kinari" : "text-ink"}`}>
+                    メールから
+                  </Text>
                 </Pressable>
               </View>
             )}
 
             <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
-              {mode === "manual" || fixedMode ? (
+              {mode === "manual" || !showTabs ? (
                 <PlanEntryForm
                   onSubmit={onAdd}
                   tripDate={tripDate}
@@ -121,8 +146,8 @@ export function AddEntrySheet({
                 />
               ) : mode === "bulk" ? (
                 <View className="gap-3">
-                  <Text className="-mt-2 font-gothic-400 text-[12px] leading-[20px] text-muted">
-                    行きたい場所を思いつくまま書くだけでOK。AIが読み取って一括で登録します。{"\n"}住所・営業時間・定休日は自動で補完されます。
+                  <Text className="font-gothic-400 text-[13px] leading-[21px] text-muted">
+                    行きたい場所を思いつくまま書くだけでOK。{"\n"}AIが読み取って一括で登録し、住所・営業時間・定休日も自動で補完します。
                   </Text>
                   <View className="gap-1">
                     <TextInput
@@ -150,8 +175,10 @@ export function AddEntrySheet({
                 </View>
               ) : (
                 <View className="gap-3">
-                  <Text className="-mt-2 font-gothic-400 text-[12px] leading-[20px] text-muted">
-                    航空券・ホテル等の予約確認メールを貼り付けると、AIが読み取って確定予定（固定時刻）として取り込みます。
+                  <Text className="font-gothic-400 text-[13px] leading-[21px] text-muted">
+                    {fixedMode === "stay"
+                      ? "宿の予約確認メールを貼り付けると、AIが宿名・住所・チェックイン/アウトを読み取って登録します。"
+                      : "航空券・ホテル等の予約確認メールを貼り付けると、AIが読み取って確定予定（時刻固定）として取り込みます。"}
                   </Text>
                   <View className="gap-1">
                     <Text className="font-gothic-400 text-[11px] text-muted">送信元（任意）</Text>
