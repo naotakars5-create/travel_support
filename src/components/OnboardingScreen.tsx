@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Illustration } from "./Illustration";
+import { IllustrationPlate } from "./Illustration";
 import { IllustrationName } from "@/lib/illustrations";
-import { DAY_COLORS, tint } from "@/lib/palette";
+import { COLORS, DAY_COLORS, tint } from "@/lib/palette";
 import { LogoWordmark } from "./Logo";
 
 /** 初回だけ出す3枚のカード。旅の準備が楽しみになるトーンで、次に何をすればいいかを示す。 */
@@ -13,7 +13,7 @@ interface Card {
   eyebrow: string;
   title: string;
   body: string;
-  /** そのカードの色（藍→松葉→テラコッタ。最後だけ「今から始まる」色にする） */
+  /** そのカードの色（紅梅→朽葉→ローズ。最後だけ「今から始まる」色にする） */
   color: string;
 }
 
@@ -37,7 +37,7 @@ const CARDS: Card[] = [
     eyebrow: "はじめよう",
     title: "さっそく、\n最初の行き先を決めよう",
     body: "目的地をひとつ入れるだけで始められます。\n迷ったら、AIにゼロから\n旅程を作ってもらうこともできます。",
-    color: "#D96F4C",
+    color: COLORS.accent,
   },
 ];
 
@@ -59,14 +59,14 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
       </View>
 
       <View className="flex-1 items-center justify-center px-[34px]">
-        {/* 絵の後ろに、そのカードの色をごく薄く敷く */}
-        <View className="items-center justify-center rounded-full p-6" style={{ backgroundColor: tint(card.color, 0.1) }}>
-          {card.illustration === "logo" ? (
+        {/* 1枚目はロゴ（薄い色の円）。イラストはブランドの地色（コーラルピンク）の台座に載せる */}
+        {card.illustration === "logo" ? (
+          <View className="items-center justify-center rounded-full p-6" style={{ backgroundColor: tint(card.color, 0.1) }}>
             <LogoWordmark width={186} />
-          ) : (
-            <Illustration name={card.illustration} size="lg" alt="" />
-          )}
-        </View>
+          </View>
+        ) : (
+          <IllustrationPlate name={card.illustration} size="lg" alt="" round />
+        )}
         <Text className="mt-6 font-gothic-500 text-[11px] tracking-[.2em]" style={{ color: card.color }}>
           {card.eyebrow}
         </Text>

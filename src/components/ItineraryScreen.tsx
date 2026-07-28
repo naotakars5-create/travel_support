@@ -15,7 +15,7 @@ import {
   PRIORITY_META,
 } from "@/lib/plan";
 import { pickBenchIllustration } from "@/lib/illustrations";
-import { dayColor, tint } from "@/lib/palette";
+import { COLORS, dayColor, tint } from "@/lib/palette";
 import { directionsUrl } from "@/lib/mapsLink";
 import { placePhotoImageUrl } from "@/lib/placePhoto";
 import { Illustration } from "./Illustration";
@@ -23,8 +23,8 @@ import { RouteMap } from "./RouteMap";
 import { Blinker, PulseRing, useNodeInStyle } from "./animations";
 import { SectionHeading } from "./ui";
 
-const MUTED_LIGHT = "#6E675C";
-const INK = "#23201D";
+const MUTED_LIGHT = COLORS.muted;
+const INK = COLORS.ink;
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 
 interface LineStyle {
@@ -600,7 +600,7 @@ function NodeRow({
   const reorderable = Boolean(entry && entry.mode !== "stay" && entry.mode !== "rental");
   // その日の色。番号とカードの縁に薄く効かせて、日ごとのまとまりを分かりやすくする
   const dc = dayColor(dayNumber);
-  const markerBg = isCurrent ? "#D96F4C" : isPast ? "#6E675C" : dayColor(dayNumber);
+  const markerBg = isCurrent ? COLORS.accent : isPast ? COLORS.muted : dayColor(dayNumber);
   // 時刻は「開始〜終了」の1行にまとめる（滞在時間を別行に出さずに済み、情報が密になる）
   const start = new Date(item.time);
   const timeLabel =
@@ -636,13 +636,13 @@ function NodeRow({
               ? null
               : { borderColor: tint(dc, isPast ? 0.14 : 0.28), backgroundColor: tint(dc, isPast ? 0.03 : 0.06) },
             // 次に向かう予定：左に3pxのテラコッタ縦ボーダー（今・進行中の合図）
-            isNext && !isCurrent ? { borderLeftWidth: 3, borderLeftColor: "#D96F4C" } : null,
+            isNext && !isCurrent ? { borderLeftWidth: 3, borderLeftColor: COLORS.accent } : null,
           ]}
         >
           {/* 番号・時刻・行き先を1行に。番号がカードの中に入るので、地点の区切りが分かりやすい */}
           <View className="flex-row items-center gap-2">
             <View style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
-              {isCurrent && <PulseRing size={22} color="rgba(217,111,76,.45)" />}
+              {isCurrent && <PulseRing size={22} color="rgba(221, 89, 103, .45)" />}
               <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: markerBg, alignItems: "center", justifyContent: "center" }}>
                 <Text className="font-gothic-500 text-[12px] text-kinari" style={TNUM}>
                   {stopNumber ?? ""}

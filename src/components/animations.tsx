@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Animated, Easing, StyleProp, ViewStyle } from "react-native";
+import { COLORS } from "@/lib/palette";
 
 /** CSS `animate-spin`相当：一定速度で回転し続けるリング */
-export function Spinner({ size = 20, color = "#6E675C" }: { size?: number; color?: string }) {
+export function Spinner({ size = 20, color = COLORS.muted }: { size?: number; color?: string }) {
   const [rotation] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
@@ -31,7 +32,7 @@ export function Spinner({ size = 20, color = "#6E675C" }: { size?: number; color
 }
 
 /** CSS `animate-pulse` 相当：脈打って外側へ広がり消えるリング（現在地ドットの背後に重ねる） */
-export function PulseRing({ size = 13, color = "rgba(35,32,29,.5)" }: { size?: number; color?: string }) {
+export function PulseRing({ size = 13, color = "rgba(26, 26, 26, .5)" }: { size?: number; color?: string }) {
   const [scale] = useState(() => new Animated.Value(1));
   const [opacity] = useState(() => new Animated.Value(0.6));
 

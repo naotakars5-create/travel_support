@@ -20,13 +20,13 @@ import { formatDurationMin } from "@/lib/itinerary";
 import { dateForDay, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { formatYen } from "@/lib/format";
 import { DateOnlyField, SelectField } from "./PlainFields";
-import { Illustration, illustrationUri } from "./Illustration";
-import { dayColor, tint } from "@/lib/palette";
+import { IllustrationPlate, illustrationUri } from "./Illustration";
+import { COLORS, dayColor, tint } from "@/lib/palette";
 import { Floater } from "./animations";
 import { Button, SectionHeading } from "./ui";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
-const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
+const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 // 日ごとの淡い背景色（複数日程で日を見分けやすくする）。
 // 色は palette.ts の「日ごとの色」を薄くしたもので、旅程・当日タブと同じ割り当て。
@@ -484,7 +484,7 @@ export function PlanScreen({
           <View className="mt-4 items-center">
             {/* 行き先ゼロの時こそ、いちばん強い導線を置く。
                 以前はデモの行き先が入っていたので、この画面は誰にも見えていなかった。 */}
-            <Illustration name="loading-map" size="lg" alt="" />
+            <IllustrationPlate name="loading-map" size="lg" alt="" />
             <Text className="mt-4 text-center font-mincho-700 text-[22px] leading-[32px] text-ink">
               どこへ行きましょうか
             </Text>
@@ -699,7 +699,7 @@ export function PlanScreen({
 <SectionHeading label="この辺のおすすめ" className="mb-1.5" />
             {areaSuggestionsLoading ? (
               <View className="flex-row items-center gap-2">
-                <ActivityIndicator size="small" color="#6E675C" />
+                <ActivityIndicator size="small" color={COLORS.muted} />
                 <Text className="font-gothic-400 text-[12px] text-muted-light">周辺のおすすめを探しています…</Text>
               </View>
             ) : (
@@ -772,7 +772,7 @@ export function PlanScreen({
       {composing && (
         <View className="absolute inset-0 items-center justify-center bg-base/90">
           <Floater>
-            <Illustration name="loading-map" size="md" alt="" />
+            <IllustrationPlate name="loading-map" size="md" alt="" />
           </Floater>
           <Text className="mt-4 font-mincho-600 text-[15px] text-ink">旅程を組み立てています</Text>
           <Text className="mt-1.5 font-gothic-400 text-[12px] text-muted">少しお待ちください</Text>

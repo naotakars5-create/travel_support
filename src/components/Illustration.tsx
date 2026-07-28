@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Image, ImageStyle, Platform, StyleProp } from "react-native";
+import { Image, ImageStyle, Platform, StyleProp, View } from "react-native";
 import { IllustrationName } from "@/lib/illustrations";
 
 /** サイズトークン（正方形前提）。 */
@@ -36,6 +36,33 @@ export function Illustration({
       resizeMode="contain"
       style={[{ width: px, height: px }, style]}
     />
+  );
+}
+
+/**
+ * イラストを「コーラルピンクの面」に載せて出す台座。
+ *
+ * ブランドのイラストは、地がコーラルピンクで、その上をクリーム・ローズ・黒だけで
+ * 描いてある。素材そのものは背景が透明なので、大きく見せる場所（空の画面・
+ * 読み込み中・初回紹介）ではこの台座で地を作り、絵と同じ見え方に揃える。
+ * 逆に小さく添えるだけの場所（空き時間チップなど）では台座を敷かない。
+ */
+export function IllustrationPlate({
+  name,
+  size = "lg",
+  alt,
+  round = false,
+}: {
+  name: IllustrationName;
+  size?: IllustrationSize;
+  alt: string;
+  /** 丸く抜く（初回紹介のように1枚を主役にする場面） */
+  round?: boolean;
+}) {
+  return (
+    <View className={`items-center justify-center bg-highlight p-6 ${round ? "rounded-full" : "rounded-[22px]"}`}>
+      <Illustration name={name} size={size} alt={alt} />
+    </View>
   );
 }
 

@@ -1,4 +1,5 @@
 import { TransportMode } from "./types";
+import { COLORS } from "./palette";
 
 export const MODE_LABEL: Record<TransportMode, string> = {
   air: "空路",
@@ -13,17 +14,17 @@ export const MODE_LABEL: Record<TransportMode, string> = {
 };
 
 // 移動・種別の線色はすべて補助色（ink-muted）に統一。
-// 有彩色（テラコッタ/マスタード）は「今・進行中」「完了」専用のため、ここでは使わない。
+// 有彩色（ローズ/コーラル）は「今・進行中」「完了」専用のため、ここでは使わない。
 export const MODE_COLOR: Record<TransportMode, string> = {
-  air: "#6E675C",
-  rail: "#6E675C",
-  bus: "#6E675C",
-  walk: "#6E675C",
-  car: "#6E675C",
-  stay: "#6E675C",
-  dining: "#6E675C",
-  activity: "#6E675C",
-  rental: "#6E675C",
+  air: COLORS.muted,
+  rail: COLORS.muted,
+  bus: COLORS.muted,
+  walk: COLORS.muted,
+  car: COLORS.muted,
+  stay: COLORS.muted,
+  dining: COLORS.muted,
+  activity: COLORS.muted,
+  rental: COLORS.muted,
 };
 
 export const MODE_DASHED: Partial<Record<TransportMode, boolean>> = {

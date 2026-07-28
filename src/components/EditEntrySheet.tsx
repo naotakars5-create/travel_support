@@ -28,7 +28,7 @@ export function EditEntrySheet({
       {/* 背景は絶対配置にして、シート側だけが高さを持つようにする
           （シートの maxHeight が画面高に対して効き、ScrollView が正しく縮む） */}
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <Pressable className="absolute inset-0 bg-[rgba(26,26,26,.28)]" onPress={onClose} />
         <SlideUp trigger={entry.id} style={{ maxHeight: "88%" }}>
           <View className="rounded-t-sheet bg-sheet px-6 pt-3" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />

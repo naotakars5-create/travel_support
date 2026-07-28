@@ -6,10 +6,10 @@ import { PlanEntry } from "@/lib/types";
 import { dateForDay, formatJstTime } from "@/lib/date";
 import { MODE_LABEL } from "@/lib/modeMeta";
 import { PhotoPicker } from "./PhotoPicker";
-import { Illustration, illustrationUri } from "./Illustration";
+import { IllustrationPlate, illustrationUri } from "./Illustration";
 import { SlideUp } from "./animations";
 
-const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
+const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 /** "2023-09-01" → "2023.09.01" */
 function dot(dateStr: string): string {
@@ -126,7 +126,7 @@ export function ShioriScreen({
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 16, paddingBottom: 110 }}>
         {trips.length === 0 ? (
           <View className="mt-14 items-center">
-            <Illustration name="empty-suitcase" size="lg" alt="" />
+            <IllustrationPlate name="empty-suitcase" size="lg" alt="" />
             <Text className="mt-3 font-mincho-600 text-[16px] text-ink">まだしおりがありません</Text>
             <Text className="mt-1.5 text-center font-gothic-400 text-[12px] leading-[20px] text-muted">
               しおりは、作った旅がそのまま並びます。{"\n"}まず「旅」タブで行き先を決めましょう。
@@ -213,7 +213,7 @@ function CreateShioriSheet({
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <Pressable className="absolute inset-0 bg-[rgba(26,26,26,.28)]" onPress={onClose} />
         <SlideUp trigger="create-shiori" style={{ maxHeight: "90%" }}>
           <View className="rounded-t-sheet bg-sheet px-6 pt-3" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />
@@ -321,7 +321,7 @@ function ShioriDetail({
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.4)]" onPress={onClose} />
+        <Pressable className="absolute inset-0 bg-[rgba(26,26,26,.4)]" onPress={onClose} />
         <SlideUp trigger={trip.id} style={{ maxHeight: "90%" }}>
           <View className="rounded-t-sheet bg-sheet" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 20 }}>
             {/* 表紙 */}

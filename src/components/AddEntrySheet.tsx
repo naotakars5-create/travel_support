@@ -5,9 +5,10 @@ import { PlanEntryForm } from "./PlanEntryForm";
 import { PlanEntryInput } from "@/lib/plan";
 import { TransportMode } from "@/lib/types";
 import { SlideUp } from "./animations";
+import { COLORS } from "@/lib/palette";
 
 type Mode = "manual" | "bulk" | "mail";
-const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
+const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 export function AddEntrySheet({
   onClose,
@@ -74,7 +75,7 @@ export function AddEntrySheet({
       {/* 背景は絶対配置にして、シート側だけが高さを持つようにする
           （シートの maxHeight が画面高に対して効き、ScrollView が正しく縮む） */}
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <Pressable className="absolute inset-0 bg-[rgba(26,26,26,.28)]" onPress={onClose} />
         <SlideUp trigger="add-entry" style={{ maxHeight: "88%" }}>
           <View className="rounded-t-sheet bg-sheet px-6 pt-3" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />
@@ -167,7 +168,7 @@ export function AddEntrySheet({
                     onPress={runBulk}
                     className={`mt-1 flex-row items-center justify-center gap-2 rounded-[12px] px-4 py-3 ${bulkText.trim() && !importing ? "bg-ink" : "bg-ink/30"}`}
                   >
-                    {importing && <ActivityIndicator size="small" color="#F4EFE5" />}
+                    {importing && <ActivityIndicator size="small" color={COLORS.base} />}
                     <Text className="text-center font-gothic-500 text-[12px] text-kinari">
                       {importing ? "読み取り中…" : "AIで読み取って追加"}
                     </Text>
@@ -209,7 +210,7 @@ export function AddEntrySheet({
                     onPress={runImport}
                     className={`mt-1 flex-row items-center justify-center gap-2 rounded-[12px] px-4 py-3 ${body.trim() && !importing ? "bg-ink" : "bg-ink/30"}`}
                   >
-                    {importing && <ActivityIndicator size="small" color="#F4EFE5" />}
+                    {importing && <ActivityIndicator size="small" color={COLORS.base} />}
                     <Text className="text-center font-gothic-500 text-[12px] text-kinari">{importing ? "解析中…" : "メールを解析して追加"}</Text>
                   </Pressable>
                 </View>

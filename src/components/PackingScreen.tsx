@@ -3,9 +3,9 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PackingItem } from "@/lib/types";
 import { packingProgress } from "@/lib/packing";
-import { Illustration } from "./Illustration";
+import { IllustrationPlate } from "./Illustration";
 
-const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
+const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 export function PackingScreen({
   items,
@@ -74,7 +74,7 @@ export function PackingScreen({
         {/* 全部チェックできたときだけ「準備完了」を出す（1つでも外れたら消える） */}
         {total > 0 && done === total && (
           <View className="mt-5 items-center">
-            <Illustration name="packed-done" size="md" alt="" />
+            <IllustrationPlate name="packed-done" size="md" alt="" />
             <Text className="mt-2 font-mincho-600 text-[15px] text-ink">準備完了です</Text>
           </View>
         )}

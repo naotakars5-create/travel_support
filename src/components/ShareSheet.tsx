@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { copyToClipboard, nativeShare } from "@/lib/share";
 import { SlideUp } from "./animations";
 import { Button } from "./ui";
+import { COLORS } from "@/lib/palette";
 
 /**
  * 共有シート。
@@ -81,7 +82,7 @@ export function ShareSheet({
                 </>
               ) : !url ? (
                 <View className="flex-row items-center gap-3 py-6">
-                  <ActivityIndicator size="small" color="#6E675C" />
+                  <ActivityIndicator size="small" color={COLORS.muted} />
                   <Text className="font-gothic-400 text-[13px] text-muted">共有リンクを作っています…</Text>
                 </View>
               ) : (

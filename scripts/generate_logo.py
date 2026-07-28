@@ -5,7 +5,7 @@
 デザインの考え方:
   燕（つばめ）を家紋のように左右対称へ整理し、その下に一本の道を引く。
   燕の尾の V 字は「経路の分岐」、下の線は「一本につながった道」を指す。
-  色はアプリと同じ 生成り #F4EFE5 / 墨 #23201D / テラコッタ #D96F4C の3色だけ。
+  色はアプリと同じ クリーム #F5EAD6 / 墨 #1A1A1A / ローズレッド #DD5967 の3色だけ。
 
 出力:
   public/illustrations/logo-mark.png       マークのみ（透過）
@@ -19,9 +19,9 @@ from PIL import Image, ImageDraw, ImageFont
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-KINARI = (244, 239, 229, 255)
-INK = (35, 32, 29, 255)
-ACCENT = (217, 111, 76, 255)
+KINARI = (245, 234, 214, 255)
+INK = (26, 26, 26, 255)
+ACCENT = (221, 89, 103, 255)
 
 SS = 4  # スーパーサンプリング倍率（縮小してアンチエイリアスを得る）
 
