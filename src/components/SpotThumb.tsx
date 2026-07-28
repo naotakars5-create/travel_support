@@ -23,7 +23,7 @@ export function SpotThumb({
     <View className="overflow-hidden rounded-[8px] bg-black/[.05]" style={{ width: size, height: size }}>
       <Image source={{ uri }} onError={() => setFailed(true)} resizeMode="cover" style={{ width: size, height: size }} />
       {attribution ? (
-        <View className="absolute bottom-0 left-0 right-0 bg-black/45">
+        <View className="absolute bottom-0 left-0 right-0 bg-black/[.45]">
           <Text numberOfLines={1} className="px-[2px] text-[5px] text-white">
             {attribution}
           </Text>

@@ -114,7 +114,7 @@ export function TripSwitcherSheet({
                     いまはこの旅だけです。新しい旅を始めても、今の旅はしおりに残ります。
                   </Text>
                 ) : (
-                  <View className="overflow-hidden rounded-[14px] border border-ink/12 bg-white/50">
+                  <View className="overflow-hidden rounded-[14px] border border-ink/[.15] bg-white/50">
                     {others.map((t, i) => (
                       <Pressable
                         key={t.id}

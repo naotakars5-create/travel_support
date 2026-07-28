@@ -150,7 +150,7 @@ export function MapScreen({
               onPress={() => setMapCenter(liveLocation)}
               accessibilityRole="button"
               accessibilityLabel="現在地へ移動"
-              className="absolute right-3 top-[104px] h-9 w-9 items-center justify-center rounded-[12px] border border-ink/15 bg-kinari/95"
+              className="absolute right-3 top-[104px] h-9 w-9 items-center justify-center rounded-[12px] border border-ink/[.15] bg-kinari/95"
             >
               <Text className="font-gothic-500 text-[13px] text-accent">◎</Text>
             </Pressable>
@@ -177,7 +177,7 @@ export function MapScreen({
           {/* 候補カード（横に流す）。地図の上に重ねて、地図を隠しすぎないようにする */}
           <View className="absolute bottom-0 left-0 right-0 pb-2">
             {!loading && fresh.length === 0 ? (
-              <View className="mx-4 rounded-[14px] border border-ink/12 bg-kinari/95 px-4 py-3">
+              <View className="mx-4 rounded-[14px] border border-ink/[.15] bg-kinari/95 px-4 py-3">
                 <Text className="text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
                   この範囲では候補が見つかりませんでした。{"\n"}地図を動かすか「−」で広げて探してみてください。
                 </Text>
@@ -202,8 +202,8 @@ export function MapScreen({
                       }}
                       accessibilityRole="button"
                       accessibilityLabel={`${s.name}を地図の中心にする`}
-                      className={`w-[228px] rounded-[14px] border bg-kinari/97 px-3.5 py-2.5 ${
-                        isSelected ? "border-accent" : "border-ink/12"
+                      className={`w-[228px] rounded-[14px] border bg-kinari px-3.5 py-2.5 ${
+                        isSelected ? "border-accent" : "border-ink/[.15]"
                       }`}
                     >
                       <View className="flex-row items-center gap-2">

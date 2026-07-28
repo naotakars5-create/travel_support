@@ -274,10 +274,16 @@ export function useAppState() {
     return (entries ?? []).filter((e) => e.mode !== "rental" && !placed.has(e.id));
   }, [entries, slots]);
 
+  // ジオコーディングに失敗した地点を少し待って再挑戦するためのカウンタ。
+  // （サーバーのキー未設定・一時的な通信失敗のとき、以前はアプリを開き直すまで
+  // 座標が欠けたままになり、動線マップの番号が一部だけになる原因だった）
+  const [geoRetry, setGeoRetry] = useState(0);
+
   // 地点テキスト（place / title）を座標へジオコーディングし、entries へ書き戻す。
   useEffect(() => {
     if (!entries) return;
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     async function run() {
       const list = entries ?? [];
       // ジオコーディング対象を (entryId, フィールド, テキスト) で洗い出す。
@@ -311,6 +317,10 @@ export function useAppState() {
       );
       if (cancelled) return;
       const hits = results.filter((r) => r.point);
+      // 失敗が残っていたら、20秒おいて最大3回まで再挑戦する
+      if (hits.length < results.length && geoRetry < 3) {
+        retryTimer = setTimeout(() => setGeoRetry((n) => n + 1), 20000);
+      }
       if (hits.length === 0) return;
 
       setEntries((prev) =>
@@ -332,8 +342,9 @@ export function useAppState() {
     void run();
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [entries]);
+  }, [entries, geoRetry]);
 
   // スポット写真の自動取得。photoRef の無い行き先（宿泊・食事・観光）について
   // 名前から代表写真を探し、entries へ書き戻す（行き先リスト・旅程の横に出る）。

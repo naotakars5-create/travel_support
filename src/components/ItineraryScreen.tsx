@@ -281,7 +281,7 @@ export function ItineraryScreen({
         )}
         {/* 行き先が変わった時だけそっと出す「最適化しますか？」チップ（B案）。押し忘れをなくす */}
         {suggestOptimize && !optimizeDismissed && rail.length > 0 && (
-          <View className="mb-2 flex-row items-center gap-2 rounded-[12px] border border-ink/15 bg-surface/60 px-3 py-2">
+          <View className="mb-2 flex-row items-center gap-2 rounded-[12px] border border-ink/[.15] bg-surface/60 px-3 py-2">
             <Text className="flex-1 font-gothic-400 text-[12px] leading-[18px] text-ink">
               行き先が変わりました。AIで予定を組み直しますか？
             </Text>
@@ -456,7 +456,7 @@ export function ItineraryScreen({
                             hitSlop={6}
                             accessibilityRole="button"
                             accessibilityLabel={`${g.day}日目のこの時間に行き先を追加`}
-                            className="rounded-full border border-accent/45 bg-accent/[.08] px-2.5 py-1"
+                            className="rounded-full border border-accent/[.45] bg-accent/[.08] px-2.5 py-1"
                           >
                             <Text className="font-gothic-500 text-[12px] text-accent">＋ ここに追加</Text>
                           </Pressable>
@@ -638,7 +638,7 @@ function NodeRow({
             </Text>
             {isCurrent && (
               <Blinker>
-                <View className="rounded-full bg-accent/15 px-2 py-[2px]">
+                <View className="rounded-full bg-accent/[.15] px-2 py-[2px]">
                   <Text className="font-gothic-500 text-[10px] text-ink">● 現在地</Text>
                 </View>
               </Blinker>
