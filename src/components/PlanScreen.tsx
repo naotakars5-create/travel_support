@@ -265,7 +265,7 @@ export function PlanScreen({
         )}
         {!readOnly && (
           // 開始日と日数は横並び。日数は 1〜7 を並べると読みづらいのでプルダウンにする
-          <View className="mb-3 flex-row items-end gap-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
+          <View className="mb-2 flex-row items-end gap-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2">
             <DateOnlyField label="開始日" value={tripDate} onChange={onSetTripDate} />
             <SelectField
               label="日数"
@@ -283,7 +283,7 @@ export function PlanScreen({
             onPress={onOpenGenerate}
             accessibilityRole="button"
             accessibilityLabel="条件を選んでAIにゼロから旅程を作ってもらう"
-            className="mb-3 flex-row items-center gap-3 rounded-[14px] border border-accent/[.45] bg-accent/[.08] px-4 py-3"
+            className="mb-2 flex-row items-center gap-3 rounded-[14px] border border-accent/[.45] bg-accent/[.08] px-4 py-2.5"
           >
             <View className="h-9 w-9 items-center justify-center rounded-full bg-accent">
               <Text className="font-gothic-700 text-[12px] text-kinari">AI</Text>
@@ -315,7 +315,7 @@ export function PlanScreen({
           </Text>
         )}
         {totals.totalCost > 0 && (
-          <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
+          <View className="mb-2 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2">
             <View className="flex-row items-baseline justify-between">
               <Text className="font-gothic-500 text-[11px] tracking-[.1em] text-muted">予算のめやす</Text>
               <Text className="font-mincho-600 text-[16px] text-ink" style={TNUM}>
@@ -343,7 +343,7 @@ export function PlanScreen({
         )}
         {/* 宿泊先（固定・並び替え対象外） */}
         {!readOnly && (
-          <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
+          <View className="mb-2 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2">
             <View className="flex-row items-center justify-between">
               <Text className="font-gothic-500 text-[12px] text-ink">宿泊先（固定）</Text>
               <Pressable onPress={onOpenAddLodging} className="rounded-full border border-ink/25 px-3 py-1">
@@ -392,7 +392,7 @@ export function PlanScreen({
 
         {/* 車の移動（ずっと車 or レンタカーを借りている期間だけ車）。移動時間の見積もりに使う。 */}
         {!readOnly && (
-          <View className="mb-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
+          <View className="mb-2 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2">
             <View className="flex-row items-center justify-between">
               <Text className="font-gothic-500 text-[12px] text-ink">車の移動</Text>
               {baseMode === "walk" && (

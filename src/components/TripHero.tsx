@@ -51,7 +51,7 @@ export function TripHero({
   const subColor = onPhoto ? "text-white/[.85]" : "text-muted";
 
   const body = (
-    <View className="px-[26px] pb-3.5 pt-3">
+    <View className="px-[26px] pb-2.5 pt-2">
       {/* 旅名は押すと設定が開く。「押せる」と分かるよう、
           隣に用途を書いたボタンを必ず添える（▾ だけでは気づかれなかった） */}
       <View className="flex-row items-center gap-2">
@@ -84,7 +84,7 @@ export function TripHero({
         </Pressable>
       ) : null}
 
-      <View className="mt-2 flex-row flex-wrap items-center gap-2">
+      <View className="mt-1.5 flex-row flex-wrap items-center gap-2">
         {/* 旅がいつなのか。ここだけは色を強く出す（旅への高揚をつくる場所） */}
         {phase.phase === "before" && (
           <View className="rounded-full bg-accent px-3 py-[5px]">
@@ -112,12 +112,12 @@ export function TripHero({
 
       {/* 「＋」だけでは何が足せるのか分からなかったので、文字を入れて主要動作として置く */}
       {!readOnly && (
-        <View className="mt-3 flex-row gap-2">
+        <View className="mt-2 flex-row gap-2">
           <Pressable
             onPress={onAdd}
             accessibilityRole="button"
             accessibilityLabel="行き先を追加"
-            className="flex-1 flex-row items-center justify-center gap-1.5 rounded-[12px] bg-ink py-3"
+            className="flex-1 flex-row items-center justify-center gap-1.5 rounded-[12px] bg-ink py-2.5"
           >
             <Text className="font-gothic-700 text-[14px] text-kinari">＋ 行き先を追加</Text>
           </Pressable>

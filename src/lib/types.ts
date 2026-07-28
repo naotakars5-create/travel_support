@@ -120,6 +120,11 @@ export interface PlanEntry {
   photoRef?: string;
   /** 写真の提供元表示（Googleの規約で表示が必須） */
   photoAttribution?: string;
+  /**
+   * 宿にチェックインしたあと（チェックイン〜チェックアウトの間）でも
+   * 配置してよい行き先か。夜ご飯・夜景など。既定は false＝入れない。
+   */
+  allowDuringStay?: boolean;
 
   // --- 移動系（鉄道・バス・飛行機・車）専用 ---
   /** 出発地 */

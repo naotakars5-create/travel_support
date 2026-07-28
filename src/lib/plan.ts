@@ -231,6 +231,31 @@ export function entryAnchorTime(entry: PlanEntry): string | null {
 }
 
 /**
+ * 宿泊の「チェックイン〜チェックアウト」の時間帯（ms区間）。
+ * この間には、allowDuringStay の付いていない行き先を自動配置しない。
+ * チェックアウト未設定の宿は「翌朝の行動開始時刻まで」を塞ぐとみなす。
+ */
+export function stayWindows(entries: PlanEntry[]): { start: number; end: number }[] {
+  const wins: { start: number; end: number }[] = [];
+  for (const e of entries) {
+    if (e.mode !== "stay" || !e.arriveBy) continue;
+    const start = new Date(e.arriveBy).getTime();
+    if (Number.isNaN(start)) continue;
+    let end: number;
+    if (e.checkOut) {
+      const c = new Date(e.checkOut).getTime();
+      end = Number.isNaN(c) ? start : c;
+    } else {
+      const next = new Date(start + 86400000);
+      next.setHours(DAY_START_HOUR, 0, 0, 0);
+      end = next.getTime();
+    }
+    if (end > start) wins.push({ start, end });
+  }
+  return wins.sort((a, b) => a.start - b.start);
+}
+
+/**
  * 「行き先リストの並び順」をそのまま行程の順序として、時刻を前から順に自動計算する。
  * - 日ごとにグループ化し、各日は朝（DAY_START_HOUR）から前詰め。
  * - 固定時刻の予定（fixedTime）はその時刻を厳守し、以降のカーソルを進める。
@@ -254,6 +279,7 @@ export function sequentialSchedule(
   }
 
   const slots: ScheduleSlot[] = [];
+  const stayWins = stayWindows(entries);
   const days = [...byDay.keys()].sort((a, b) => a - b);
   for (const day of days) {
     const dayStart = new Date(referenceDate.getTime() + (day - 1) * 86400000);
@@ -286,6 +312,12 @@ export function sequentialSchedule(
           const abMs = new Date(e.arriveBy).getTime();
           if (!Number.isNaN(abMs) && abMs > start) start = abMs;
         }
+        // 宿のチェックイン〜チェックアウトの間には置かない（許可された行き先だけ例外）
+        if (!e.allowDuringStay) {
+          for (const w of stayWins) {
+            if (start >= w.start && start < w.end) start = w.end;
+          }
+        }
       }
       slots.push({ entryId: e.id, arriveAt: new Date(start).toISOString(), stayMin: entryDurationMin(e) });
       cursor = Math.max(cursor, start) + (entryDurationMin(e) + TRAVEL_BUFFER_MIN) * 60000;
@@ -308,11 +340,12 @@ export function fillIntoGaps(
   slots: ScheduleSlot[],
   referenceDate: Date,
   dayCount: number,
-  opts?: { notBefore?: string; notAfter?: string }
+  opts?: { notBefore?: string; notAfter?: string; stayWindows?: { start: number; end: number }[] }
 ): ScheduleSlot[] {
   const bufferMs = TRAVEL_BUFFER_MIN * 60000;
   const notBeforeMs = opts?.notBefore ? new Date(opts.notBefore).getTime() : -Infinity;
   const notAfterMs = opts?.notAfter ? new Date(opts.notAfter).getTime() : Infinity;
+  const stayIvs = opts?.stayWindows ?? [];
 
   type Iv = { start: number; end: number };
   const ivs: Iv[] = slots
@@ -363,6 +396,8 @@ export function fillIntoGaps(
         if (winEnd - winStart < durMs) continue;
 
         let cursor = winStart;
+        // 宿の時間帯は「塞がっている区間」として扱う（許可された行き先だけ通す）
+        const occupied = e.allowDuringStay ? ivs : [...ivs, ...stayIvs].sort((a, b) => a.start - b.start);
         const tryPlace = (gapEnd: number, needTrailingBuffer: boolean): boolean => {
           let start = cursor === winStart ? cursor : cursor + bufferMs;
           start = clampToOpenHours(start, e);
@@ -374,7 +409,7 @@ export function fillIntoGaps(
           return false;
         };
 
-        for (const iv of ivs) {
+        for (const iv of occupied) {
           if (iv.end <= cursor) continue;
           if (iv.start >= winEnd) break;
           if (tryPlace(Math.min(iv.start, winEnd), true)) break;
@@ -595,6 +630,7 @@ export interface PlanEntryInput {
   /** スポット写真（Places Photo の参照IDと提供元） */
   photoRef?: string;
   photoAttribution?: string;
+  allowDuringStay?: boolean;
 }
 
 export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | null {
@@ -626,6 +662,7 @@ export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | nul
     closedDays: input.closedDays && input.closedDays.length > 0 ? input.closedDays : undefined,
     photoRef: input.photoRef,
     photoAttribution: input.photoAttribution,
+    allowDuringStay: input.allowDuringStay || undefined,
   };
 }
 
