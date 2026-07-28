@@ -9,6 +9,8 @@ import {
   effectiveStayMin,
   entryDurationMin,
   isClosedOn,
+  timeWishOf,
+  wishLabel,
   COST_CATEGORY_LABEL,
   COST_CATEGORY_ORDER,
 } from "@/lib/plan";
@@ -35,6 +37,34 @@ const PRIORITY_STYLE: Record<Priority, { border: string; text: string }> = {
   want: { border: "border-ink/40", text: "text-ink" },
   optional: { border: "border-muted-light", text: "text-muted" },
 };
+
+/**
+ * 「いつ行く？」の希望を1つのチップで示す。
+ * 時刻が決まっているものだけ濃く、任せてあるものは薄く出して、
+ * 「どこまで自分で決めて、どこからAIに任せているか」が一目で分かるようにする。
+ */
+function WishChip({ entry, disabled, onPress }: { entry: PlanEntry; disabled?: boolean; onPress: () => void }) {
+  const kind = timeWishOf(entry);
+  const strong = kind === "fixed";
+  const loose = kind === "any";
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityRole={disabled ? undefined : "button"}
+      accessibilityLabel={`いつ行くか: ${wishLabel(entry)}。押すと変えられます`}
+      className={`rounded-full border px-2 py-[2px] ${
+        strong ? "border-ink bg-ink" : loose ? "border-black/[.15]" : "border-accent/50 bg-accent/[.08]"
+      }`}
+    >
+      <Text className={`font-gothic-500 text-[10px] ${strong ? "text-kinari" : loose ? "text-muted-light" : "text-accent"}`}>
+        {strong ? "🕐 " : ""}
+        {wishLabel(entry)}
+      </Text>
+    </Pressable>
+  );
+}
 
 export function PlanScreen({
   entries,
@@ -66,7 +96,6 @@ export function PlanScreen({
   onRemoveEntry,
   onEditEntry,
   onSetEntryDay,
-  onToggleFixed,
   onMoveEntry,
   onMoveEntryToEdge,
   onAddSuggestions,
@@ -109,7 +138,6 @@ export function PlanScreen({
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
   onSetEntryDay: (id: string, day: number) => void;
-  onToggleFixed: (id: string) => void;
   onMoveEntry: (id: string, dir: -1 | 1) => void;
   onMoveEntryToEdge: (id: string, dir: -1 | 1) => void;
   onAddSuggestions: (list: SpotSuggestion[]) => void;
@@ -518,21 +546,8 @@ export function PlanScreen({
                         <Text className="font-gothic-400 text-[11px] text-muted-light">時刻未定</Text>
                       )}
                     </Pressable>
-                    {/* 時刻を固定（AIに動かされたくない予定）。時刻が入っている時だけ有効 */}
-                    {!readOnly && (
-                      <Pressable
-                        onPress={() => onToggleFixed(e.id)}
-                        hitSlop={6}
-                        className={`flex-row items-center gap-1 rounded-full border px-2 py-[2px] ${
-                          e.fixedTime ? "border-ink bg-ink" : "border-black/[.2]"
-                        }`}
-                      >
-                        <Text className={`font-gothic-500 text-[10px] ${e.fixedTime ? "text-kinari" : "text-muted"}`}>
-                          {e.fixedTime ? "✓ 時刻固定" : "時刻を固定"}
-                        </Text>
-                      </Pressable>
-                    )}
-                    {readOnly && e.fixedTime && <Text className="font-gothic-400 text-[10px] text-ink">固定</Text>}
+                    {/* いつ行きたいかの希望。ここが「AIに何を任せたか」の表示になる */}
+                    <WishChip entry={e} disabled={readOnly} onPress={() => onEditEntry(e.id)} />
                   </View>
                   <Pressable disabled={readOnly} onPress={() => onEditEntry(e.id)}>
                     <View className="mt-0.5 flex-row items-center gap-1.5">
@@ -638,7 +653,9 @@ export function PlanScreen({
         })}
 
         {!readOnly && ordered.length > 1 && (
-          <Text className="mt-2 font-gothic-400 text-[11px] text-muted-light">▲▼で並び替え（長押しで先頭・末尾へ）。順番から時刻を自動計算します。</Text>
+          <Text className="mt-2 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
+            ここは行きたい場所を溜めていく場所です。時刻は「AIで予定を組む」で決まります。{"\n"}▲▼は手で順番を決めたい時に（長押しで先頭・末尾へ）。
+          </Text>
         )}
 
         {!readOnly && entries.length > 0 && (
@@ -672,7 +689,7 @@ export function PlanScreen({
               </View>
             )}
             <Text className="mt-2 text-center font-gothic-400 text-[12px] leading-[19px] text-muted-light">
-              旅程は並び順から自動で組まれています。押すとAIが移動効率・営業時間・定休日を見て、順番と時間配分を組み直します。
+              押すとAIが、それぞれの「いつ行く？」の希望・移動効率・営業時間・定休日を見て、順番と時刻を決めます。結果はタイムラインに出ます。
             </Text>
             {composeError && <Text className="mt-2 text-center font-gothic-400 text-[12px] text-ink">{composeError}</Text>}
             {planNotes && (

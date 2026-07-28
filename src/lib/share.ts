@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import { GeoPoint, PlanEntry, Priority, ScheduleSlot, TransportMode } from "./types";
+import { DayPeriod, GeoPoint, PlanEntry, Priority, ScheduleSlot, TimeWishKind, TransportMode } from "./types";
 import { apiUrl, getApiBaseUrl } from "./apiBase";
 import { fetchWithTimeout } from "./http";
 
@@ -53,6 +53,10 @@ interface CompactEntry {
   co?: string; // checkOut
   ph?: string; // photoRef
   pa?: string; // photoAttribution
+  w?: string; // wish（"any" は省略）
+  pd?: string; // period
+  wf?: string; // windowFrom
+  wt?: string; // windowTo
 }
 
 interface CompactPlan {
@@ -80,6 +84,10 @@ function toCompact(entries: PlanEntry[], slots: ScheduleSlot[]): CompactPlan {
       if (typeof e.cost === "number") c.c = e.cost;
       if (e.detail) c.n = e.detail;
       if (e.day && e.day > 1) c.d = e.day;
+      if (e.wish && e.wish !== "any") c.w = e.wish;
+      if (e.period) c.pd = e.period;
+      if (e.windowFrom) c.wf = e.windowFrom;
+      if (e.windowTo) c.wt = e.windowTo;
       if (e.openFrom) c.of = e.openFrom;
       if (e.openTo) c.ot = e.openTo;
       if (e.closedDays && e.closedDays.length > 0) c.cd = e.closedDays;
@@ -126,6 +134,10 @@ function fromCompact(c: CompactPlan): SharedPlan {
       checkOut: e.co,
       photoRef: e.ph,
       photoAttribution: e.pa,
+      wish: e.w as TimeWishKind | undefined,
+      period: e.pd as DayPeriod | undefined,
+      windowFrom: e.wf,
+      windowTo: e.wt,
     })),
     slots: c.s.map(([entryId, arriveAt, stayMin]) => ({ entryId, arriveAt, stayMin })),
   };
@@ -322,7 +334,7 @@ export async function readSharedPlanFromUrl(): Promise<SharedPlan | null> {
  * 共有リンクを送る。Web Share API（LINE等に送れる）が使えればそれを使い、
  * 使えなければクリップボードにコピーする。結果を返す。
  */
-export async function sharePlanLink(url: string, title = "旅ナビの旅程"): Promise<"shared" | "copied" | "failed"> {
+export async function sharePlanLink(url: string, title = "つばめみちの旅程"): Promise<"shared" | "copied" | "failed"> {
   try {
     const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { share?: (d: unknown) => Promise<void> }) : undefined;
     if (nav?.share) {

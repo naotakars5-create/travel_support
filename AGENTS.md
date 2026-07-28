@@ -1,4 +1,4 @@
-# 旅ナビ / TABI-NAVI — Expo (React Native) プロジェクト
+# つばめみち / TSUBAMEMICHI — Expo (React Native) プロジェクト
 
 このリポジトリは Expo Router + React Native + NativeWind で構築されています。
 以前は Next.js で実装されていましたが、Expo/React Native に全面移行しました。

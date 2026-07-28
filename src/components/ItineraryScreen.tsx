@@ -5,7 +5,7 @@ import { RailItem, computeStats, formatDurationMin } from "@/lib/itinerary";
 import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
 import { dayOfIso, formatJstHeadingJa, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { GeoPoint, PlanEntry } from "@/lib/types";
-import { isClosedOn, closedDaysLabel, entryIdFromEventId, PRIORITY_META } from "@/lib/plan";
+import { isClosedOn, closedDaysLabel, entryIdFromEventId, timeWishOf, violatesWish, wishLabel, PRIORITY_META } from "@/lib/plan";
 import { pickBenchIllustration } from "@/lib/illustrations";
 import { dayColor, tint } from "@/lib/palette";
 import { directionsUrl } from "@/lib/mapsLink";
@@ -601,6 +601,9 @@ function NodeRow({
     .join(" · ");
   // 定休日と重なっていないか（Place Details 由来の定休日がある場合のみ判定できる）
   const closedConflict = isClosedOn(item.event, start);
+  // 「午後がいい」等の希望どおりに置けたか。外れていたら黙らせずに知らせる
+  const wishKind = entry ? timeWishOf(entry) : "any";
+  const wishMissed = entry ? violatesWish(entry, item.time) : false;
 
   return (
     <Animated.View style={nodeInStyle} className="flex-row">
@@ -652,7 +655,7 @@ function NodeRow({
             )}
             <SpotThumb photoRef={item.event.photoRef} attribution={item.event.photoAttribution} />
           </View>
-          {(meta || item.confidence < 0.5 || closedConflict) && (
+          {(meta || item.confidence < 0.5 || closedConflict || wishMissed) && (
             <View className="mt-0.5 flex-row items-center gap-1.5" style={{ paddingLeft: 30 }}>
               {closedConflict && (
                 <View className="rounded-full border border-ink bg-surface px-1.5">
@@ -664,6 +667,18 @@ function NodeRow({
               {item.confidence < 0.5 && (
                 <View className="rounded-full border border-muted px-1.5">
                   <Text className="font-gothic-400 text-[10px] text-muted">要確認</Text>
+                </View>
+              )}
+              {wishMissed && entry && (
+                <View className="rounded-full border border-accent/60 bg-accent/[.1] px-1.5">
+                  <Text className="font-gothic-500 text-[10px] text-accent">
+                    希望「{wishLabel(entry)}」に置けませんでした
+                  </Text>
+                </View>
+              )}
+              {!wishMissed && wishKind === "fixed" && (
+                <View className="rounded-full bg-ink px-1.5">
+                  <Text className="font-gothic-500 text-[10px] text-kinari">時刻固定</Text>
                 </View>
               )}
               {meta ? (
