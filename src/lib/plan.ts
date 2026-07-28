@@ -11,6 +11,7 @@ import {
   TimeWishKind,
   TransportMode,
 } from "./types";
+import { dayOfIso } from "./date";
 
 export const PRIORITY_META: Record<Priority, { label: string; short: string; weight: number }> = {
   must: { label: "必ず行く", short: "必須", weight: 0 },
@@ -125,16 +126,37 @@ export function wishLabel(entry: PlanEntry): string {
   }
 }
 
-/** 割り当てられた時刻が希望の帯から外れていないか（外れていれば true）。 */
-export function violatesWish(entry: PlanEntry, arriveAtIso: string | undefined): boolean {
+/**
+ * 割り当てられた時刻が希望から外れていないか（外れていれば true）。
+ * 帯（午前・時間の範囲）だけでなく、「何日目」の希望も見る。
+ * tripDate を渡すと日のずれも判定できる。
+ */
+export function violatesWish(entry: PlanEntry, arriveAtIso: string | undefined, tripDate?: string): boolean {
   if (!arriveAtIso) return false;
-  const w = wishWindowMin(entry);
-  if (!w) return false;
+  const kind = timeWishOf(entry);
+  if (kind === "any") return false;
   const d = new Date(arriveAtIso);
   if (Number.isNaN(d.getTime())) return false;
+
+  // 「2日目に行きたい」のに別の日へ置かれた
+  if (tripDate && entry.day && entry.day > 0) {
+    const placedDay = dayOfIso(tripDate, arriveAtIso);
+    if (placedDay > 0 && placedDay !== entry.day) return true;
+  }
+
+  const w = wishWindowMin(entry);
+  if (!w) return false;
   const min = d.getHours() * 60 + d.getMinutes();
   // 帯の中で始まっていれば良しとする（終わりが少しはみ出すのは許容）
   return min < w.fromMin - 1 || min > w.toMin;
+}
+
+/** 希望を「2日目・午後」のように、日を含めて言い表す（ずれた時の説明に使う）。 */
+export function wishFullLabel(entry: PlanEntry): string {
+  const kind = timeWishOf(entry);
+  const label = wishLabel(entry);
+  if (kind === "any" || kind === "fixed") return label;
+  return entry.day && entry.day > 0 ? `${entry.day}日目・${label}` : label;
 }
 
 /** 希望の帯の開始時刻（その日の 0 時からのミリ秒）。無ければ null。 */

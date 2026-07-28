@@ -57,6 +57,14 @@ export const PLAN_SYSTEM_PROMPT = `あなたは日本の個人旅行者のため
 - "notes" は組み方の一言メモ（例: 「昼食の予約に合わせ午前は美術館、午後は買い物を配置しました」）。40〜80字程度。
 - 出力はJSONのみ。マークダウンや説明文は絶対に付けない。`;
 
+/** 何日目に置いてほしいか。希望が「こだわらない」なら日も自由なので書かない。 */
+function dayLine(e: PlanEntry): string | null {
+  const kind = timeWishOf(e);
+  if (kind === "any") return null;
+  if (!e.day || e.day < 1) return null;
+  return `何日目: ${e.day}日目${kind === "fixed" ? "（この日に厳守）" : "（希望。効率が上がるなら調整可）"}`;
+}
+
 /** 「いつ行きたいか」をAIに伝える1行。指定が無ければ調整に使ってよいと明示する。 */
 function wishLine(e: PlanEntry): string {
   const kind = timeWishOf(e);
@@ -98,7 +106,9 @@ export function buildPlanUserMessage(params: {
       e.placeGeo ? `座標: ${e.placeGeo.lat.toFixed(4)},${e.placeGeo.lng.toFixed(4)}` : null,
       `重要度: ${PRIORITY_META[e.priority].label}`,
       `種別: ${MODE_LABEL[e.mode]}`,
-      e.day && e.day > 1 ? `何日目: ${e.day}日目${e.fixedTime ? "（この日に厳守）" : "（希望。効率が上がるなら調整可）"}` : null,
+      // 「1日目ならどこでもいい」も日の希望なので、1日目でも必ず伝える
+      //（以前は 2日目以降しか書いておらず、1日目指定がAIに届いていなかった）
+      dayLine(e),
       wishLine(e),
       typeof e.stayMin === "number" ? `滞在: ${e.stayMin}分` : null,
       e.openFrom || e.openTo ? `営業時間: ${e.openFrom ?? "?"}〜${e.openTo ?? "?"}` : null,
