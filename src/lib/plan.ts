@@ -1,4 +1,16 @@
-import { GeoPoint, isTransitMode, ParsedEvent, ParsedField, PlanEntry, Priority, ScheduleSlot, SpotSuggestion, TransportMode } from "./types";
+import {
+  DayPeriod,
+  GeoPoint,
+  isTransitMode,
+  ParsedEvent,
+  ParsedField,
+  PlanEntry,
+  Priority,
+  ScheduleSlot,
+  SpotSuggestion,
+  TimeWishKind,
+  TransportMode,
+} from "./types";
 
 export const PRIORITY_META: Record<Priority, { label: string; short: string; weight: number }> = {
   must: { label: "必ず行く", short: "必須", weight: 0 },
@@ -48,6 +60,90 @@ export const WEEKDAY_JA = ["日", "月", "火", "水", "木", "金", "土"] as c
 export function closedDaysLabel(entry: Pick<PlanEntry, "closedDays">): string | null {
   if (!entry.closedDays || entry.closedDays.length === 0) return null;
   return `${entry.closedDays.map((d) => WEEKDAY_JA[d] ?? "?").join("・")}曜定休`;
+}
+
+// ===== いつ行きたいか（希望）=====
+//
+// 行き先リストは「行きたい所を溜めていく場所」で、ここで時刻まで決めきらなくてよい。
+// 決まっている分だけ希望として持たせ、残りの時刻はAIが埋める。
+
+/** 時間帯の定義（表示名と、その帯の開始・終了）。 */
+export const PERIOD_META: Record<DayPeriod, { label: string; fromMin: number; toMin: number }> = {
+  morning: { label: "午前", fromMin: 9 * 60, toMin: 12 * 60 },
+  afternoon: { label: "午後", fromMin: 12 * 60, toMin: 17 * 60 },
+  evening: { label: "夕方", fromMin: 17 * 60, toMin: 20 * 60 },
+  night: { label: "夜", fromMin: 19 * 60, toMin: 23 * 60 },
+};
+
+export const PERIOD_ORDER: DayPeriod[] = ["morning", "afternoon", "evening", "night"];
+
+/**
+ * その行き先の希望の種類。
+ * wish を持たない古いデータ（および取り込み系）は fixedTime / day から推測する。
+ */
+export function timeWishOf(entry: Pick<PlanEntry, "wish" | "fixedTime" | "day">): TimeWishKind {
+  if (entry.wish) return entry.wish;
+  if (entry.fixedTime) return "fixed";
+  if (entry.day && entry.day > 0) return "day";
+  return "any";
+}
+
+/**
+ * 希望が指す「その日の中の時間帯」（分・0時起点）。
+ * any / day は帯を持たないので null。fixed は arriveBy 側で扱う。
+ */
+export function wishWindowMin(entry: PlanEntry): { fromMin: number; toMin: number } | null {
+  const kind = timeWishOf(entry);
+  if (kind === "period") {
+    const meta = PERIOD_META[entry.period ?? "morning"];
+    return { fromMin: meta.fromMin, toMin: meta.toMin };
+  }
+  if (kind === "window") {
+    const from = parseHm(entry.windowFrom);
+    const to = parseHm(entry.windowTo);
+    if (!from && !to) return null;
+    const fromMin = from ? from.h * 60 + from.min : 0;
+    const toMin = to ? to.h * 60 + to.min : 24 * 60;
+    return fromMin < toMin ? { fromMin, toMin } : { fromMin, toMin: 24 * 60 };
+  }
+  return null;
+}
+
+/** 希望の見出し（リストのチップやAIへの説明に使う短い言葉）。 */
+export function wishLabel(entry: PlanEntry): string {
+  switch (timeWishOf(entry)) {
+    case "fixed":
+      return "時刻が決まっている";
+    case "window":
+      return `${entry.windowFrom ?? "?"}〜${entry.windowTo ?? "?"}`;
+    case "period":
+      return PERIOD_META[entry.period ?? "morning"].label;
+    case "day":
+      return "この日ならいつでも";
+    default:
+      return "いつでもいい";
+  }
+}
+
+/** 割り当てられた時刻が希望の帯から外れていないか（外れていれば true）。 */
+export function violatesWish(entry: PlanEntry, arriveAtIso: string | undefined): boolean {
+  if (!arriveAtIso) return false;
+  const w = wishWindowMin(entry);
+  if (!w) return false;
+  const d = new Date(arriveAtIso);
+  if (Number.isNaN(d.getTime())) return false;
+  const min = d.getHours() * 60 + d.getMinutes();
+  // 帯の中で始まっていれば良しとする（終わりが少しはみ出すのは許容）
+  return min < w.fromMin - 1 || min > w.toMin;
+}
+
+/** 希望の帯の開始時刻（その日の 0 時からのミリ秒）。無ければ null。 */
+function wishStartMs(entry: PlanEntry, dayStartMs: number): number | null {
+  const w = wishWindowMin(entry);
+  if (!w) return null;
+  const d = new Date(dayStartMs);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime() + w.fromMin * 60000;
 }
 
 /**
@@ -159,6 +255,10 @@ export function sequentialSchedule(
         start = Number.isNaN(anchorMs) ? clampToOpenHours(cursor, e) : anchorMs;
       } else {
         start = clampToOpenHours(cursor, e); // 営業時間内へ寄せる
+        // 「午後がいい」「10:00〜12:00がいい」といった希望は、その帯より前に置かない
+        //（並び順は保ったまま下限として効かせる。空いた前半は fillIntoGaps が埋める）
+        const wishMs = wishStartMs(e, dayStart.getTime());
+        if (wishMs !== null && wishMs > start) start = wishMs;
         // 非固定でも「到着目安」があれば、その時刻より前には置かない（並び順は保ちつつ下限として尊重）。
         if (e.arriveBy) {
           const abMs = new Date(e.arriveBy).getTime();
@@ -210,38 +310,58 @@ export function fillIntoGaps(
     const durMs = durMin * 60000;
     let placedAt: number | null = null;
 
-    for (let d = 1; d <= Math.max(1, dayCount) && placedAt === null; d++) {
-      const dayStart = new Date(referenceDate.getTime() + (d - 1) * 86400000);
-      dayStart.setHours(DAY_START_HOUR, 0, 0, 0);
-      // 定休日には置かない（別の日を探す）
-      if (isClosedOn(e, dayStart)) continue;
-      const winStart = Math.max(dayStart.getTime(), notBeforeMs);
-      const dayEnd = new Date(referenceDate.getTime() + (d - 1) * 86400000);
-      dayEnd.setHours(DAY_END_HOUR, 0, 0, 0);
-      const winEnd = Math.min(dayEnd.getTime(), notAfterMs);
-      if (winEnd - winStart < durMs) continue;
+    // 「2日目の午後がいい」と言われていれば、まずその通りに置けないか探す。
+    // 置けなければ帯だけ諦め、それでも駄目なら日も諦める（希望より「入ること」を優先）。
+    const wishedDay = e.day && e.day > 0 && timeWishOf(e) !== "any" ? e.day : null;
+    const wishWin = wishWindowMin(e);
+    const relaxations: { day: number | null; win: { fromMin: number; toMin: number } | null }[] = [
+      { day: wishedDay, win: wishWin },
+      { day: wishedDay, win: null },
+      { day: null, win: null },
+    ];
 
-      let cursor = winStart;
-      const tryPlace = (gapEnd: number, needTrailingBuffer: boolean): boolean => {
-        let start = cursor === winStart ? cursor : cursor + bufferMs;
-        start = clampToOpenHours(start, e);
-        const limit = gapEnd - (needTrailingBuffer ? bufferMs : 0);
-        if (start + durMs <= limit && start >= winStart && start + durMs <= winEnd) {
-          placedAt = start;
-          return true;
+    for (const relax of relaxations) {
+      if (placedAt !== null) break;
+      for (let d = 1; d <= Math.max(1, dayCount) && placedAt === null; d++) {
+        if (relax.day !== null && d !== relax.day) continue;
+        const dayStart = new Date(referenceDate.getTime() + (d - 1) * 86400000);
+        dayStart.setHours(DAY_START_HOUR, 0, 0, 0);
+        // 定休日には置かない（別の日を探す）
+        if (isClosedOn(e, dayStart)) continue;
+        let winStart = Math.max(dayStart.getTime(), notBeforeMs);
+        const dayEnd = new Date(referenceDate.getTime() + (d - 1) * 86400000);
+        dayEnd.setHours(DAY_END_HOUR, 0, 0, 0);
+        let winEnd = Math.min(dayEnd.getTime(), notAfterMs);
+        if (relax.win) {
+          const midnight = new Date(dayStart);
+          midnight.setHours(0, 0, 0, 0);
+          winStart = Math.max(winStart, midnight.getTime() + relax.win.fromMin * 60000);
+          winEnd = Math.min(winEnd, midnight.getTime() + relax.win.toMin * 60000);
         }
-        return false;
-      };
+        if (winEnd - winStart < durMs) continue;
 
-      for (const iv of ivs) {
-        if (iv.end <= cursor) continue;
-        if (iv.start >= winEnd) break;
-        if (tryPlace(Math.min(iv.start, winEnd), true)) break;
-        cursor = Math.max(cursor, iv.end);
-        if (cursor >= winEnd) break;
-      }
-      if (placedAt === null && cursor < winEnd) {
-        tryPlace(winEnd, false); // 最後の予定のあとの余り時間
+        let cursor = winStart;
+        const tryPlace = (gapEnd: number, needTrailingBuffer: boolean): boolean => {
+          let start = cursor === winStart ? cursor : cursor + bufferMs;
+          start = clampToOpenHours(start, e);
+          const limit = gapEnd - (needTrailingBuffer ? bufferMs : 0);
+          if (start + durMs <= limit && start >= winStart && start + durMs <= winEnd) {
+            placedAt = start;
+            return true;
+          }
+          return false;
+        };
+
+        for (const iv of ivs) {
+          if (iv.end <= cursor) continue;
+          if (iv.start >= winEnd) break;
+          if (tryPlace(Math.min(iv.start, winEnd), true)) break;
+          cursor = Math.max(cursor, iv.end);
+          if (cursor >= winEnd) break;
+        }
+        if (placedAt === null && cursor < winEnd) {
+          tryPlace(winEnd, false); // 最後の予定のあとの余り時間
+        }
       }
     }
 
@@ -434,6 +554,11 @@ export interface PlanEntryInput {
   detail?: string;
   /** 何日目か（1始まり） */
   day?: number;
+  /** いつ行きたいかの希望 */
+  wish?: TimeWishKind;
+  period?: DayPeriod;
+  windowFrom?: string;
+  windowTo?: string;
   /** 移動系: 出発地・到着地・出発時刻(ISO) */
   placeFrom?: string;
   placeTo?: string;
@@ -466,6 +591,10 @@ export function inputToEntry(id: string, input: PlanEntryInput): PlanEntry | nul
     detail: input.detail?.trim() || undefined,
     source: "手入力",
     day: input.day && input.day > 0 ? input.day : undefined,
+    wish: input.wish,
+    period: input.wish === "period" ? input.period : undefined,
+    windowFrom: input.wish === "window" ? input.windowFrom : undefined,
+    windowTo: input.wish === "window" ? input.windowTo : undefined,
     placeFrom: input.placeFrom?.trim() || undefined,
     placeTo: input.placeTo?.trim() || undefined,
     departAt: input.departAt || undefined,

@@ -52,6 +52,24 @@ export interface ParsedEvent {
 export type Priority = "must" | "want" | "optional";
 
 /**
+ * 「いつ行きたいか」の希望。上ほどゆるく、下ほど強い。
+ *
+ * 行き先リストは「行きたい所をどんどん足していく場所」なので、
+ * ここで時刻まで決めきる必要はない。決まっている分だけ伝えれば、
+ * 残りはAIが埋める、という段階を持たせるための型。
+ *
+ * - any    … こだわらない（日も時間もAIに任せる）
+ * - day    … その日ならいつでも（何日目だけ指定）
+ * - period … 午前・午後・夕方・夜のどれか
+ * - window … 時間の範囲（10:00〜12:00 など）
+ * - fixed  … 時刻が決まっている（予約など。絶対に動かさない）
+ */
+export type TimeWishKind = "any" | "day" | "period" | "window" | "fixed";
+
+/** 1日の時間帯。 */
+export type DayPeriod = "morning" | "afternoon" | "evening" | "night";
+
+/**
  * ユーザーが自分で追加する「行きたい場所／予定」1件。
  * これを溜めていくと、AI（またはローカル・ヒューリスティック）が到着時刻順に
  * 旅程へ組み上げる。予約メールから取り込んだ確定予定は fixedTime=true の anchor になる。
@@ -80,6 +98,17 @@ export interface PlanEntry {
   source: string;
   /** 何日目か（1始まり）。複数日程で使う。未指定は1日目扱い。 */
   day?: number;
+
+  /**
+   * いつ行きたいかの希望。未指定の古いデータは fixedTime / day から推測する
+   * （`timeWishOf()` を通して読むこと）。
+   */
+  wish?: TimeWishKind;
+  /** wish="period" のときの時間帯 */
+  period?: DayPeriod;
+  /** wish="window" のときの範囲（"HH:MM"） */
+  windowFrom?: string;
+  windowTo?: string;
 
   /** 営業・開館時間（開始, "HH:MM"）。AIや自動配置がこの時刻より前に置かないようにする。 */
   openFrom?: string;
