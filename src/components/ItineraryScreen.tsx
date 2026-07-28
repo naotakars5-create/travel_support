@@ -5,7 +5,15 @@ import { RailItem, computeStats, formatDurationMin } from "@/lib/itinerary";
 import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
 import { dayOfIso, formatJstHeadingJa, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { GeoPoint, PlanEntry } from "@/lib/types";
-import { isClosedOn, closedDaysLabel, entryIdFromEventId, timeWishOf, violatesWish, wishLabel, PRIORITY_META } from "@/lib/plan";
+import {
+  isClosedOn,
+  closedDaysLabel,
+  entryIdFromEventId,
+  timeWishOf,
+  violatesWish,
+  wishFullLabel,
+  PRIORITY_META,
+} from "@/lib/plan";
 import { pickBenchIllustration } from "@/lib/illustrations";
 import { dayColor, tint } from "@/lib/palette";
 import { directionsUrl } from "@/lib/mapsLink";
@@ -363,6 +371,7 @@ export function ItineraryScreen({
                     onToggleOpen={() => setOpenKey((k) => (k === item.key ? null : item.key))}
                     tripDayCount={tripDayCount}
                     dayNumber={g.day}
+                    tripDate={tripDate}
                     onEditEntry={onEditEntry}
                     onRemoveEntry={(id) => {
                       setOpenKey(null);
@@ -559,6 +568,7 @@ function NodeRow({
   onToggleOpen,
   tripDayCount,
   dayNumber,
+  tripDate,
   onEditEntry,
   onRemoveEntry,
   onMoveEntry,
@@ -578,6 +588,8 @@ function NodeRow({
   onToggleOpen: () => void;
   tripDayCount: number;
   dayNumber: number;
+  /** 旅行の開始日（希望の「何日目」とのずれを判定するために使う） */
+  tripDate: string;
   onEditEntry: (id: string) => void;
   onRemoveEntry: (id: string) => void;
   onMoveEntry: (id: string, dir: -1 | 1) => void;
@@ -603,7 +615,7 @@ function NodeRow({
   const closedConflict = isClosedOn(item.event, start);
   // 「午後がいい」等の希望どおりに置けたか。外れていたら黙らせずに知らせる
   const wishKind = entry ? timeWishOf(entry) : "any";
-  const wishMissed = entry ? violatesWish(entry, item.time) : false;
+  const wishMissed = entry ? violatesWish(entry, item.time, tripDate) : false;
 
   return (
     <Animated.View style={nodeInStyle} className="flex-row">
@@ -672,7 +684,7 @@ function NodeRow({
               {wishMissed && entry && (
                 <View className="rounded-full border border-accent/60 bg-accent/[.1] px-1.5">
                   <Text className="font-gothic-500 text-[10px] text-accent">
-                    希望「{wishLabel(entry)}」に置けませんでした
+                    希望「{wishFullLabel(entry)}」に置けませんでした
                   </Text>
                 </View>
               )}

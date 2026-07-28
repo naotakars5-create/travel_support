@@ -1,4 +1,4 @@
-import { fillIntoGaps, sequentialSchedule, timeWishOf, violatesWish, wishLabel, wishWindowMin } from "../plan";
+import { fillIntoGaps, sequentialSchedule, timeWishOf, violatesWish, wishFullLabel, wishLabel, wishWindowMin } from "../plan";
 import { PlanEntry } from "../types";
 
 const base = (over: Partial<PlanEntry>): PlanEntry => ({
@@ -120,5 +120,28 @@ describe("violatesWish", () => {
   });
   it("希望が無ければ常に問題なし", () => {
     expect(violatesWish(base({}), "2026-08-01T23:00:00")).toBe(false);
+  });
+});
+
+describe("希望がAIに伝わるか（何日目の指定）", () => {
+  it("1日目の指定も日として扱う（violatesWish が別日を検出できる）", () => {
+    const e = base({ wish: "day", day: 1 });
+    expect(violatesWish(e, "2026-08-01T13:00:00", "2026-08-01")).toBe(false);
+    expect(violatesWish(e, "2026-08-02T13:00:00", "2026-08-01")).toBe(true);
+  });
+
+  it("時間帯は合っていても日がずれていれば希望外れ", () => {
+    const e = base({ wish: "period", period: "afternoon", day: 2 });
+    expect(violatesWish(e, "2026-08-02T13:00:00", "2026-08-01")).toBe(false);
+    expect(violatesWish(e, "2026-08-03T13:00:00", "2026-08-01")).toBe(true);
+  });
+
+  it("こだわらない予定は日がどこでも問題なし", () => {
+    expect(violatesWish(base({ wish: "any", day: 1 }), "2026-08-03T13:00:00", "2026-08-01")).toBe(false);
+  });
+
+  it("ずれた時の説明は日を含める", () => {
+    expect(wishFullLabel(base({ wish: "period", period: "afternoon", day: 2 }))).toBe("2日目・午後");
+    expect(wishFullLabel(base({ wish: "any" }))).toBe("いつでもいい");
   });
 });
