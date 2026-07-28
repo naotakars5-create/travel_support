@@ -19,7 +19,7 @@ import { MODE_LABEL } from "@/lib/modeMeta";
 import { formatDurationMin } from "@/lib/itinerary";
 import { dateForDay, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { formatYen } from "@/lib/format";
-import { DateOnlyField } from "./PlainFields";
+import { DateOnlyField, SelectField } from "./PlainFields";
 import { Illustration, illustrationUri } from "./Illustration";
 import { dayColor, tint } from "@/lib/palette";
 import { Floater } from "./animations";
@@ -31,6 +31,9 @@ const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済み
 // 日ごとの淡い背景色（複数日程で日を見分けやすくする）。
 // 色は palette.ts の「日ごとの色」を薄くしたもので、旅程・当日タブと同じ割り当て。
 const dayTintStyle = (day: number) => ({ backgroundColor: tint(dayColor(day), 0.05) });
+
+/** 旅行日数の選択肢（1〜7日）。 */
+const DAY_COUNT_OPTIONS = Array.from({ length: 7 }, (_, i) => ({ value: i + 1, label: `${i + 1}日間` }));
 
 const PRIORITY_STYLE: Record<Priority, { border: string; text: string }> = {
   must: { border: "border-ink", text: "text-ink" },
@@ -260,27 +263,16 @@ export function PlanScreen({
           </View>
         )}
         {!readOnly && (
-          <View className="mb-3 gap-2 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
-            <View className="flex-row flex-wrap items-end justify-between gap-2">
-              <DateOnlyField label="開始日" value={tripDate} onChange={onSetTripDate} />
-              <View className="gap-1">
-                <Text className="font-gothic-400 text-[11px] text-muted">日数</Text>
-                <View className="flex-row gap-2">
-                  {[1, 2, 3, 4, 5, 6, 7].map((n) => {
-                    const active = tripDayCount === n;
-                    return (
-                      <Pressable
-                        key={n}
-                        onPress={() => onSetTripDayCount(n)}
-                        className={`rounded-full border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.12] bg-white/50"}`}
-                      >
-                        <Text className={`font-gothic-400 text-[12px] ${active ? "text-kinari" : "text-ink"}`}>{n}日</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            </View>
+          // 開始日と日数は横並び。日数は 1〜7 を並べると読みづらいのでプルダウンにする
+          <View className="mb-3 flex-row items-end gap-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
+            <DateOnlyField label="開始日" value={tripDate} onChange={onSetTripDate} />
+            <SelectField
+              label="日数"
+              value={tripDayCount}
+              options={DAY_COUNT_OPTIONS}
+              onChange={onSetTripDayCount}
+              widthAuto
+            />
           </View>
         )}
         {/* ゼロから作り直す入口。日程を決める場所のすぐ下＝「はじめる」流れの頭に置き、

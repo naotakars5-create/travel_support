@@ -15,6 +15,7 @@ import { ShioriScreen } from "@/components/ShioriScreen";
 import { MapScreen } from "@/components/MapScreen";
 import { GeneratePlanSheet } from "@/components/GeneratePlanSheet";
 import { TripSwitcherSheet } from "@/components/TripSwitcherSheet";
+import { ShareSheet } from "@/components/ShareSheet";
 import { FlashOverlay } from "@/components/FlashOverlay";
 import { OnboardingScreen } from "@/components/OnboardingScreen";
 import { hasSeenOnboarding, markOnboardingSeen } from "@/lib/onboarding";
@@ -246,6 +247,15 @@ export default function Home() {
             app.removeEntry(editingEntry.id);
             setEditId(null);
           }}
+        />
+      )}
+
+      {app.shareState.open && (
+        <ShareSheet
+          url={app.shareState.url}
+          error={app.shareState.error}
+          onClose={app.closeShare}
+          onRetry={app.retryShare}
         />
       )}
 
