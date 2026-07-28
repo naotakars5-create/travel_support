@@ -1,7 +1,7 @@
 import { GeoPoint, ParsedEvent, TransportMode, isTransitMode } from "./types";
 import { TransitEstimator, heuristicTransitEstimator } from "./transit";
 
-export const FREE_GAP_THRESHOLD_MIN = 60;
+export const FREE_GAP_THRESHOLD_MIN = 45;
 
 export interface RailNode {
   type: "node";

@@ -698,16 +698,17 @@ export function useAppState() {
     [entries, slots, suggestions, planNotes, openTrip]
   );
 
-  /** 地図で見つけたスポットを1件だけ行き先リストへ追加する。 */
+  /** 地図や空き時間の提案で見つけたスポットを1件だけ行き先リストへ追加する。 */
   const addSpot = useCallback(
-    (spot: Spot) => {
+    (spot: Spot, opts?: { day?: number; stayMin?: number }) => {
       const entry = inputToEntry(genId("entry"), {
         title: spot.name,
         place: spot.address,
         placeGeo: spot.lat != null && spot.lng != null ? { lat: spot.lat, lng: spot.lng } : undefined,
         mode: "activity",
         priority: "want",
-        stayMin: 60,
+        stayMin: opts?.stayMin ?? 60,
+        day: opts?.day,
       });
       if (!entry) return;
       setEntries((prev) => [...(prev ?? []), entry]);
