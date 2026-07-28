@@ -84,7 +84,7 @@ export function SectionHeading({ label, right, className = "" }: { label: string
   return (
     <View className={`flex-row items-center justify-between ${className}`}>
       <View className="flex-row items-center gap-1.5">
-        <View className="h-[12px] w-[3px] rounded-full bg-accent" />
+        <View className="h-[12px] w-[3px] rounded-full bg-highlight" />
         <Text className="font-gothic-700 text-[11px] tracking-[.14em] text-ink">{label}</Text>
       </View>
       {right}

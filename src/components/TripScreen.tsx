@@ -67,7 +67,7 @@ export function TripScreen({
           />
         </View>
       )}
-      <View className="h-px w-full bg-black/[.08]" />
+      <View className="h-px w-full bg-highlight/60" />
 
       {app.tripView === "timeline" && hasPlan ? (
         <ItineraryScreen

@@ -20,7 +20,7 @@ import { formatDurationMin } from "@/lib/itinerary";
 import { dateForDay, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { formatYen } from "@/lib/format";
 import { DateOnlyField, SelectField } from "./PlainFields";
-import { IllustrationPlate, illustrationUri } from "./Illustration";
+import { Illustration, illustrationUri } from "./Illustration";
 import { COLORS, dayColor, tint } from "@/lib/palette";
 import { Floater } from "./animations";
 import { Button, SectionHeading } from "./ui";
@@ -240,7 +240,7 @@ export function PlanScreen({
           </Text>
         </View>
       )}
-      {!embedded && <View className="h-px w-full bg-black/[.08]" />}
+      {!embedded && <View className="h-px w-full bg-highlight/60" />}
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 90 }}>
         {/* 旅行が終わったら、しおりに残す導線を出す（作った思い出機能へ辿り着けるように） */}
@@ -484,7 +484,7 @@ export function PlanScreen({
           <View className="mt-4 items-center">
             {/* 行き先ゼロの時こそ、いちばん強い導線を置く。
                 以前はデモの行き先が入っていたので、この画面は誰にも見えていなかった。 */}
-            <IllustrationPlate name="loading-map" size="lg" alt="" />
+            <Illustration name="loading-map" size="lg" alt="" />
             <Text className="mt-4 text-center font-mincho-700 text-[22px] leading-[32px] text-ink">
               どこへ行きましょうか
             </Text>
@@ -772,7 +772,7 @@ export function PlanScreen({
       {composing && (
         <View className="absolute inset-0 items-center justify-center bg-base/90">
           <Floater>
-            <IllustrationPlate name="loading-map" size="md" alt="" />
+            <Illustration name="loading-map" size="md" alt="" />
           </Floater>
           <Text className="mt-4 font-mincho-600 text-[15px] text-ink">旅程を組み立てています</Text>
           <Text className="mt-1.5 font-gothic-400 text-[12px] text-muted">少しお待ちください</Text>
