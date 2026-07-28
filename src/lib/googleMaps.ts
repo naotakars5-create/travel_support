@@ -161,6 +161,30 @@ export async function nearbyTouristSpots(origin: GeoPoint, radiusMeters: number,
     .slice(0, 15);
 }
 
+/** スポット名（＋住所）から代表写真を1枚探す（Places Find Place API）。 */
+export async function findPlacePhoto(query: string): Promise<{ photoRef: string; attribution?: string } | null> {
+  const url = new URL("https://maps.googleapis.com/maps/api/place/findplacefromtext/json");
+  url.searchParams.set("input", query);
+  url.searchParams.set("inputtype", "textquery");
+  url.searchParams.set("fields", "photos");
+  url.searchParams.set("language", "ja");
+  url.searchParams.set("key", apiKey());
+
+  const res = await fetchWithTimeout(url.toString(), undefined, 8000);
+  if (!res.ok) throw new Error(`Places API error ${res.status}`);
+  const data = await res.json();
+  if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+    throw new Error(`Places API status ${data.status}: ${data.error_message ?? ""}`);
+  }
+  const photo = (data.candidates ?? [])[0]?.photos?.[0] as
+    | { photo_reference?: string; html_attributions?: string[] }
+    | undefined;
+  if (!photo?.photo_reference) return null;
+  // html_attributions は <a href="...">名前</a> 形式。表示用にタグを剥がす。
+  const attribution = photo.html_attributions?.[0]?.replace(/<[^>]*>/g, "").trim() || undefined;
+  return { photoRef: photo.photo_reference, attribution };
+}
+
 /** Places Photo の画像URL（サーバー専用・キーを含む）。 */
 export function placePhotoUrl(photoRef: string, maxWidth: number): string {
   const url = new URL("https://maps.googleapis.com/maps/api/place/photo");
