@@ -1,3 +1,4 @@
+import { getLlmProvider } from "@/lib/llmProvider";
 /**
  * 診断用エンドポイント：サーバーに環境変数（APIキー）が届いているかを確認する。
  * キーの「値」は返さず、設定されているかどうか（真偽）だけを返す。
@@ -5,7 +6,8 @@
  */
 export async function GET(): Promise<Response> {
   return Response.json({
-    provider: process.env.LLM_PROVIDER || "anthropic",
+    // 実際にAIが使うプロバイダ（キーの有無から自動選択された結果）
+    provider: getLlmProvider().name,
     hasAnthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
     hasOpenAIKey: Boolean(process.env.OPENAI_API_KEY),
     openaiModel: process.env.OPENAI_MODEL || "gpt-4.1",
