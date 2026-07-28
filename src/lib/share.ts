@@ -342,7 +342,7 @@ export async function readSharedPlanFromUrl(): Promise<SharedPlan | null> {
  * - "unsupported" … この端末・ブラウザに共有機能が無い
  * - "failed"      … 呼べたが失敗した
  */
-export async function nativeShare(url: string, title = "つばめみちの旅程"): Promise<"shared" | "cancelled" | "unsupported" | "failed"> {
+export async function nativeShare(url: string, title = "旅ナビの旅程"): Promise<"shared" | "cancelled" | "unsupported" | "failed"> {
   const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { share?: (d: unknown) => Promise<void> }) : undefined;
   if (!nav?.share) return "unsupported";
   try {
