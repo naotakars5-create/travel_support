@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "旅ナビ",
+    "name": "つばめみち",
     "slug": "travel-support",
     "owner": "naotaka0131",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "tabinavi",
+    "scheme": "tsubamemichi",
     "userInterfaceStyle": "automatic",
     "android": {
       "adaptiveIcon": {
@@ -28,7 +28,7 @@
         {
           "backgroundColor": "#f5ead6",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 160
+          "imageWidth": 190
         }
       ],
       [

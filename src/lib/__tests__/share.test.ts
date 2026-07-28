@@ -1,4 +1,4 @@
-import { buildShareUrl, decodePlan, encodePlan } from "../share";
+import { buildShareUrl, copyToClipboard, decodePlan, encodePlan, nativeShare } from "../share";
 import { PlanEntry, ScheduleSlot } from "../types";
 
 const ENTRIES: PlanEntry[] = [
@@ -101,5 +101,61 @@ describe("share: 短縮リンク", () => {
     global.fetch = jest.fn().mockRejectedValue(new Error("offline")) as unknown as typeof fetch;
     const url = await buildShareUrl(ENTRIES, SLOTS);
     expect(url).toContain("?p=");
+  });
+});
+
+describe("copyToClipboard", () => {
+  const original = globalThis.navigator;
+
+  afterEach(() => {
+    Object.defineProperty(globalThis, "navigator", { value: original, configurable: true, writable: true });
+  });
+
+  const setNavigator = (value: unknown) => {
+    Object.defineProperty(globalThis, "navigator", { value, configurable: true, writable: true });
+  };
+
+  it("クリップボードAPIが使えればコピーする", async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    setNavigator({ clipboard: { writeText } });
+    await expect(copyToClipboard("https://example.com/?s=abc")).resolves.toBe(true);
+    expect(writeText).toHaveBeenCalledWith("https://example.com/?s=abc");
+  });
+
+  it("拒否されても落ちない（手でコピーしてもらう）", async () => {
+    setNavigator({ clipboard: { writeText: jest.fn().mockRejectedValue(new Error("denied")) } });
+    await expect(copyToClipboard("x")).resolves.toBe(false);
+  });
+
+  it("クリップボードが無い環境では false", async () => {
+    setNavigator({});
+    await expect(copyToClipboard("x")).resolves.toBe(false);
+  });
+});
+
+describe("nativeShare", () => {
+  const original = globalThis.navigator;
+  afterEach(() => {
+    Object.defineProperty(globalThis, "navigator", { value: original, configurable: true, writable: true });
+  });
+  const setNavigator = (value: unknown) => {
+    Object.defineProperty(globalThis, "navigator", { value, configurable: true, writable: true });
+  };
+
+  it("共有機能が無ければ unsupported（呼び出し側はコピーへ切り替える）", async () => {
+    setNavigator({});
+    await expect(nativeShare("https://example.com")).resolves.toBe("unsupported");
+  });
+
+  it("ユーザーが閉じただけなら cancelled（失敗表示は出さない）", async () => {
+    const err = new Error("abort");
+    err.name = "AbortError";
+    setNavigator({ share: jest.fn().mockRejectedValue(err) });
+    await expect(nativeShare("https://example.com")).resolves.toBe("cancelled");
+  });
+
+  it("共有できたら shared", async () => {
+    setNavigator({ share: jest.fn().mockResolvedValue(undefined) });
+    await expect(nativeShare("https://example.com")).resolves.toBe("shared");
   });
 });

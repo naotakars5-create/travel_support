@@ -129,7 +129,6 @@ export function TripScreen({
           onRemoveEntry={app.removeEntry}
           onEditEntry={onEditEntry}
           onSetEntryDay={app.setEntryDay}
-          onToggleFixed={app.toggleEntryFixed}
           onMoveEntry={app.moveEntry}
           onMoveEntryToEdge={app.moveEntryToEdge}
           onAddSuggestions={app.addSuggestions}

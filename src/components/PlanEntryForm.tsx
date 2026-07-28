@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
-import { GeoPoint, Priority, TransportMode } from "@/lib/types";
-import { closedDaysLabel, PlanEntryInput } from "@/lib/plan";
+import { DayPeriod, GeoPoint, Priority, TimeWishKind, TransportMode } from "@/lib/types";
+import { closedDaysLabel, PERIOD_META, PERIOD_ORDER, PlanEntryInput, timeWishOf } from "@/lib/plan";
 import { combineDateAndTime, dateForDay, dayOfIso, timeStrFromIso } from "@/lib/date";
 import { fetchPlacePredictions, fetchPlaceDetails, PlacePrediction } from "@/lib/places";
 import { TimeField } from "./PlainFields";
@@ -64,6 +64,23 @@ function Chip({ active, label, onPress }: { active: boolean; label: string; onPr
   );
 }
 
+/** 「いつ行く？」の選択肢。左ほどゆるく、右ほど強い。 */
+const WISH_OPTIONS: { value: TimeWishKind; label: string }[] = [
+  { value: "any", label: "こだわらない" },
+  { value: "day", label: "日を決める" },
+  { value: "period", label: "時間帯" },
+  { value: "window", label: "時間の範囲" },
+  { value: "fixed", label: "時刻を決める" },
+];
+
+const WISH_HINT: Record<TimeWishKind, string> = {
+  any: "日も時刻もAIにおまかせ。順路がいちばん良くなるように置かれます。",
+  day: "その日の中でAIが時刻を決めます。",
+  period: "その時間帯の中でAIが時刻を決めます（午前=9〜12時／午後=12〜17時／夕方=17〜20時／夜=19〜23時）。",
+  window: "その範囲の中でAIが時刻を決めます。",
+  fixed: "予約など、動かせない時刻。AIもこの時刻は変えません。",
+};
+
 export interface PlanEntryFormInitial {
   title: string;
   place?: string;
@@ -76,6 +93,10 @@ export interface PlanEntryFormInitial {
   cost?: number;
   detail?: string;
   day?: number;
+  wish?: TimeWishKind;
+  period?: DayPeriod;
+  windowFrom?: string;
+  windowTo?: string;
   placeFrom?: string;
   placeTo?: string;
   departAt?: string;
@@ -127,7 +148,11 @@ export function PlanEntryForm({
     if (Number.isNaN(inMs) || Number.isNaN(outMs)) return 1;
     return Math.max(1, Math.round((outMs - inMs) / 86400000) || 1);
   });
-  const [fixedTime, setFixedTime] = useState(initial?.fixedTime ?? false);
+  // いつ行きたいか（決まっている分だけ伝える。残りはAIが決める）
+  const [wish, setWish] = useState<TimeWishKind>(() => (initial ? timeWishOf(initial) : "any"));
+  const [period, setPeriod] = useState<DayPeriod>(initial?.period ?? "morning");
+  const [windowFrom, setWindowFrom] = useState<string>(initial?.windowFrom ?? "");
+  const [windowTo, setWindowTo] = useState<string>(initial?.windowTo ?? "");
   const [cost, setCost] = useState(typeof initial?.cost === "number" ? String(initial.cost) : "");
   const [detail, setDetail] = useState(initial?.detail ?? "");
   const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
@@ -241,8 +266,14 @@ export function PlanEntryForm({
       input.place = place || undefined;
       input.placeGeo = placeGeo;
       input.stayMin = stayMin ?? undefined;
-      input.arriveBy = iso(day, arriveTime);
-      input.fixedTime = arriveTime ? fixedTime : false;
+      input.wish = wish;
+      // 「いつでもいい」は日も自由にする（AIが順路の調整に使えるようにする）
+      input.day = wish === "any" ? undefined : day;
+      input.period = wish === "period" ? period : undefined;
+      input.windowFrom = wish === "window" ? windowFrom || undefined : undefined;
+      input.windowTo = wish === "window" ? windowTo || undefined : undefined;
+      input.arriveBy = wish === "fixed" ? iso(day, arriveTime) : undefined;
+      input.fixedTime = wish === "fixed" && Boolean(arriveTime);
       input.openFrom = openFrom;
       input.openTo = openTo;
       input.closedDays = closedDays;
@@ -260,7 +291,10 @@ export function PlanEntryForm({
     setArriveTime("");
     setDepartTime("");
     setCheckOutTime("");
-    setFixedTime(false);
+    setWish("any");
+    setPeriod("morning");
+    setWindowFrom("");
+    setWindowTo("");
     setCost("");
     setDetail("");
     setPredictions([]);
@@ -321,7 +355,7 @@ export function PlanEntryForm({
         </View>
       )}
 
-      {tripDayCount > 1 && !rental && (
+      {tripDayCount > 1 && (transit || stay) && (
         <View className="gap-1.5">
           <Text className="font-gothic-400 text-[11px] text-muted">何日目</Text>
           <View className="flex-row flex-wrap gap-2">
@@ -450,8 +484,51 @@ export function PlanEntryForm({
               <Chip active={stayMin === null} label="指定なし" onPress={() => setStayMin(null)} />
             </View>
           </View>
-          <View className="flex-row">
-            <TimeField label="到着時刻（任意）" value={arriveTime} onChange={setArriveTime} />
+          {/* いつ行くか。行き先リストは「行きたい所を溜める場所」なので、
+              決まっている分だけ伝えれば足りる。残りの時刻はAIが埋める。 */}
+          <View className="gap-1.5">
+            <Text className="font-gothic-400 text-[11px] text-muted">いつ行く？（決まっている分だけでOK）</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {WISH_OPTIONS.map((o) => (
+                <Chip key={o.value} active={wish === o.value} label={o.label} onPress={() => setWish(o.value)} />
+              ))}
+            </View>
+
+            {wish !== "any" && tripDayCount > 1 && (
+              <View className="mt-1.5 gap-1.5">
+                <Text className="font-gothic-400 text-[11px] text-muted">何日目</Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {Array.from({ length: tripDayCount }, (_, i) => i + 1).map((d) => (
+                    <Chip key={d} active={day === d} label={`${d}日目`} onPress={() => setDay(d)} />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {wish === "period" && (
+              <View className="mt-1.5 flex-row flex-wrap gap-2">
+                {PERIOD_ORDER.map((k) => (
+                  <Chip key={k} active={period === k} label={PERIOD_META[k].label} onPress={() => setPeriod(k)} />
+                ))}
+              </View>
+            )}
+
+            {wish === "window" && (
+              <View className="mt-1.5 flex-row items-end gap-3">
+                <TimeField label="この時刻から" value={windowFrom} onChange={setWindowFrom} />
+                <TimeField label="この時刻まで" value={windowTo} onChange={setWindowTo} />
+              </View>
+            )}
+
+            {wish === "fixed" && (
+              <View className="mt-1.5 flex-row">
+                <TimeField label="到着時刻" value={arriveTime} onChange={setArriveTime} />
+              </View>
+            )}
+
+            <Text className="mt-1 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
+              {WISH_HINT[wish]}
+            </Text>
           </View>
           <View className="gap-1">
             <Text className="font-gothic-400 text-[11px] text-muted">費用（円・任意）</Text>
@@ -465,14 +542,6 @@ export function PlanEntryForm({
               style={{ height: 42, fontVariant: ["tabular-nums"] }}
             />
           </View>
-          {arriveTime !== "" && (
-            <Pressable onPress={() => setFixedTime((v) => !v)} className="flex-row items-center gap-2">
-              <View className={`h-[18px] w-[18px] items-center justify-center rounded-[5px] border ${fixedTime ? "border-ink bg-ink" : "border-black/[.25]"}`}>
-                {fixedTime && <View className="h-[8px] w-[8px] rounded-[2px] bg-kinari" />}
-              </View>
-              <Text className="font-gothic-400 text-[12px] text-muted">この時刻は固定（予約など。AIが動かしません）</Text>
-            </Pressable>
-          )}
         </>
       )}
 

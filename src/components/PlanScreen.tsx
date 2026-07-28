@@ -9,6 +9,8 @@ import {
   effectiveStayMin,
   entryDurationMin,
   isClosedOn,
+  timeWishOf,
+  wishLabel,
   COST_CATEGORY_LABEL,
   COST_CATEGORY_ORDER,
 } from "@/lib/plan";
@@ -17,7 +19,7 @@ import { MODE_LABEL } from "@/lib/modeMeta";
 import { formatDurationMin } from "@/lib/itinerary";
 import { dateForDay, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { formatYen } from "@/lib/format";
-import { DateOnlyField } from "./PlainFields";
+import { DateOnlyField, SelectField } from "./PlainFields";
 import { IllustrationPlate, illustrationUri } from "./Illustration";
 import { COLORS, dayColor, tint } from "@/lib/palette";
 import { Floater } from "./animations";
@@ -30,11 +32,42 @@ const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済�
 // 色は palette.ts の「日ごとの色」を薄くしたもので、旅程・当日タブと同じ割り当て。
 const dayTintStyle = (day: number) => ({ backgroundColor: tint(dayColor(day), 0.05) });
 
+/** 旅行日数の選択肢（1〜7日）。 */
+const DAY_COUNT_OPTIONS = Array.from({ length: 7 }, (_, i) => ({ value: i + 1, label: `${i + 1}日間` }));
+
 const PRIORITY_STYLE: Record<Priority, { border: string; text: string }> = {
   must: { border: "border-ink", text: "text-ink" },
   want: { border: "border-ink/40", text: "text-ink" },
   optional: { border: "border-muted-light", text: "text-muted" },
 };
+
+/**
+ * 「いつ行く？」の希望を1つのチップで示す。
+ * 時刻が決まっているものだけ濃く、任せてあるものは薄く出して、
+ * 「どこまで自分で決めて、どこからAIに任せているか」が一目で分かるようにする。
+ */
+function WishChip({ entry, disabled, onPress }: { entry: PlanEntry; disabled?: boolean; onPress: () => void }) {
+  const kind = timeWishOf(entry);
+  const strong = kind === "fixed";
+  const loose = kind === "any";
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityRole={disabled ? undefined : "button"}
+      accessibilityLabel={`いつ行くか: ${wishLabel(entry)}。押すと変えられます`}
+      className={`rounded-full border px-2 py-[2px] ${
+        strong ? "border-ink bg-ink" : loose ? "border-black/[.15]" : "border-accent/50 bg-accent/[.08]"
+      }`}
+    >
+      <Text className={`font-gothic-500 text-[10px] ${strong ? "text-kinari" : loose ? "text-muted-light" : "text-accent"}`}>
+        {strong ? "🕐 " : ""}
+        {wishLabel(entry)}
+      </Text>
+    </Pressable>
+  );
+}
 
 export function PlanScreen({
   entries,
@@ -66,7 +99,6 @@ export function PlanScreen({
   onRemoveEntry,
   onEditEntry,
   onSetEntryDay,
-  onToggleFixed,
   onMoveEntry,
   onMoveEntryToEdge,
   onAddSuggestions,
@@ -109,7 +141,6 @@ export function PlanScreen({
   onRemoveEntry: (id: string) => void;
   onEditEntry: (id: string) => void;
   onSetEntryDay: (id: string, day: number) => void;
-  onToggleFixed: (id: string) => void;
   onMoveEntry: (id: string, dir: -1 | 1) => void;
   onMoveEntryToEdge: (id: string, dir: -1 | 1) => void;
   onAddSuggestions: (list: SpotSuggestion[]) => void;
@@ -232,27 +263,16 @@ export function PlanScreen({
           </View>
         )}
         {!readOnly && (
-          <View className="mb-3 gap-2 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
-            <View className="flex-row flex-wrap items-end justify-between gap-2">
-              <DateOnlyField label="開始日" value={tripDate} onChange={onSetTripDate} />
-              <View className="gap-1">
-                <Text className="font-gothic-400 text-[11px] text-muted">日数</Text>
-                <View className="flex-row gap-2">
-                  {[1, 2, 3, 4, 5, 6, 7].map((n) => {
-                    const active = tripDayCount === n;
-                    return (
-                      <Pressable
-                        key={n}
-                        onPress={() => onSetTripDayCount(n)}
-                        className={`rounded-full border px-3 py-1.5 ${active ? "border-ink bg-ink" : "border-black/[.12] bg-white/50"}`}
-                      >
-                        <Text className={`font-gothic-400 text-[12px] ${active ? "text-kinari" : "text-ink"}`}>{n}日</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            </View>
+          // 開始日と日数は横並び。日数は 1〜7 を並べると読みづらいのでプルダウンにする
+          <View className="mb-3 flex-row items-end gap-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2.5">
+            <DateOnlyField label="開始日" value={tripDate} onChange={onSetTripDate} />
+            <SelectField
+              label="日数"
+              value={tripDayCount}
+              options={DAY_COUNT_OPTIONS}
+              onChange={onSetTripDayCount}
+              widthAuto
+            />
           </View>
         )}
         {/* ゼロから作り直す入口。日程を決める場所のすぐ下＝「はじめる」流れの頭に置き、
@@ -518,21 +538,8 @@ export function PlanScreen({
                         <Text className="font-gothic-400 text-[11px] text-muted-light">時刻未定</Text>
                       )}
                     </Pressable>
-                    {/* 時刻を固定（AIに動かされたくない予定）。時刻が入っている時だけ有効 */}
-                    {!readOnly && (
-                      <Pressable
-                        onPress={() => onToggleFixed(e.id)}
-                        hitSlop={6}
-                        className={`flex-row items-center gap-1 rounded-full border px-2 py-[2px] ${
-                          e.fixedTime ? "border-ink bg-ink" : "border-black/[.2]"
-                        }`}
-                      >
-                        <Text className={`font-gothic-500 text-[10px] ${e.fixedTime ? "text-kinari" : "text-muted"}`}>
-                          {e.fixedTime ? "✓ 時刻固定" : "時刻を固定"}
-                        </Text>
-                      </Pressable>
-                    )}
-                    {readOnly && e.fixedTime && <Text className="font-gothic-400 text-[10px] text-ink">固定</Text>}
+                    {/* いつ行きたいかの希望。ここが「AIに何を任せたか」の表示になる */}
+                    <WishChip entry={e} disabled={readOnly} onPress={() => onEditEntry(e.id)} />
                   </View>
                   <Pressable disabled={readOnly} onPress={() => onEditEntry(e.id)}>
                     <View className="mt-0.5 flex-row items-center gap-1.5">
@@ -638,7 +645,9 @@ export function PlanScreen({
         })}
 
         {!readOnly && ordered.length > 1 && (
-          <Text className="mt-2 font-gothic-400 text-[11px] text-muted-light">▲▼で並び替え（長押しで先頭・末尾へ）。順番から時刻を自動計算します。</Text>
+          <Text className="mt-2 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
+            ここは行きたい場所を溜めていく場所です。時刻は「AIで予定を組む」で決まります。{"\n"}▲▼は手で順番を決めたい時に（長押しで先頭・末尾へ）。
+          </Text>
         )}
 
         {!readOnly && entries.length > 0 && (
@@ -672,7 +681,7 @@ export function PlanScreen({
               </View>
             )}
             <Text className="mt-2 text-center font-gothic-400 text-[12px] leading-[19px] text-muted-light">
-              旅程は並び順から自動で組まれています。押すとAIが移動効率・営業時間・定休日を見て、順番と時間配分を組み直します。
+              押すとAIが、それぞれの「いつ行く？」の希望・移動効率・営業時間・定休日を見て、順番と時刻を決めます。結果はタイムラインに出ます。
             </Text>
             {composeError && <Text className="mt-2 text-center font-gothic-400 text-[12px] text-ink">{composeError}</Text>}
             {planNotes && (

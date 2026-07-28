@@ -5,6 +5,7 @@ import { normalizeAvatar, Profile } from "@/lib/profile";
 import { IllustrationName } from "@/lib/illustrations";
 import { illustrationUri } from "./Illustration";
 import { SlideUp } from "./animations";
+import { LogoWordmark } from "./Logo";
 
 /** アイコン表示（写真があれば写真、無ければイラスト）。 */
 function Avatar({ profile, size }: { profile: Profile; size: number }) {
@@ -145,7 +146,9 @@ export function ProfileScreen({
         <Text className="mt-4 text-center font-gothic-400 text-[12px] leading-[19px] text-muted-light">
           アカウント登録はありません。{"\n"}このアプリのデータは、この端末の中だけにあります。
         </Text>
-        <Text className="mt-3 text-center font-gothic-400 text-[11px] text-muted-light">旅ナビ / TABI-NAVI</Text>
+        <View className="mt-4 items-center opacity-70">
+          <LogoWordmark width={120} />
+        </View>
       </ScrollView>
 
       {/* 各種情報 */}

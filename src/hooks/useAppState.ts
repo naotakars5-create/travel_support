@@ -20,7 +20,7 @@ import {
 } from "@/lib/plan";
 import { buildDefaultPacking } from "@/lib/packing";
 import { DEFAULT_PROFILE, loadProfile, Profile, saveProfile } from "@/lib/profile";
-import { buildShareUrl, readSharedPlanFromUrl, sharePlanLink, SHARE_PARAM, SHORT_PARAM } from "@/lib/share";
+import { buildShareUrl, readSharedPlanFromUrl, SHARE_PARAM, SHORT_PARAM } from "@/lib/share";
 import { BaseMode, CarWindow, EdgeTravel, createPrecomputedEstimator, edgeKey, guessMode } from "@/lib/transit";
 import { createSpotProvider, Spot } from "@/lib/spots";
 import { dateForDay, dayOfIso, todayDateStr } from "@/lib/date";
@@ -719,23 +719,6 @@ export function useAppState() {
     });
   }, []);
 
-  /**
-   * 「時刻固定」を切り替える。固定にする時、まだ時刻が入っていなければ
-   * 現在の組み上げ結果の時刻を確定値として書き込む（AIに動かされなくなる）。
-   */
-  const toggleEntryFixed = useCallback((id: string) => {
-    setEntries((prev) => {
-      if (!prev) return prev;
-      const slotByEntry = new Map(slots.map((s) => [s.entryId, s.arriveAt]));
-      return prev.map((e) => {
-        if (e.id !== id) return e;
-        if (e.fixedTime) return { ...e, fixedTime: false };
-        const arriveBy = e.arriveBy ?? slotByEntry.get(e.id);
-        return { ...e, fixedTime: true, arriveBy };
-      });
-    });
-  }, [slots]);
-
   /** 行き先を同じ日の先頭（dir<0）／末尾（dir>0）へ一気に動かす（長押し操作用）。 */
   const moveEntryToEdge = useCallback((id: string, dir: -1 | 1) => {
     setEntries((prev) => {
@@ -939,19 +922,39 @@ export function useAppState() {
   }, []);
 
   /** 現在のプランの共有リンクを発行して送る（LINE等）／コピーする。 */
-  const shareCurrentPlan = useCallback(async () => {
+  // 共有シートの状態。押した瞬間に開いてリンクを作り、送信・コピーは
+  // シートの中のボタン（＝新しいユーザー操作）から行う。
+  // ブラウザは「操作の直後」しか共有を許さないため、待ってから呼ぶと拒否される。
+  const [shareState, setShareState] = useState<{ open: boolean; url: string | null; error: string | null }>({
+    open: false,
+    url: null,
+    error: null,
+  });
+
+  const buildShareLink = useCallback(async () => {
     const list = entries ?? [];
-    if (list.length === 0) return;
-    const url = await buildShareUrl(list, slots);
-    const result = await sharePlanLink(url);
-    if (result === "copied") {
-      setFlash({ visible: true, text: "共有リンクをコピーしました\nLINEなどに貼り付けて送れます" });
-      setTimeout(() => setFlash({ visible: false, text: "" }), 2000);
-    } else if (result === "failed") {
-      setFlash({ visible: true, text: "共有リンクの発行に失敗しました" });
-      setTimeout(() => setFlash({ visible: false, text: "" }), 1700);
+    if (list.length === 0) {
+      setShareState({ open: true, url: null, error: "共有する行き先がまだありません。" });
+      return;
+    }
+    setShareState({ open: true, url: null, error: null });
+    try {
+      const url = await buildShareUrl(list, slots);
+      setShareState({ open: true, url, error: null });
+    } catch {
+      setShareState({
+        open: true,
+        url: null,
+        error: "共有リンクを作れませんでした。通信状況を確かめて、もう一度お試しください。",
+      });
     }
   }, [entries, slots]);
+
+  const shareCurrentPlan = useCallback(() => {
+    void buildShareLink();
+  }, [buildShareLink]);
+
+  const closeShare = useCallback(() => setShareState({ open: false, url: null, error: null }), []);
 
   /** 共有リンクで開いたプランを、自分用（編集可）として取り込む。 */
   const importSharedToOwn = useCallback(() => {
@@ -1348,6 +1351,9 @@ export function useAppState() {
     composeError,
     readOnly,
     shareCurrentPlan,
+    shareState,
+    retryShare: buildShareLink,
+    closeShare,
     importSharedToOwn,
     addEntry,
     addSpot,
@@ -1358,7 +1364,6 @@ export function useAppState() {
     editEntry,
     removeEntry,
     setEntryDay,
-    toggleEntryFixed,
     moveEntry,
     moveEntryToEdge,
     importFromMail,

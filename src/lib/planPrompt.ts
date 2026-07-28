@@ -1,5 +1,5 @@
 import { PlanEntry } from "./types";
-import { PRIORITY_META, WEEKDAY_JA } from "./plan";
+import { PRIORITY_META, WEEKDAY_JA, timeWishOf, wishWindowMin, PERIOD_META } from "./plan";
 import { MODE_LABEL } from "./modeMeta";
 
 export const PLAN_SYSTEM_PROMPT = `あなたは日本の個人旅行者のための旅程プランナーです。
@@ -21,6 +21,13 @@ export const PLAN_SYSTEM_PROMPT = `あなたは日本の個人旅行者のため
    1日に詰め込みすぎて移動時間が確保できていない旅程は失敗とみなす。
 8. **営業時間が指定された行き先（営業時間: 開店〜閉店）は、その時間内に到着し滞在が閉店までに収まるように配置する。** 開店前や閉店後には割り当てない。どうしても収まらない場合は翌日に回すか、重要度の低いものを外す。**「定休日」が指定された行き先は、その曜日には絶対に配置しない。** 旅行期間が全部定休日と重なる場合のみ除外し、notes にその旨を書く。
 9. **「何日目」の指定**：fixedTime=true の予定は指定日に厳守。それ以外は原則その日に置くが、全体の効率・バランスが明らかに良くなる場合は別の日へ調整してよい。基準日を1日目として、2日目は翌日、3日目は翌々日…の日付に置く。
+9-2. **「希望」の指定**：各行き先には「希望:」として、いつ行きたいかが5段階で付いている。強い順に守ること。
+    - 「時刻固定」… その時刻を絶対に動かさない（予約・便）
+    - 「10:00〜12:00」のような範囲 … その範囲の中で開始する
+    - 「午前／午後／夕方／夜」… その帯の中で開始する（午前=9〜12時、午後=12〜17時、夕方=17〜20時、夜=19〜23時）
+    - 「この日ならいつでも」… 指定された日の中なら時刻は自由
+    - 「いつでもいい」… 日も時刻も完全に任せる。**順路を効率よくするための調整弁として積極的に使う**
+    範囲・帯の希望はできる限り守る。物理的にどうしても守れない場合だけ最も近い時間へずらし、notes にその旨を1行書く。
 10. **1日目（基準日当日）から予定を入れること。** 出発時刻の指定が無ければ1日目は朝9:00から使える。理由なく1日目を空にしてはいけない。
 11. **「旅程づくりへのお願い」（ユーザーの自由文）があれば、それを最優先の希望として尊重する。**
     「1日目はホテルに着いたらもう予定を入れない」「午前はゆっくり」「移動は少なめに」のような
@@ -50,6 +57,31 @@ export const PLAN_SYSTEM_PROMPT = `あなたは日本の個人旅行者のため
 - "notes" は組み方の一言メモ（例: 「昼食の予約に合わせ午前は美術館、午後は買い物を配置しました」）。40〜80字程度。
 - 出力はJSONのみ。マークダウンや説明文は絶対に付けない。`;
 
+/** 何日目に置いてほしいか。希望が「こだわらない」なら日も自由なので書かない。 */
+function dayLine(e: PlanEntry): string | null {
+  const kind = timeWishOf(e);
+  if (kind === "any") return null;
+  if (!e.day || e.day < 1) return null;
+  return `何日目: ${e.day}日目${kind === "fixed" ? "（この日に厳守）" : "（希望。効率が上がるなら調整可）"}`;
+}
+
+/** 「いつ行きたいか」をAIに伝える1行。指定が無ければ調整に使ってよいと明示する。 */
+function wishLine(e: PlanEntry): string {
+  const kind = timeWishOf(e);
+  if (kind === "fixed") return "希望: 時刻固定（絶対に動かさない）";
+  if (kind === "window") {
+    const w = wishWindowMin(e);
+    if (w) return `希望: ${e.windowFrom ?? "?"}〜${e.windowTo ?? "?"} の間に開始（できる限り守る）`;
+  }
+  if (kind === "period") {
+    const meta = PERIOD_META[e.period ?? "morning"];
+    const hh = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    return `希望: ${meta.label}（${hh(meta.fromMin)}〜${hh(meta.toMin)} の間に開始・できる限り守る）`;
+  }
+  if (kind === "day") return "希望: この日ならいつでも（時刻は自由）";
+  return "希望: いつでもいい（日も時刻も自由。順路の調整に使ってよい）";
+}
+
 export function buildPlanUserMessage(params: {
   entries: PlanEntry[];
   referenceDateIso: string;
@@ -74,7 +106,10 @@ export function buildPlanUserMessage(params: {
       e.placeGeo ? `座標: ${e.placeGeo.lat.toFixed(4)},${e.placeGeo.lng.toFixed(4)}` : null,
       `重要度: ${PRIORITY_META[e.priority].label}`,
       `種別: ${MODE_LABEL[e.mode]}`,
-      e.day && e.day > 1 ? `何日目: ${e.day}日目${e.fixedTime ? "（この日に厳守）" : "（希望。効率が上がるなら調整可）"}` : null,
+      // 「1日目ならどこでもいい」も日の希望なので、1日目でも必ず伝える
+      //（以前は 2日目以降しか書いておらず、1日目指定がAIに届いていなかった）
+      dayLine(e),
+      wishLine(e),
       typeof e.stayMin === "number" ? `滞在: ${e.stayMin}分` : null,
       e.openFrom || e.openTo ? `営業時間: ${e.openFrom ?? "?"}〜${e.openTo ?? "?"}` : null,
       e.closedDays && e.closedDays.length > 0

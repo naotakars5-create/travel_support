@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import { GeoPoint, PlanEntry, Priority, ScheduleSlot, TransportMode } from "./types";
+import { DayPeriod, GeoPoint, PlanEntry, Priority, ScheduleSlot, TimeWishKind, TransportMode } from "./types";
 import { apiUrl, getApiBaseUrl } from "./apiBase";
 import { fetchWithTimeout } from "./http";
 
@@ -53,6 +53,10 @@ interface CompactEntry {
   co?: string; // checkOut
   ph?: string; // photoRef
   pa?: string; // photoAttribution
+  w?: string; // wish（"any" は省略）
+  pd?: string; // period
+  wf?: string; // windowFrom
+  wt?: string; // windowTo
 }
 
 interface CompactPlan {
@@ -80,6 +84,10 @@ function toCompact(entries: PlanEntry[], slots: ScheduleSlot[]): CompactPlan {
       if (typeof e.cost === "number") c.c = e.cost;
       if (e.detail) c.n = e.detail;
       if (e.day && e.day > 1) c.d = e.day;
+      if (e.wish && e.wish !== "any") c.w = e.wish;
+      if (e.period) c.pd = e.period;
+      if (e.windowFrom) c.wf = e.windowFrom;
+      if (e.windowTo) c.wt = e.windowTo;
       if (e.openFrom) c.of = e.openFrom;
       if (e.openTo) c.ot = e.openTo;
       if (e.closedDays && e.closedDays.length > 0) c.cd = e.closedDays;
@@ -126,6 +134,10 @@ function fromCompact(c: CompactPlan): SharedPlan {
       checkOut: e.co,
       photoRef: e.ph,
       photoAttribution: e.pa,
+      wish: e.w as TimeWishKind | undefined,
+      period: e.pd as DayPeriod | undefined,
+      windowFrom: e.wf,
+      windowTo: e.wt,
     })),
     slots: c.s.map(([entryId, arriveAt, stayMin]) => ({ entryId, arriveAt, stayMin })),
   };
@@ -319,22 +331,57 @@ export async function readSharedPlanFromUrl(): Promise<SharedPlan | null> {
 }
 
 /**
- * 共有リンクを送る。Web Share API（LINE等に送れる）が使えればそれを使い、
- * 使えなければクリップボードにコピーする。結果を返す。
+ * 端末の共有機能（LINE・メール等へ渡す）を呼ぶ。
+ *
+ * **必ずユーザーの操作から直接呼ぶこと。** ブラウザは「操作の直後」しか
+ * 共有を許可しない。リンク生成を待ってから呼ぶと期限切れで拒否される
+ * （これが以前「共有が効かない」原因だった）。
+ *
+ * - "shared"      … 共有アプリへ渡した
+ * - "cancelled"   … ユーザーが共有をやめた（失敗ではない）
+ * - "unsupported" … この端末・ブラウザに共有機能が無い
+ * - "failed"      … 呼べたが失敗した
  */
-export async function sharePlanLink(url: string, title = "旅ナビの旅程"): Promise<"shared" | "copied" | "failed"> {
+export async function nativeShare(url: string, title = "つばめみちの旅程"): Promise<"shared" | "cancelled" | "unsupported" | "failed"> {
+  const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { share?: (d: unknown) => Promise<void> }) : undefined;
+  if (!nav?.share) return "unsupported";
   try {
-    const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { share?: (d: unknown) => Promise<void> }) : undefined;
-    if (nav?.share) {
-      await nav.share({ title, text: "この旅程を共有します", url });
-      return "shared";
-    }
-    if (nav?.clipboard?.writeText) {
-      await nav.clipboard.writeText(url);
-      return "copied";
-    }
-    return "failed";
-  } catch {
+    await nav.share({ title, text: "この旅程を共有します", url });
+    return "shared";
+  } catch (err) {
+    // ユーザーが共有シートを閉じただけ。エラー表示は出さない
+    if (err instanceof Error && err.name === "AbortError") return "cancelled";
     return "failed";
   }
+}
+
+/** リンクをクリップボードへコピーする。使えない環境では false。 */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  const nav = typeof navigator !== "undefined" ? navigator : undefined;
+  if (nav?.clipboard?.writeText) {
+    try {
+      await nav.clipboard.writeText(text);
+      return true;
+    } catch {
+      // 権限が無い等。下の手段へ
+    }
+  }
+  // クリップボードAPIが使えない古い環境向けの手段（HTTP接続などで起こる）
+  if (typeof document !== "undefined" && typeof document.execCommand === "function") {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
