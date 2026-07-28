@@ -1,35 +1,24 @@
-# つばめみち / TSUBAMEMICHI
+# 旅ナビ / TABI-NAVI
 
 日本の個人旅行者向け旅程アプリ。**行きたい場所を自分で追加していくと、AI が到着時刻・重要度・移動時間をもとに1日の順路へ組み上げる**。計画中も当日も周辺の立ち寄りスポットを提案し、旅行当日は「次に何をするか」だけを示す。予約確認メールを貼り付けて確定予定として取り込むこともできる（補助機能）。
 
 Expo Router（React Native）+ TypeScript + NativeWind（Tailwind for RN）。サーバー処理は Expo Router の API Routes（`src/app/api/*+api.ts`）。状態は React state + AsyncStorage（DB・認証なし）。
 
-## 名前とロゴ
+## アイコン
 
-**つばめみち**。燕（つばめ）は渡り鳥で、遠くへ行って必ず帰ってくる。その尾は深く割れていて、そのまま経路の分岐に見える。「みち」は、バラバラの行き先が一本につながることを指す ── このアプリがやっていることそのもの。
-
-ロゴは燕を家紋のように左右対称へ整理し、その下に一本の道を引いた形。色は本文と同じ クリーム `#F5EAD6` / 墨 `#1A1A1A` / ローズレッド `#DD5967` の3色だけ。
-
-素材はコードから生成しています（手描きの原稿を持たずに、いつでも同じものを作り直せるようにするため）。
+アプリアイコンはブランドイラストのスーツケース（`assets/brand/app-icon-source.png`）から生成します。
 
 ```bash
-python3 scripts/generate_logo.py
+python3 scripts/generate_app_icon.py
 ```
-
-出力先:
 
 | ファイル | 用途 |
 | --- | --- |
-| `public/illustrations/logo-mark.png` | マーク単体（アプリ内） |
-| `public/illustrations/logo-wordmark.png` | マーク＋「つばめみち」（オンボーディング・マイページ） |
-| `assets/images/icon.png` | アプリアイコン |
+| `assets/images/icon.png` | アプリアイコン（コーラル地） |
 | `assets/images/favicon.png` | ブラウザのタブ |
-| `assets/images/splash-icon.png` | 起動画面 |
+| `assets/images/splash-icon.png` | 起動画面（透過） |
 | `assets/images/android-icon-*.png` | Android アダプティブアイコン |
-
-アプリ内での表示は `src/components/Logo.tsx`（`LogoMark` / `LogoWordmark`）。画像が読めない環境でも名前だけは文字で残ります。
-
-なお端末に保存するキー（`tabinavi.*`）と `package.json` の名前は旧名のままです。**これらを変えると既存ユーザーの旅程・しおりが読めなくなる**ため、意図的に据え置いています。
+| `public/apple-touch-icon.png` | iOS「ホーム画面に追加」 |
 
 > 以前は Next.js（Web）で実装していましたが、実機で動く「アプリ」として使いたいという要望を受けて Expo/React Native に全面移行しました。
 
