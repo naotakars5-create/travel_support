@@ -53,4 +53,10 @@ jobs:
         # expo-github-action が `eas` コマンドを PATH に入れる。
         # `npx eas` だと npm が「eas」という別パッケージを探して
         # "could not determine executable to run" で落ちるため、直接呼ぶ。
-        run: eas deploy --prod
+        #
+        # --environment production: `eas env:create --environment production` で
+        # 登録したAPIキー（ANTHROPIC / GOOGLE_MAPS 等）をこのデプロイに紐付ける。
+        # これが無いとCIからのデプロイはキー無しで動き、住所候補・AI・地図が
+        # 全て静かに無効になる（手動デプロイでは手元の .env.local が拾われて
+        # いたため気づかなかった）。
+        run: eas deploy --prod --environment production
