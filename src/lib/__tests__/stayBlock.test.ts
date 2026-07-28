@@ -5,7 +5,7 @@ import { PlanEntry } from "../types";
 const REF = new Date("2026-07-24T00:00:00");
 
 function visit(id: string, over: Partial<PlanEntry> = {}): PlanEntry {
-  return { id, title: id, mode: "activity", priority: "want", stayMin: 60, ...over };
+  return { id, title: id, mode: "activity", priority: "want", stayMin: 60, source: "テスト", ...over };
 }
 
 function hotel(over: Partial<PlanEntry> = {}): PlanEntry {
@@ -18,6 +18,7 @@ function hotel(over: Partial<PlanEntry> = {}): PlanEntry {
     title: "ホテル",
     mode: "stay",
     priority: "must",
+    source: "テスト",
     arriveBy: checkIn.toISOString(),
     checkOut: checkOut.toISOString(),
     fixedTime: true,
