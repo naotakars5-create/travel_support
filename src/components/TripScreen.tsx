@@ -72,6 +72,7 @@ export function TripScreen({
       {app.tripView === "timeline" && hasPlan ? (
         <ItineraryScreen
           embedded
+          planNotes={app.planNotes}
           rail={app.rail}
           entries={entries}
           unplaced={app.unplacedEntries}
@@ -94,6 +95,7 @@ export function TripScreen({
           onMoveEntry={app.moveEntry}
           onSetEntryDay={app.setEntryDay}
           onAddToDay={onAddToDay}
+          onAddSpotToDay={(spot, day, stayMin) => app.addSpot(spot, { day, stayMin })}
         />
       ) : (
         <PlanScreen
@@ -105,7 +107,6 @@ export function TripScreen({
           areaSuggestions={app.areaSuggestions}
           areaSuggestionsLoading={app.areaSuggestionsLoading}
           hasGeoReference={app.hasGeoReference}
-          planNotes={app.planNotes}
           composing={app.composing}
           composeError={app.composeError}
           readOnly={app.readOnly}

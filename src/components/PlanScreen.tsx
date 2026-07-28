@@ -22,6 +22,7 @@ import { formatYen } from "@/lib/format";
 import { DateOnlyField, SelectField } from "./PlainFields";
 import { Illustration, illustrationUri } from "./Illustration";
 import { SpotThumb } from "./SpotThumb";
+import { FlowSteps } from "./FlowSteps";
 import { COLORS, dayColor, tint } from "@/lib/palette";
 import { Floater } from "./animations";
 import { Button, SectionHeading } from "./ui";
@@ -78,7 +79,6 @@ export function PlanScreen({
   areaSuggestions,
   areaSuggestionsLoading,
   hasGeoReference,
-  planNotes,
   composing,
   composeError,
   readOnly,
@@ -116,7 +116,6 @@ export function PlanScreen({
   areaSuggestions: SpotSuggestion[];
   areaSuggestionsLoading: boolean;
   hasGeoReference: boolean;
-  planNotes: string | null;
   composing: boolean;
   composeError: string | null;
   readOnly: boolean;
@@ -496,6 +495,10 @@ export function PlanScreen({
             <Text className="mt-2.5 text-center font-gothic-400 text-[13px] leading-[22px] text-muted">
               行き先だけ決まっていれば、{"\n"}あとはAIが旅程をまるごと組み立てます。
             </Text>
+            {/* 使い方の流れを図で。文章より先に「順番」が目に入るように */}
+            <View className="mt-5">
+              <FlowSteps current={1} />
+            </View>
             <View className="mt-6 w-full gap-2.5">
               <Button label="AIに旅程を作ってもらう" size="lg" accent onPress={onOpenGenerate} />
               <Button label="自分で行き先を追加する" tone="secondary" onPress={onOpenAdd} />
@@ -693,12 +696,7 @@ export function PlanScreen({
               押すとAIが、それぞれの「いつ行く？」の希望・移動効率・営業時間・定休日を見て、順番と時刻を決めます。結果はタイムラインに出ます。
             </Text>
             {composeError && <Text className="mt-2 text-center font-gothic-400 text-[12px] text-ink">{composeError}</Text>}
-            {planNotes && (
-              <View className="mt-3 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
-                <Text className="font-gothic-500 text-[11px] tracking-[.1em] text-muted">AIのメモ</Text>
-                <Text className="mt-1 font-mincho-400 text-[13px] leading-[21px] text-ink">{planNotes}</Text>
-              </View>
-            )}
+
           </View>
         )}
 

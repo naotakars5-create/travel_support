@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Animated, Linking, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RailItem, computeStats, formatDurationMin } from "@/lib/itinerary";
@@ -18,6 +18,8 @@ import { pickBenchIllustration } from "@/lib/illustrations";
 import { COLORS, dayColor, tint } from "@/lib/palette";
 import { directionsUrl } from "@/lib/mapsLink";
 import { SpotThumb } from "./SpotThumb";
+import { createSpotProvider, Spot } from "@/lib/spots";
+import { FlowSteps } from "./FlowSteps";
 import { Illustration } from "./Illustration";
 import { RouteMap } from "./RouteMap";
 import { Blinker, PulseRing, useNodeInStyle } from "./animations";
@@ -71,6 +73,112 @@ function RouteLink({ url, label }: { url: string; label: string }) {
 }
 
 /**
+ * 空き時間に寄れる周辺スポットの提案。
+ * 「＋ ここに追加」を押すと開き、直前の地点の座標から
+ * 「往復の徒歩＋ひと通り見る時間」が空き時間に収まるスポットだけを出す。
+ */
+function GapSuggest({
+  originGeo,
+  durationMin,
+  day,
+  onAddSpot,
+  onAddManual,
+  onClose,
+}: {
+  originGeo?: GeoPoint;
+  durationMin: number;
+  day: number;
+  onAddSpot?: (spot: Spot, day: number, stayMin: number) => void;
+  onAddManual: () => void;
+  onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [spots, setSpots] = useState<Spot[]>([]);
+  const [added, setAdded] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const provider = createSpotProvider(Boolean(originGeo));
+      const found = await provider.nearby(originGeo?.lat ?? 0, originGeo?.lng ?? 0, durationMin);
+      if (cancelled) return;
+      // 「往復の徒歩 + 最低20分の滞在」が空き時間に収まるものだけ提案する
+      const fit = found.filter((sp) => sp.walkMin * 2 + 20 <= durationMin).slice(0, 3);
+      setSpots(fit);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [originGeo, durationMin]);
+
+  // そのスポットで使える滞在時間（空き時間 − 往復徒歩 − 乗り継ぎの余白5分）
+  const stayFor = (sp: Spot) => Math.max(20, Math.min(90, durationMin - sp.walkMin * 2 - 5));
+
+  return (
+    <View className="mt-1.5 rounded-[12px] border border-accent/[.45] bg-white/60 px-3 py-2.5">
+      <View className="flex-row items-center justify-between">
+        <Text className="font-gothic-500 text-[11px] tracking-[.08em] text-accent">この空き時間で寄れるスポット</Text>
+        <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="提案を閉じる">
+          <Text className="font-gothic-400 text-[13px] text-muted-light">×</Text>
+        </Pressable>
+      </View>
+      {loading ? (
+        <Text className="mt-2 font-gothic-400 text-[12px] text-muted">近くを探しています…</Text>
+      ) : spots.length === 0 ? (
+        <Text className="mt-2 font-gothic-400 text-[12px] leading-[18px] text-muted">
+          この時間内に収まるスポットが見つかりませんでした。
+        </Text>
+      ) : (
+        <View className="mt-1.5 gap-1.5">
+          {spots.map((sp) => {
+            const isAdded = added.has(sp.name);
+            return (
+              <View key={sp.name} className="flex-row items-center gap-2 border-t border-black/[.06] pt-1.5">
+                <View className="flex-1">
+                  <Text numberOfLines={1} className="font-mincho-600 text-[13px] text-ink">{sp.name}</Text>
+                  <Text numberOfLines={1} className="mt-0.5 font-gothic-400 text-[10px] text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+                    {[sp.category, `往復徒歩${sp.walkMin * 2}分`, `滞在${stayFor(sp)}分とれます`].filter(Boolean).join(" · ")}
+                  </Text>
+                </View>
+                {onAddSpot && (
+                  <Pressable
+                    disabled={isAdded}
+                    onPress={() => {
+                      onAddSpot(sp, day, stayFor(sp));
+                      setAdded((prev) => new Set(prev).add(sp.name));
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${sp.name}をこの日に追加`}
+                    className={`rounded-full px-2.5 py-1 ${isAdded ? "border border-ink/20" : "bg-accent"}`}
+                  >
+                    <Text className={`font-gothic-500 text-[11px] ${isAdded ? "text-muted-light" : "text-kinari"}`}>
+                      {isAdded ? "✓ 追加済み" : "＋ 追加"}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+      <Pressable onPress={onAddManual} className="mt-2 self-start" accessibilityRole="button">
+        <Text className="font-gothic-400 text-[11px] text-muted underline">自分で行き先を選んで追加する ›</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** 空き時間の直前にある地点の座標（提案スポットの検索中心）。 */
+function prevNodeGeo(group: DayGroup, itemIndex: number): GeoPoint | undefined {
+  for (let i = itemIndex - 1; i >= 0; i--) {
+    const prev = group.items[i];
+    if (prev.type === "node" && prev.geo) return prev.geo;
+  }
+  return undefined;
+}
+
+/**
  * 空き時間ブロックの安定シード。直前の地点の時刻（無ければ日と位置）を使う。
  * 再レンダリングしても値が変わらないため、同じブロックには常に同じ絵が出る。
  */
@@ -118,6 +226,8 @@ export function ItineraryScreen({
   onMoveEntry,
   onSetEntryDay,
   onAddToDay,
+  onAddSpotToDay,
+  planNotes = null,
   embedded = false,
 }: {
   rail: RailItem[];
@@ -148,12 +258,18 @@ export function ItineraryScreen({
   onSetEntryDay: (id: string, day: number) => void;
   /** その日に新しい行き先を足す（空き時間の「＋」から） */
   onAddToDay: (day: number) => void;
+  /** 空き時間の提案スポットをその日に追加する */
+  onAddSpotToDay?: (spot: Spot, day: number, stayMin: number) => void;
+  /** AIが旅程を組んだときの一言メモ（タイムラインの一番下に出す） */
+  planNotes?: string | null;
   /** 「旅」タブの中に埋め込まれているか（見出しは TripHero が持つので出さない） */
   embedded?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   // タップして開いている地点（そこだけ操作バーを出す）。もう一度押すと閉じる。
   const [openKey, setOpenKey] = useState<string | null>(null);
+  // 提案パネルを開いている空き時間（gap の位置キー）。同時に1つだけ
+  const [openGapKey, setOpenGapKey] = useState<string | null>(null);
   const entryById = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
   // 「最適化しますか？」チップを閉じたか。行き先がさらに変わったら（suggestOptimize が立ち直したら）また出す
   const [optimizeDismissed, setOptimizeDismissed] = useState(false);
@@ -299,11 +415,17 @@ export function ItineraryScreen({
           </View>
         )}
         {rail.length === 0 && (
-          <Pressable onPress={onNavigatePlan} className="mt-10 self-center rounded-[12px] border border-ink/25 px-5 py-3">
-            <Text className="text-center font-gothic-400 text-[12px] text-muted">
-              まだ予定がありません。{"\n"}行き先を追加すると、ここに旅程が並びます。
-            </Text>
-          </Pressable>
+          <View className="mt-8 items-center">
+            {/* いまどの段階かが分かる図解（行き先が無ければ①、あるのに組んでいなければ②） */}
+            <FlowSteps current={entries.length === 0 ? 1 : 2} />
+            <Pressable onPress={onNavigatePlan} className="mt-5 self-center rounded-[12px] border border-ink/25 px-5 py-3">
+              <Text className="text-center font-gothic-400 text-[12px] leading-[19px] text-muted">
+                {entries.length === 0
+                  ? "まだ予定がありません。\nまず行き先を追加しましょう。"
+                  : "行き先はあります。\n「AIで予定を組む」とここに旅程が並びます。"}
+              </Text>
+            </Pressable>
+          </View>
         )}
 
         {dayGroups.map((g, gi) => (
@@ -441,25 +563,40 @@ export function ItineraryScreen({
                         <Text className="font-gothic-400 text-[12px] text-muted">翌日まで（宿泊）</Text>
                       </View>
                     ) : (
-                      <View className="flex-row items-center gap-2">
-                        {/* 直前ノードの時刻をシードに、常に同じ絵を出す（Math.randomは使わない） */}
-                        <Illustration name={pickBenchIllustration(gapSeed(g, item, gi, i))} size="sm" alt="" />
-                        <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
-                          <Text className="font-gothic-400 text-[12px] text-muted" style={TNUM}>
-                            空き時間 · {formatDurationMin(item.durationMin)}
-                          </Text>
+                      <View>
+                        <View className="flex-row items-center gap-2">
+                          {/* 直前ノードの時刻をシードに、常に同じ絵を出す（Math.randomは使わない） */}
+                          <Illustration name={pickBenchIllustration(gapSeed(g, item, gi, i))} size="sm" alt="" />
+                          <View className="self-start rounded-[10px] border border-muted-light px-3 py-1.5">
+                            <Text className="font-gothic-400 text-[12px] text-muted" style={TNUM}>
+                              空き時間 · {formatDurationMin(item.durationMin)}
+                            </Text>
+                          </View>
+                          {/* 押すと「この空き時間で寄れるスポット」の提案が開く（自分で選ぶ導線も中にある） */}
+                          {!readOnly && (
+                            <Pressable
+                              onPress={() => setOpenGapKey((k) => (k === `${gi}-${i}` ? null : `${gi}-${i}`))}
+                              hitSlop={6}
+                              accessibilityRole="button"
+                              accessibilityLabel={`${g.day}日目のこの空き時間に行き先を追加`}
+                              className="rounded-full border border-accent/[.45] bg-accent/[.08] px-2.5 py-1"
+                            >
+                              <Text className="font-gothic-500 text-[12px] text-accent">＋ ここに追加</Text>
+                            </Pressable>
+                          )}
                         </View>
-                        {/* 空いている所にその場で行き先を足せるようにする（この日が初期選択される） */}
-                        {!readOnly && (
-                          <Pressable
-                            onPress={() => onAddToDay(g.day)}
-                            hitSlop={6}
-                            accessibilityRole="button"
-                            accessibilityLabel={`${g.day}日目のこの時間に行き先を追加`}
-                            className="rounded-full border border-accent/[.45] bg-accent/[.08] px-2.5 py-1"
-                          >
-                            <Text className="font-gothic-500 text-[12px] text-accent">＋ ここに追加</Text>
-                          </Pressable>
+                        {!readOnly && openGapKey === `${gi}-${i}` && (
+                          <GapSuggest
+                            originGeo={prevNodeGeo(g, i)}
+                            durationMin={item.durationMin}
+                            day={g.day}
+                            onAddSpot={onAddSpotToDay}
+                            onAddManual={() => {
+                              setOpenGapKey(null);
+                              onAddToDay(g.day);
+                            }}
+                            onClose={() => setOpenGapKey(null)}
+                          />
                         )}
                       </View>
                     )}
@@ -492,6 +629,16 @@ export function ItineraryScreen({
             <Text className="mt-1.5 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
               時間が足りず入らなかった予定です。「必ず行くにする」→もう一度「AIで旅程を組む」と優先して組み込みます。
             </Text>
+          </View>
+        )}
+
+        {/* AIが旅程を組んだときの一言メモ。旅程を読み終えた最後に置く */}
+        {planNotes && rail.length > 0 && (
+          <View className="mt-6">
+            <SectionHeading label="AIのメモ" className="mb-2" />
+            <View className="rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
+              <Text className="font-mincho-400 text-[13px] leading-[21px] text-ink">{planNotes}</Text>
+            </View>
           </View>
         )}
       </ScrollView>
