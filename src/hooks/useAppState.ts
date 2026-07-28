@@ -335,6 +335,62 @@ export function useAppState() {
     };
   }, [entries]);
 
+  // スポット写真の自動取得。photoRef の無い行き先（宿泊・食事・観光）について
+  // 名前から代表写真を探し、entries へ書き戻す（行き先リスト・旅程の横に出る）。
+  // オートコンプリート経由の追加は place-details が最初から photoRef を付けるので、
+  // ここで拾うのは手入力・AI生成・メール取り込み・周辺スポット追加の分。
+  const photoAttemptedRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!entries) return;
+    let cancelled = false;
+    async function run() {
+      const list = entries ?? [];
+      const targets = list.filter((e) => {
+        if (e.photoRef) return false;
+        // 移動・レンタカーは「場所」ではないので対象外
+        if (e.mode === "rental" || isTransitMode(e.mode)) return false;
+        const key = `${e.id}:${entryPlaceText(e)}`;
+        return !photoAttemptedRef.current.has(key);
+      });
+      if (targets.length === 0) return;
+      for (const t of targets) photoAttemptedRef.current.add(`${t.id}:${entryPlaceText(t)}`);
+
+      const results = await Promise.all(
+        targets.map(async (e) => {
+          try {
+            const res = await fetchWithTimeout(apiUrl("/api/spot-photo"), {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ query: entryPlaceText(e) }),
+            });
+            const data = await res.json();
+            const photo = data.photo as { photoRef: string; attribution?: string } | null;
+            return { id: e.id, photo };
+          } catch {
+            return { id: e.id, photo: null };
+          }
+        })
+      );
+      if (cancelled) return;
+      const hits = results.filter((r) => r.photo);
+      if (hits.length === 0) return;
+
+      setEntries((prev) =>
+        prev
+          ? prev.map((e) => {
+              const hit = hits.find((h) => h.id === e.id);
+              if (!hit?.photo || e.photoRef) return e;
+              return { ...e, photoRef: hit.photo.photoRef, photoAttribution: hit.photo.attribution };
+            })
+          : prev
+      );
+    }
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [entries]);
+
   // ジオコーディング済みの隣接イベント間の実測移動時間キャッシュ（下の effect が取得・追記する）。
   const transitCacheRef = useRef(transitCache);
   useEffect(() => {

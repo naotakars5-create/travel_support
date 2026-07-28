@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Animated, Image, Linking, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
+import { Animated, Linking, Pressable, ScrollView, Text, TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RailItem, computeStats, formatDurationMin } from "@/lib/itinerary";
 import { MODE_COLOR, MODE_DASHED, MODE_LABEL } from "@/lib/modeMeta";
@@ -17,7 +17,7 @@ import {
 import { pickBenchIllustration } from "@/lib/illustrations";
 import { COLORS, dayColor, tint } from "@/lib/palette";
 import { directionsUrl } from "@/lib/mapsLink";
-import { placePhotoImageUrl } from "@/lib/placePhoto";
+import { SpotThumb } from "./SpotThumb";
 import { Illustration } from "./Illustration";
 import { RouteMap } from "./RouteMap";
 import { Blinker, PulseRing, useNodeInStyle } from "./animations";
@@ -67,28 +67,6 @@ function RouteLink({ url, label }: { url: string; label: string }) {
     <Pressable onPress={() => void Linking.openURL(url)} hitSlop={6} className="self-start">
       <Text className="font-gothic-400 text-[11px] text-muted underline">{label}</Text>
     </Pressable>
-  );
-}
-
-/**
- * スポットの写真（Places Photo）。取得できない時は静かに消える。
- * Googleの規約で提供元の表示が必要なため、あれば画像の下端に小さく重ねる。
- */
-function SpotThumb({ photoRef, attribution }: { photoRef?: string; attribution?: string }) {
-  const [failed, setFailed] = useState(false);
-  const uri = placePhotoImageUrl(photoRef, 160);
-  if (!uri || failed) return null;
-  return (
-    <View className="overflow-hidden rounded-[8px] bg-black/[.05]" style={{ width: 44, height: 44 }}>
-      <Image source={{ uri }} onError={() => setFailed(true)} resizeMode="cover" style={{ width: 44, height: 44 }} />
-      {attribution ? (
-        <View className="absolute bottom-0 left-0 right-0 bg-black/45">
-          <Text numberOfLines={1} className="px-[2px] text-[5px] text-white">
-            {attribution}
-          </Text>
-        </View>
-      ) : null}
-    </View>
   );
 }
 

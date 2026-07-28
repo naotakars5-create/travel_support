@@ -21,6 +21,7 @@ import { dateForDay, formatJstMonthDayJa, formatJstTime } from "@/lib/date";
 import { formatYen } from "@/lib/format";
 import { DateOnlyField, SelectField } from "./PlainFields";
 import { Illustration, illustrationUri } from "./Illustration";
+import { SpotThumb } from "./SpotThumb";
 import { COLORS, dayColor, tint } from "@/lib/palette";
 import { Floater } from "./animations";
 import { Button, SectionHeading } from "./ui";
@@ -360,8 +361,12 @@ export function PlanScreen({
               <View className="mt-2 gap-2">
                 {lodging.map((e) => (
                   <View key={e.id} className="flex-row items-center gap-3">
-                    {/* 登録済みでもアイコンは残す（未登録時だけ絵が出る挙動を分かりにくくしない） */}
-                    <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
+                    {/* 宿の写真があれば写真、無ければベッドのアイコン */}
+                    {e.photoRef ? (
+                      <SpotThumb photoRef={e.photoRef} attribution={e.photoAttribution} size={40} />
+                    ) : (
+                      <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
+                    )}
                     <Pressable onPress={() => onEditEntry(e.id)} className="flex-1">
                       <Text className="font-mincho-600 text-[13px] text-ink">{e.title}</Text>
                       <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted" style={TNUM}>
@@ -528,6 +533,10 @@ export function PlanScreen({
                   <View className="h-[20px] w-[20px] items-center justify-center rounded-full" style={{ backgroundColor: dayColor(day) }}>
                     <Text className="font-gothic-500 text-[11px] text-kinari" style={TNUM}>{num}</Text>
                   </View>
+                </View>
+                {/* スポットの写真（photoRef が付いたら自動で出る） */}
+                <View className="pt-0.5">
+                  <SpotThumb photoRef={e.photoRef} attribution={e.photoAttribution} size={48} />
                 </View>
                 <View className="flex-1">
                   <View className="flex-row items-center gap-1.5">
