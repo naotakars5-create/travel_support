@@ -10,7 +10,7 @@ import { SlideUp } from "./animations";
 function Avatar({ profile, size }: { profile: Profile; size: number }) {
   const uri = profile.photo ?? illustrationUri(normalizeAvatar(profile.avatar) as IllustrationName);
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2 }} className="overflow-hidden bg-surface">
+    <View style={{ width: size, height: size, borderRadius: size / 2 }} className="overflow-hidden bg-highlight/40">
       <Image source={{ uri }} style={{ width: size, height: size }} resizeMode="cover" />
     </View>
   );
@@ -79,7 +79,7 @@ export function ProfileScreen({
       <View className="px-[26px] pb-3 pt-4">
         <Text className="font-mincho-600 text-[26px] text-ink">マイページ</Text>
       </View>
-      <View className="h-px w-full bg-black/[.08]" />
+      <View className="h-px w-full bg-highlight/60" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 16, paddingBottom: 90 }}>
         {/* プロフィール */}
@@ -95,7 +95,7 @@ export function ProfileScreen({
 
         {/* しおり・持ち物は下タブから外したので、ここが入口になる */}
         <View className="mb-2 mt-8 flex-row items-center gap-1.5">
-          <View className="h-[11px] w-[3px] rounded-full bg-accent" />
+          <View className="h-[11px] w-[3px] rounded-full bg-highlight" />
           <Text className="font-gothic-500 text-[11px] tracking-[.15em] text-muted">旅の道具</Text>
         </View>
         <View className="overflow-hidden rounded-[16px] border border-ink/10">
@@ -127,7 +127,7 @@ export function ProfileScreen({
 
         {/* 各種設定 */}
         <View className="mb-2 mt-8 flex-row items-center gap-1.5">
-          <View className="h-[11px] w-[3px] rounded-full bg-accent" />
+          <View className="h-[11px] w-[3px] rounded-full bg-highlight" />
           <Text className="font-gothic-500 text-[11px] tracking-[.15em] text-muted">設定</Text>
         </View>
         <View className="overflow-hidden rounded-[16px] border border-ink/10">

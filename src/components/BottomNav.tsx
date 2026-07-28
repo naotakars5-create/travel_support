@@ -31,8 +31,8 @@ export function BottomNav({ tab, onChange, dark }: { tab: Tab; onChange: (t: Tab
               accessibilityState={{ selected: active }}
               className="flex-1 items-center justify-center gap-1.5"
             >
-              {/* 今いるタブの印。明るい画面ではテラコッタ（＝今）で示す */}
-              <View className={`h-[2px] w-[18px] rounded-full ${active ? (dark ? "bg-day-text" : "bg-accent") : "bg-transparent"}`} />
+              {/* 今いるタブの印。明るい画面ではコーラル（差し色）で示す */}
+              <View className={`h-[2px] w-[18px] rounded-full ${active ? (dark ? "bg-day-text" : "bg-highlight") : "bg-transparent"}`} />
               <Text
                 className={`font-gothic-400 text-[12px] ${
                   active ? (dark ? "text-day-text font-gothic-500" : "text-ink font-gothic-500") : dark ? "text-day-text3" : "text-muted-light"

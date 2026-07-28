@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PackingItem } from "@/lib/types";
 import { packingProgress } from "@/lib/packing";
-import { IllustrationPlate } from "./Illustration";
+import { Illustration } from "./Illustration";
 
 const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
@@ -51,7 +51,7 @@ export function PackingScreen({
           </View>
         )}
       </View>
-      <View className="h-px w-full bg-black/[.08]" />
+      <View className="h-px w-full bg-highlight/60" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 90 }} keyboardShouldPersistTaps="handled">
         {items.map((item) => (
@@ -74,7 +74,7 @@ export function PackingScreen({
         {/* 全部チェックできたときだけ「準備完了」を出す（1つでも外れたら消える） */}
         {total > 0 && done === total && (
           <View className="mt-5 items-center">
-            <IllustrationPlate name="packed-done" size="md" alt="" />
+            <Illustration name="packed-done" size="md" alt="" />
             <Text className="mt-2 font-mincho-600 text-[15px] text-ink">準備完了です</Text>
           </View>
         )}

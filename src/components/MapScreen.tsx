@@ -109,7 +109,7 @@ export function MapScreen({
         <View className="px-[26px] pb-2 pt-3">
           <Text className="font-mincho-600 text-[26px] text-ink">地図で探す</Text>
         </View>
-        <View className="h-px w-full bg-black/[.08]" />
+        <View className="h-px w-full bg-highlight/60" />
         <Pressable onPress={onNavigatePlan} className="mt-10 self-center rounded-[12px] border border-ink/25 px-5 py-3">
           <Text className="text-center font-gothic-400 text-[12px] leading-[21px] text-muted">
             まだ基点がありません。{"\n"}「旅」で行き先をひとつ追加してください。

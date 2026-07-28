@@ -278,7 +278,7 @@ export function ItineraryScreen({
           )}
         </View>
       )}
-      {!embedded && <View className="h-px w-full bg-black/[.08]" />}
+      {!embedded && <View className="h-px w-full bg-highlight/60" />}
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 90 }}>
         {embedded && rail.length > 0 && (

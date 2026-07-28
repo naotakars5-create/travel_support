@@ -6,7 +6,7 @@ import { PlanEntry } from "@/lib/types";
 import { dateForDay, formatJstTime } from "@/lib/date";
 import { MODE_LABEL } from "@/lib/modeMeta";
 import { PhotoPicker } from "./PhotoPicker";
-import { IllustrationPlate, illustrationUri } from "./Illustration";
+import { Illustration, illustrationUri } from "./Illustration";
 import { SlideUp } from "./animations";
 
 const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
@@ -121,12 +121,12 @@ export function ShioriScreen({
         </Pressable>
         <Text className="mt-1 font-mincho-600 text-[26px] text-ink">旅のしおり</Text>
       </View>
-      <View className="h-px w-full bg-black/[.08]" />
+      <View className="h-px w-full bg-highlight/60" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 16, paddingBottom: 110 }}>
         {trips.length === 0 ? (
           <View className="mt-14 items-center">
-            <IllustrationPlate name="empty-suitcase" size="lg" alt="" />
+            <Illustration name="empty-suitcase" size="lg" alt="" />
             <Text className="mt-3 font-mincho-600 text-[16px] text-ink">まだしおりがありません</Text>
             <Text className="mt-1.5 text-center font-gothic-400 text-[12px] leading-[20px] text-muted">
               しおりは、作った旅がそのまま並びます。{"\n"}まず「旅」タブで行き先を決めましょう。

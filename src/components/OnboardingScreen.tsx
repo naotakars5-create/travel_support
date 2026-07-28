@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { IllustrationPlate } from "./Illustration";
+import { Illustration } from "./Illustration";
 import { IllustrationName } from "@/lib/illustrations";
 import { COLORS, DAY_COLORS, tint } from "@/lib/palette";
 
@@ -57,8 +57,8 @@ export function OnboardingScreen({ onDone }: { onDone: () => void }) {
       </View>
 
       <View className="flex-1 items-center justify-center px-[34px]">
-        {/* 絵はブランドの地色（コーラルピンク）の台座に載せる。素材と同じ見え方になる */}
-        <IllustrationPlate name={card.illustration} size="lg" alt="" round />
+        {/* 絵は透過のまま画面の地に直接置く（台座は敷かない） */}
+        <Illustration name={card.illustration} size="lg" alt="" />
         <Text className="mt-6 font-gothic-500 text-[11px] tracking-[.2em]" style={{ color: card.color }}>
           {card.eyebrow}
         </Text>
