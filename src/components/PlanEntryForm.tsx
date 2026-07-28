@@ -106,6 +106,7 @@ export interface PlanEntryFormInitial {
   closedDays?: number[];
   photoRef?: string;
   photoAttribution?: string;
+  allowDuringStay?: boolean;
 }
 
 /** 行き先を入力するフォーム。種別で入力欄が変わり、複数日程では「何日目」を選べる。 */
@@ -166,6 +167,8 @@ export function PlanEntryForm({
     ref: initial?.photoRef,
     attribution: initial?.photoAttribution,
   });
+  // 宿にチェックインしたあとの時間帯にも入れてよいか（夜ご飯・夜景など）
+  const [allowNight, setAllowNight] = useState(Boolean(initial?.allowDuringStay));
   // レンタカーを返す日（借りる日と別日になりうる）
   const [returnDay, setReturnDay] = useState<number>(() => {
     if (initial?.mode === "rental" && initial.arriveBy) {
@@ -263,6 +266,7 @@ export function PlanEntryForm({
       input.photoRef = photo.ref;
       input.photoAttribution = photo.attribution;
     } else {
+      input.allowDuringStay = allowNight || undefined;
       input.place = place || undefined;
       input.placeGeo = placeGeo;
       input.stayMin = stayMin ?? undefined;
@@ -555,6 +559,30 @@ export function PlanEntryForm({
             ))}
           </View>
         </View>
+      )}
+
+      {/* 宿の時間帯への配置許可。既定ではチェックイン〜チェックアウトの間に予定を入れない */}
+      {!transit && !stay && !rental && (
+        <Pressable
+          onPress={() => setAllowNight((v) => !v)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: allowNight }}
+          className="flex-row items-center gap-2.5"
+        >
+          <View
+            className={`h-[20px] w-[20px] items-center justify-center rounded-[6px] border ${
+              allowNight ? "border-accent bg-accent" : "border-black/[.25] bg-white/60"
+            }`}
+          >
+            {allowNight && <Text className="font-gothic-700 text-[12px] text-kinari">✓</Text>}
+          </View>
+          <View className="flex-1">
+            <Text className="font-gothic-400 text-[12px] text-ink">ホテルにチェックイン後でも行く（夜の予定）</Text>
+            <Text className="mt-0.5 font-gothic-400 text-[10px] leading-[15px] text-muted-light">
+              ふだんはチェックイン〜チェックアウトの間に予定を入れません。夜ご飯・夜景などはここをオンに。
+            </Text>
+          </View>
+        </Pressable>
       )}
 
       {/* 費用（移動・宿泊・レンタカーはこちらに） */}

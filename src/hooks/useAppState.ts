@@ -11,6 +11,7 @@ import {
   entryPlaceText,
   eventToPlanEntry,
   fillIntoGaps,
+  stayWindows,
   inputToEntry,
   orderEntriesBySchedule,
   PlanEntryInput,
@@ -930,7 +931,9 @@ export function useAppState() {
         // それでも入らなかったものだけ「旅程に入らなかった予定」になる。
         // レンタカーは期間の登録なので、空き時間へ詰める対象にはしない。
         const leftovers = orderedByAi.filter((e) => e.mode !== "rental" && !anchors.has(e.id) && !mustKeep(e));
-        const extra = fillIntoGaps(leftovers, filledSlots, localReferenceDate(), tripDayCount);
+        const extra = fillIntoGaps(leftovers, filledSlots, localReferenceDate(), tripDayCount, {
+          stayWindows: stayWindows(included),
+        });
         const allSlots = [...filledSlots, ...extra].sort(
           (a, b) => new Date(a.arriveAt).getTime() - new Date(b.arriveAt).getTime()
         );

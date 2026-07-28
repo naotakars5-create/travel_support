@@ -57,7 +57,7 @@ export function TripScreen({
 
       {/* 見え方の切り替え。行き先が1つも無いうちは意味が無いので出さない */}
       {entries.length > 0 && (
-        <View className="flex-row gap-1.5 px-[26px] pb-2.5">
+        <View className="flex-row gap-1.5 px-[26px] pb-2">
           <ViewTab label="行き先リスト" active={app.tripView === "list"} onPress={() => app.setTripView("list")} />
           <ViewTab
             label="タイムライン"
