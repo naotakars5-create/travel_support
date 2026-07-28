@@ -1,4 +1,4 @@
-import { DAY_COLORS, dayColor, tint } from "../palette";
+import { COLORS, DAY_COLORS, dayColor, tint } from "../palette";
 
 /** 相対輝度（WCAG）。 */
 function luminance(hex: string): number {
@@ -27,14 +27,18 @@ describe("palette", () => {
     expect(dayColor(-3)).toBe(DAY_COLORS[0]);
   });
 
-  it("どの日の色にも生成りの文字が読める濃さがある（コントラスト4.5以上）", () => {
+  it("どの日の色にもクリームの文字が読める濃さがある（コントラスト4.5以上）", () => {
     for (const c of DAY_COLORS) {
-      expect(contrast(c, "#F4EFE5")).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(c, COLORS.base)).toBeGreaterThanOrEqual(4.5);
     }
   });
 
+  it("補助テキストの色はクリームの上で4.5以上ある", () => {
+    expect(contrast(COLORS.muted, COLORS.base)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("薄い面は同じ色のrgbaになる", () => {
-    expect(tint("#4A6B8A", 0.1)).toBe("rgba(74, 107, 138, 0.1)");
+    expect(tint("#A8465F", 0.1)).toBe("rgba(168, 70, 95, 0.1)");
   });
 
   it("色として読めない文字列はそのまま返す（描画を壊さない）", () => {

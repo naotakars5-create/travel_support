@@ -160,6 +160,34 @@ src/
 - `hooks/useAppState.ts` — 行き先リストの状態管理、ローカル/AI旅程作成、メール取り込み、到着記録、AsyncStorage永続化、地点のジオコーディングと隣接イベント間のDirections APIキャッシュ取得を非同期に行う。
 - `components/animations.tsx` — Web版のCSSアニメーション（pulse/spin/blink/sheetup/flashfade/nodein）をReact NativeのAnimated APIで再現した共通部品。
 
+### 色とイラスト（ブランドのテイスト）
+
+色は**ブランドイラストから直接抜いた4色**が土台。UI とイラストが同じ絵の具で描かれて
+見えるようにするため、この4色（と、そこから派生させた砂色・補助文字色）以外は使わない。
+
+| トークン | HEX | 役割 |
+| --- | --- | --- |
+| `base` | `#F5EAD6` | 画面の地（クリーム） |
+| `surface` / `sheet` | `#EFDFC5` | カード面・シート・区切り（砂） |
+| `ink` / `bezel` | `#1A1A1A` | 文字・輪郭・主要ボタン（墨） |
+| `muted` | `#6F625A` | 補助テキスト |
+| `accent` | `#DD5967` | **今・進行中だけ**（ローズレッド） |
+| `highlight` | `#F69B96` | **完了・達成**と、イラストの下地（コーラルピンク） |
+
+- 実体は `tailwind.config.js`（className 用）と `src/lib/palette.ts` の `COLORS`
+  （`style` / SVG / `ActivityIndicator` など className を書けない場所用）の2か所。
+  **色を変えるときは必ず両方**を直す。コンポーネント側に生の HEX を書かない。
+- 日ごとの色（`DAY_COLORS`）は紅梅・朽葉・藤・錆浅葱・鈍藍の5色。1日目/2日目…の
+  見分けだけに使う。どれもクリームの文字を載せてコントラスト比4.5以上あり、
+  `src/lib/__tests__/palette.test.ts` がそれを検証している。
+- イラストは `public/illustrations/` の10点。大きく見せる場所では
+  `IllustrationPlate`（コーラルピンクの台座）に載せ、素材と同じ地色の上で見せる。
+  小さく添えるだけの場所（空き時間チップ）では台座を敷かない。
+- **イラストを描き直すときは `docs/illustration-prompts.md`** に、
+  画風・パレット・10点ぶんの生成プロンプト・生成後の手順をまとめてある。
+  現在の PNG は旧イラストを `scripts/recolor_illustrations.py` で新パレットに
+  塗り替えたつなぎなので、絵柄はまだ旧テイストのまま。
+
 ### デザイン上の注意（Web版からの意図的な差分）
 
 - **偽のステータスバー行は廃止**：Web版プロトタイプは「9:41」を表示する偽のステータスバーを画面内に描画していたが、実機では本物のOSステータスバーが表示されるため冗長。`expo-status-bar` でアイコン色（当日=白文字／それ以外=黒文字）のみ制御し、`SafeAreaView`/`useSafeAreaInsets` で余白を確保する方式に変更。

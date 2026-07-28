@@ -6,7 +6,7 @@ import { tripRangeLabel } from "@/lib/date";
 import { SlideUp } from "./animations";
 import { Button } from "./ui";
 
-const PLACEHOLDER = "rgba(110,103,92,0.5)";
+const PLACEHOLDER = "rgba(111, 98, 90, 0.5)";
 
 /**
  * 旅の切り替えと、名前・行き先の編集。
@@ -54,7 +54,7 @@ export function TripSwitcherSheet({
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <Pressable className="absolute inset-0 bg-[rgba(26,26,26,.28)]" onPress={onClose} />
         <SlideUp trigger="trip-switcher" style={{ maxHeight: "88%" }}>
           <View className="rounded-t-sheet bg-sheet px-6 pt-3" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />

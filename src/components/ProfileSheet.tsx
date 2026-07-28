@@ -7,7 +7,7 @@ import { illustrationUri } from "./Illustration";
 import { PhotoPicker } from "./PhotoPicker";
 import { SlideUp } from "./animations";
 
-const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
+const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 /** 名前・アイコン（絵文字/写真）を登録/編集するプロフィール画面（半モーダル）。 */
 export function ProfileSheet({
@@ -27,7 +27,7 @@ export function ProfileSheet({
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <Pressable className="absolute inset-0 bg-[rgba(26,26,26,.28)]" onPress={onClose} />
         <SlideUp trigger="profile" style={{ maxHeight: "90%" }}>
           <View className="rounded-t-sheet bg-sheet px-6 pt-3" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />

@@ -324,10 +324,10 @@ export function staticAreaMapUrl(
     if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
     // Static Maps のラベルは英数字1文字のみ。入らない番号は小さいマーカーにする。
     const usable = label && /^[0-9A-Za-z]$/.test(label) ? `label:${label}|` : "size:small|";
-    url.searchParams.append("markers", `color:0x23201D|${usable}${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
+    url.searchParams.append("markers", `color:0x1A1A1A|${usable}${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
   }
   if (me && Number.isFinite(me.lat) && Number.isFinite(me.lng)) {
-    url.searchParams.append("markers", `color:0xD96F4C|${me.lat.toFixed(5)},${me.lng.toFixed(5)}`);
+    url.searchParams.append("markers", `color:0xDD5967|${me.lat.toFixed(5)},${me.lng.toFixed(5)}`);
   }
   url.searchParams.set("key", apiKey());
   return url.toString();
@@ -364,19 +364,19 @@ export function staticRouteMapUrl(
   if (stops.length > 1) {
     // 訪問順に線を引く（＝その日の動線）
     const path = stops.map(({ p }) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join("|");
-    url.searchParams.append("path", `color:0xD96F4Cdd|weight:5|${path}`);
+    url.searchParams.append("path", `color:0xDD5967dd|weight:5|${path}`);
   }
   stops.forEach(({ p, label }, i) => {
     // Static Maps のラベルは英数字1文字のみ。10箇所目以降は数字が入らないので
     // ラベル無しの小さめマーカーにし、番号は本文側の一覧で確認してもらう。
     const usable = /^[0-9A-Za-z]$/.test(label) ? `label:${label}|` : "size:small|";
     // その日の最初の地点だけ塗りを変えて「ここから始まる」と分かるようにする
-    const color = i === 0 ? "0xD96F4C" : "0x23201D";
+    const color = i === 0 ? "0xDD5967" : "0x1A1A1A";
     url.searchParams.append("markers", `color:${color}|${usable}${p.lat.toFixed(5)},${p.lng.toFixed(5)}`);
   });
   // 現在地は青いマーカーで表示（ラベルなし）
   if (me) {
-    url.searchParams.append("markers", `color:0xD96F4C|${me.lat.toFixed(5)},${me.lng.toFixed(5)}`);
+    url.searchParams.append("markers", `color:0xDD5967|${me.lat.toFixed(5)},${me.lng.toFixed(5)}`);
     if (points.length === 0) url.searchParams.set("zoom", "15");
   }
   url.searchParams.set("key", apiKey());

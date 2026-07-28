@@ -3,8 +3,9 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Companion, COMPANION_OPTIONS, Purpose, PURPOSE_OPTIONS, TripBrief } from "@/lib/tripBrief";
 import { SlideUp } from "./animations";
+import { COLORS } from "@/lib/palette";
 
-const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
+const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
   return (
@@ -72,7 +73,7 @@ export function GeneratePlanSheet({
       {/* 背景は絶対配置にして、シート側だけが高さを持つようにする
           （シートの maxHeight が画面高に対して効き、ScrollView が正しく縮む） */}
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <Pressable className="absolute inset-0 bg-[rgba(26,26,26,.28)]" onPress={onClose} />
         <SlideUp trigger="generate-plan" style={{ maxHeight: "92%" }}>
           <View className="rounded-t-sheet bg-sheet px-6 pt-3" style={{ maxHeight: "100%", paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />
@@ -174,7 +175,7 @@ export function GeneratePlanSheet({
                   accessibilityRole="button"
                   className={`mt-1 flex-row items-center justify-center gap-2 rounded-[12px] px-4 py-3.5 ${canSubmit ? "bg-ink" : "bg-ink/30"}`}
                 >
-                  {running && <ActivityIndicator size="small" color="#F4EFE5" />}
+                  {running && <ActivityIndicator size="small" color={COLORS.base} />}
                   <Text className="text-center font-gothic-500 text-[13px] text-kinari">
                     {running ? "旅程を考えています…" : "この条件で旅程を作る"}
                   </Text>

@@ -1,6 +1,7 @@
 import { createElement, useState } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { COLORS } from "@/lib/palette";
 
 /**
  * 時刻だけ／日付だけを入力するフィールド。
@@ -17,7 +18,7 @@ const WEB_INPUT_STYLE = {
   padding: "0 12px",
   height: 42,
   fontSize: 14,
-  color: "#23201D",
+  color: COLORS.ink,
   fontFamily: "ZenOldMincho_400Regular, serif",
   width: "100%",
   boxSizing: "border-box" as const,

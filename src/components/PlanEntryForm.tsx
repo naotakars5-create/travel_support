@@ -24,7 +24,7 @@ const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
 ];
 
 const STAY_OPTIONS = [30, 60, 90, 120];
-const PLACEHOLDER = "rgba(110,103,92,0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
+const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 const TRANSIT_MODES: TransportMode[] = ["air", "rail", "bus", "car"];
 const isTransit = (m: TransportMode) => TRANSIT_MODES.includes(m);

@@ -160,7 +160,7 @@ function InfoSheet({ title, body, onClose }: { title: string; body: string; onCl
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <View className="flex-1">
-        <Pressable className="flex-1 bg-[rgba(28,25,21,.28)]" onPress={onClose} />
+        <Pressable className="flex-1 bg-[rgba(26,26,26,.28)]" onPress={onClose} />
         <SlideUp trigger={title}>
           <View className="rounded-t-sheet bg-sheet px-6 pt-3" style={{ paddingBottom: insets.bottom + 24 }}>
             <View className="mx-auto mb-3 h-1 w-9 rounded-full bg-black/[.14]" />

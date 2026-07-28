@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { COLORS } from "@/lib/palette";
 
 /**
  * 画面をまたいで使う共通パーツ。
@@ -72,7 +73,7 @@ export function Button({
         fullWidth ? "w-full" : "self-start"
       } ${off ? "opacity-40" : ""}`}
     >
-      {loading ? <ActivityIndicator size="small" color={tone === "primary" ? "#F4EFE5" : "#6E675C"} /> : left}
+      {loading ? <ActivityIndicator size="small" color={tone === "primary" ? COLORS.base : COLORS.muted} /> : left}
       <Text className={`text-center ${weight} ${s.text} ${textColor}`}>{label}</Text>
     </Pressable>
   );

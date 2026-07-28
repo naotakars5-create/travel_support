@@ -6,6 +6,7 @@ import { createSpotProvider, Spot } from "@/lib/spots";
 import { haversineMeters } from "@/lib/geo";
 import { clampZoom, viewRadiusMeters } from "@/lib/mercator";
 import { MapMarker, PannableMap } from "./PannableMap";
+import { COLORS } from "@/lib/palette";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 
@@ -165,7 +166,7 @@ export function MapScreen({
                 accessibilityLabel="この範囲でスポットを探す"
                 className={`flex-row items-center gap-2 rounded-full px-4 py-2 ${loading ? "bg-ink/70" : "bg-accent"}`}
               >
-                {loading && <ActivityIndicator size="small" color="#F4EFE5" />}
+                {loading && <ActivityIndicator size="small" color={COLORS.base} />}
                 <Text className="font-gothic-500 text-[12px] text-kinari">
                   {loading ? "探しています…" : "この範囲で探す"}
                 </Text>
