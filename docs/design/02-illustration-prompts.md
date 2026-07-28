@@ -1,6 +1,6 @@
 # 画材（イラスト素材）プロンプト集 — Have a Good Travel
 
-全 **78 点**。前提は `00-art-direction.md`。
+全 **101 点**。前提は `00-art-direction.md`。
 
 ## 使い方
 
