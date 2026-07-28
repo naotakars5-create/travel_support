@@ -75,6 +75,12 @@ export const openaiProvider: LlmProvider = {
 };
 
 export function getLlmProvider(): LlmProvider {
+  // 明示指定が最優先
   if (process.env.LLM_PROVIDER === "openai") return openaiProvider;
+  if (process.env.LLM_PROVIDER === "anthropic") return anthropicProvider;
+  // 未指定なら「持っているキー」で自動選択する。
+  // OPENAI_API_KEY だけ登録して LLM_PROVIDER を設定し忘れると、
+  // 既定の Anthropic がキー無しで呼ばれて全AI機能が失敗するため。
+  if (!process.env.ANTHROPIC_API_KEY && process.env.OPENAI_API_KEY) return openaiProvider;
   return anthropicProvider;
 }
