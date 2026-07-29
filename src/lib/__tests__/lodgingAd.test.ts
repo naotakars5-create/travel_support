@@ -1,4 +1,4 @@
-import { lodgingAd, lodgingKeyword, lodgingSearchUrl, needsLodging } from "../lodgingAd";
+import { lodgingAd, lodgingPrefecture, lodgingSearchUrl, needsLodging } from "../lodgingAd";
 import { PlanEntry } from "../types";
 
 const AFFILIATE = "1a2b3c4d.5e6f7g8h";
@@ -41,23 +41,31 @@ describe("needsLodging", () => {
   });
 });
 
-describe("lodgingKeyword", () => {
-  it("行き先の住所から都道府県が取れればそれを使う", () => {
+describe("lodgingPrefecture", () => {
+  it("行き先の住所から都道府県を取り、楽天の地域コードに変換する", () => {
     const entries = [entry({ place: "香川県高松市栗林町1-20-16" })];
-    expect(lodgingKeyword(entries, "高松・小豆島めぐり")).toBe("香川県");
+    expect(lodgingPrefecture(entries, "高松・小豆島めぐり")).toEqual({ name: "香川県", code: "kagawa" });
   });
 
-  it("住所が無ければ行き先の自由文にフォールバックする", () => {
-    expect(lodgingKeyword([entry()], "香川県 高松")).toBe("香川県 高松");
+  it("住所が無ければ行き先の自由文から都道府県を拾う", () => {
+    expect(lodgingPrefecture([entry()], "香川県 高松・小豆島")).toEqual({ name: "香川県", code: "kagawa" });
   });
 
-  it("どちらも無ければ null（＝枠を出さない）", () => {
-    expect(lodgingKeyword([entry()], "   ")).toBeNull();
+  it("都道府県が特定できなければ null（自由文を投げると別の県へ送ってしまうため）", () => {
+    expect(lodgingPrefecture([entry()], "高松のあたり")).toBeNull();
+    expect(lodgingPrefecture([entry()], "   ")).toBeNull();
+  });
+
+  it("都・道・府も変換できる", () => {
+    expect(lodgingPrefecture([entry({ place: "東京都千代田区" })], "")?.code).toBe("tokyo");
+    expect(lodgingPrefecture([entry({ place: "北海道札幌市" })], "")?.code).toBe("hokkaido");
+    expect(lodgingPrefecture([entry({ place: "京都府京都市" })], "")?.code).toBe("kyoto");
+    expect(lodgingPrefecture([entry({ place: "大阪府大阪市" })], "")?.code).toBe("osaka");
   });
 });
 
 describe("lodgingSearchUrl", () => {
-  const base = { keyword: "香川県", checkIn: "2026-08-10", checkOut: "2026-08-12" };
+  const base = { prefCode: "kagawa", checkIn: "2026-08-10", checkOut: "2026-08-12" };
 
   it("アフィリエイトID未設定なら null（設定しなくてもアプリが成立する）", () => {
     expect(lodgingSearchUrl(base, "")).toBeNull();
@@ -68,21 +76,31 @@ describe("lodgingSearchUrl", () => {
     expect(url.startsWith(`https://hb.afl.rakuten.co.jp/hgc/${encodeURIComponent(AFFILIATE)}/?pc=`)).toBe(true);
   });
 
-  it("チェックイン・チェックアウトの日付が遷移先に載る", () => {
-    const url = lodgingSearchUrl(base, AFFILIATE)!;
-    const target = decodeURIComponent(url.split("?pc=")[1]);
+  it("エンドポイントは searchVacant（yado/japan だと日付もエリアも無視される）", () => {
+    const target = decodeURIComponent(lodgingSearchUrl(base, AFFILIATE)!.split("?pc=")[1]);
+    expect(target.startsWith("https://search.travel.rakuten.co.jp/ds/vacant/searchVacant?")).toBe(true);
+  });
+
+  it("エリアと日付が実際のパラメータ名で載る", () => {
+    const target = decodeURIComponent(lodgingSearchUrl(base, AFFILIATE)!.split("?pc=")[1]);
+    expect(target).toContain("f_dai=japan");
+    expect(target).toContain("f_chu=kagawa");
     expect(target).toContain("f_nen1=2026");
     expect(target).toContain("f_tuki1=8");
     expect(target).toContain("f_hi1=10");
     expect(target).toContain("f_nen2=2026");
     expect(target).toContain("f_tuki2=8");
     expect(target).toContain("f_hi2=12");
-    expect(target).toContain(`f_query=${encodeURIComponent("香川県")}`);
+  });
+
+  it("料金の上限は渡さない（渡すとその額を超える宿が結果から消える）", () => {
+    const target = decodeURIComponent(lodgingSearchUrl(base, AFFILIATE)!.split("?pc=")[1]);
+    expect(target).not.toContain("f_kin=");
   });
 
   it("日付の形式が違えば null", () => {
     expect(lodgingSearchUrl({ ...base, checkIn: "2026/08/10" }, AFFILIATE)).toBeNull();
-    expect(lodgingSearchUrl({ ...base, keyword: " " }, AFFILIATE)).toBeNull();
+    expect(lodgingSearchUrl({ ...base, prefCode: " " }, AFFILIATE)).toBeNull();
   });
 });
 
@@ -114,6 +132,19 @@ describe("lodgingAd", () => {
   it("アフィリエイトID未設定なら null", () => {
     expect(
       lodgingAd({ entries, destination: "高松", tripDate: "2026-08-10", tripDayCount: 3, now, affiliateId: "" })
+    ).toBeNull();
+  });
+
+  it("都道府県が特定できなければ出さない（別の県へ送るより出さないほうがまし）", () => {
+    expect(
+      lodgingAd({
+        entries: [entry({ place: undefined })],
+        destination: "海の見えるところ",
+        tripDate: "2026-08-10",
+        tripDayCount: 3,
+        now,
+        affiliateId: AFFILIATE,
+      })
     ).toBeNull();
   });
 });

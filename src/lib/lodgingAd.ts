@@ -1,6 +1,6 @@
 import { PlanEntry } from "./types";
 import { dateForDay, formatDateStrJa, tripPhase } from "./date";
-import { tripRegion } from "./region";
+import { prefectureOf, tripRegion } from "./region";
 import { rakutenAffiliateId } from "./ads";
 
 /**
@@ -44,42 +44,118 @@ export function needsLodging(
 }
 
 /**
- * 宿探しに使う地域キーワード。
+ * 都道府県名 → 楽天トラベルの地域コード（`f_chu`）。
  *
- * `destination` は自由文（例「香川県 高松・小豆島」）なので、そのまま検索に
- * 投げると外すことがある。行き先の住所から都道府県が取れるならそちらを優先する
- * （しおりの表紙写真を探すときと同じ考え方・lib/region.ts）。
+ * 楽天トラベルの検索はキーワード文字列ではなく地域コードで場所を指定する。
+ * 自由文を投げても**黙って無視され、既定の地域（北海道）の結果が出る**ので、
+ * コードに変換できない場合は枠ごと出さないこと（別の県へ送客するほうが害が大きい）。
+ *
+ * `kagawa` は実際の検索結果URLで裏取り済み。ほかは同じローマ字表記の規則に
+ * 従っているが、ずれが見つかったらここだけ直せばよい。
  */
-export function lodgingKeyword(entries: PlanEntry[], destination: string): string | null {
-  const pref = tripRegion(entries.map((e) => e.place));
-  if (pref) return pref;
-  const d = destination.trim();
-  return d ? d : null;
+const RAKUTEN_PREF_CODE: Record<string, string> = {
+  北海道: "hokkaido",
+  青森県: "aomori",
+  岩手県: "iwate",
+  宮城県: "miyagi",
+  秋田県: "akita",
+  山形県: "yamagata",
+  福島県: "fukushima",
+  茨城県: "ibaraki",
+  栃木県: "tochigi",
+  群馬県: "gunma",
+  埼玉県: "saitama",
+  千葉県: "chiba",
+  東京都: "tokyo",
+  神奈川県: "kanagawa",
+  新潟県: "niigata",
+  富山県: "toyama",
+  石川県: "ishikawa",
+  福井県: "fukui",
+  山梨県: "yamanashi",
+  長野県: "nagano",
+  岐阜県: "gifu",
+  静岡県: "shizuoka",
+  愛知県: "aichi",
+  三重県: "mie",
+  滋賀県: "shiga",
+  京都府: "kyoto",
+  大阪府: "osaka",
+  兵庫県: "hyogo",
+  奈良県: "nara",
+  和歌山県: "wakayama",
+  鳥取県: "tottori",
+  島根県: "shimane",
+  岡山県: "okayama",
+  広島県: "hiroshima",
+  山口県: "yamaguchi",
+  徳島県: "tokushima",
+  香川県: "kagawa",
+  愛媛県: "ehime",
+  高知県: "kochi",
+  福岡県: "fukuoka",
+  佐賀県: "saga",
+  長崎県: "nagasaki",
+  熊本県: "kumamoto",
+  大分県: "oita",
+  宮崎県: "miyazaki",
+  鹿児島県: "kagoshima",
+  沖縄県: "okinawa",
+};
+
+export interface LodgingPrefecture {
+  /** 表示用の都道府県名（例: 香川県） */
+  name: string;
+  /** 楽天トラベルの地域コード（例: kagawa） */
+  code: string;
+}
+
+/**
+ * 宿探しの対象になる都道府県。地域コードに変換できなければ null。
+ *
+ * 行き先の住所から取れる都道府県を優先し（しおりの表紙写真と同じ考え方・
+ * lib/region.ts）、住所がまだ無ければ行き先の自由文から拾う。
+ * 「香川県 高松・小豆島」のような書き方でも都道府県だけ取り出せる。
+ */
+export function lodgingPrefecture(entries: PlanEntry[], destination: string): LodgingPrefecture | null {
+  const name = tripRegion(entries.map((e) => e.place)) ?? prefectureOf(destination);
+  if (!name) return null;
+  const code = RAKUTEN_PREF_CODE[name];
+  return code ? { name, code } : null;
 }
 
 /**
  * 楽天トラベルの空室検索URL（楽天アフィリエイトのラッパー経由）。
  * アフィリエイトID未設定なら null＝枠ごと出さない。
  *
- * 注: 遷移先のクエリ名（f_query / f_nen1 …）は楽天トラベル側の仕様で、
- * 変更される可能性がある。導入時は楽天アフィリエイトの管理画面で実際に
- * 発行されるリンクと突き合わせて確認すること。
+ * パラメータは実際の検索結果URLから起こしてある。特に**エンドポイントに注意**:
+ * `/ds/yado/japan` に投げると日付もエリアも黙って無視され、既定の地域
+ * （北海道）の結果が出る。`/ds/vacant/searchVacant` が正しい。
+ *
+ *   f_dai=japan     国内
+ *   f_chu=kagawa    都道府県コード（f_shou は市町村。省略して県全体で探す）
+ *   f_nen1/f_tuki1/f_hi1   チェックイン
+ *   f_nen2/f_tuki2/f_hi2   チェックアウト
+ *
+ * 料金の上限（f_kin）は渡さない。渡すとその額を超える宿が結果から消えるので、
+ * サイト側の既定に任せる。
  *
  * @param affiliateId テスト用に上書きできるようにしてある。
  */
 export function lodgingSearchUrl(
-  opts: { keyword: string; checkIn: string; checkOut: string; adults?: number },
+  opts: { prefCode: string; checkIn: string; checkOut: string; adults?: number },
   affiliateId: string = rakutenAffiliateId()
 ): string | null {
   const id = affiliateId.trim();
   if (!id) return null;
   const inParts = splitDate(opts.checkIn);
   const outParts = splitDate(opts.checkOut);
-  if (!opts.keyword.trim() || !inParts || !outParts) return null;
+  if (!opts.prefCode.trim() || !inParts || !outParts) return null;
 
   // React Native の URLSearchParams は実装が不完全なので、mapsLink.ts と同じく手で組む
   const q = [
-    `f_query=${encodeURIComponent(opts.keyword.trim())}`,
+    `f_dai=japan`,
+    `f_chu=${encodeURIComponent(opts.prefCode.trim())}`,
     `f_nen1=${inParts.y}`,
     `f_tuki1=${inParts.m}`,
     `f_hi1=${inParts.d}`,
@@ -88,8 +164,10 @@ export function lodgingSearchUrl(
     `f_hi2=${outParts.d}`,
     `f_heya_su=1`,
     `f_otona_su=${Math.max(1, Math.floor(opts.adults ?? 2))}`,
+    `f_tab=hotel`,
+    `f_hyoji=30`,
   ].join("&");
-  const target = `https://search.travel.rakuten.co.jp/ds/yado/japan?${q}`;
+  const target = `https://search.travel.rakuten.co.jp/ds/vacant/searchVacant?${q}`;
   return `https://hb.afl.rakuten.co.jp/hgc/${encodeURIComponent(id)}/?pc=${encodeURIComponent(target)}`;
 }
 
@@ -101,7 +179,7 @@ function splitDate(s: string): { y: number; m: number; d: number } | null {
 }
 
 export interface LodgingAd {
-  /** 検索に使う地域名（カードにも出す） */
+  /** 対象の都道府県名（カードにも出す） */
   keyword: string;
   /** チェックイン日（YYYY-MM-DD） */
   checkIn: string;
@@ -130,21 +208,23 @@ export function lodgingAd(opts: {
   const { entries, destination, tripDate, tripDayCount, now } = opts;
   if (!needsLodging(entries, tripDayCount, tripDate, now)) return null;
 
-  const keyword = lodgingKeyword(entries, destination);
-  if (!keyword) return null;
+  // 地域コードに変換できないときは出さない。自由文を投げても黙って無視され、
+  // 関係のない県の宿一覧へ送ってしまうため（出さないほうがまし）
+  const pref = lodgingPrefecture(entries, destination);
+  if (!pref) return null;
 
   const days = Math.floor(tripDayCount);
   const checkIn = tripDate;
   const checkOut = dateForDay(tripDate, days);
   const url = lodgingSearchUrl(
-    { keyword, checkIn, checkOut },
+    { prefCode: pref.code, checkIn, checkOut },
     opts.affiliateId ?? rakutenAffiliateId()
   );
   if (!url) return null;
 
   const nights = days - 1;
   return {
-    keyword,
+    keyword: pref.name,
     checkIn,
     checkOut,
     nights,
