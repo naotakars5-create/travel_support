@@ -3,6 +3,10 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PackingItem } from "@/lib/types";
 import { packingProgress } from "@/lib/packing";
+import { gearLinkFor } from "@/lib/gear";
+import { AMAZON_DISCLOSURE } from "@/lib/ads";
+import { useAdFree } from "@/hooks/useAdFree";
+import { AdDisclosure, AdInlineLink } from "./AdSlot";
 import { Illustration } from "./Illustration";
 
 const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
@@ -24,6 +28,15 @@ export function PackingScreen({
   const insets = useSafeAreaInsets();
   const [input, setInput] = useState("");
   const { done, total } = packingProgress(items);
+  const adFree = useAdFree();
+
+  /**
+   * 商品リンクは「まだチェックが付いていない項目」にだけ添える。
+   * チェック済み＝もう持っているので、勧める理由が無い。
+   * ここを分けないとリストが広告だらけに見える。
+   */
+  const gearLink = (item: PackingItem) => (adFree || item.checked ? null : gearLinkFor(item.label));
+  const anyGearLink = items.some((i) => gearLink(i) !== null);
 
   const submit = () => {
     if (!input.trim()) return;
@@ -54,22 +67,30 @@ export function PackingScreen({
       <View className="h-px w-full bg-highlight/60" />
 
       <ScrollView className="flex-1 px-[26px]" contentContainerStyle={{ paddingTop: 8, paddingBottom: 90 }} keyboardShouldPersistTaps="handled">
-        {items.map((item) => (
-          <View key={item.id} className="flex-row items-center gap-3 border-b border-black/[.06] py-3">
-            <Pressable onPress={() => onToggle(item.id)} hitSlop={8}>
-              {/* チェック済みはマスタード塗り（完了＝highlight） */}
-              <View className={`h-[22px] w-[22px] items-center justify-center rounded-[6px] border ${item.checked ? "border-highlight bg-highlight" : "border-black/[.25]"}`}>
-                {item.checked && <View className="h-[9px] w-[9px] rounded-[2px] bg-ink" />}
+        {items.map((item) => {
+          const gear = gearLink(item);
+          return (
+            <View key={item.id} className="flex-row items-center gap-3 border-b border-black/[.06] py-3">
+              <Pressable onPress={() => onToggle(item.id)} hitSlop={8}>
+                {/* チェック済みはマスタード塗り（完了＝highlight） */}
+                <View className={`h-[22px] w-[22px] items-center justify-center rounded-[6px] border ${item.checked ? "border-highlight bg-highlight" : "border-black/[.25]"}`}>
+                  {item.checked && <View className="h-[9px] w-[9px] rounded-[2px] bg-ink" />}
+                </View>
+              </Pressable>
+              {/* 商品リンクは項目名の下にぶら下げる。チェックの当たり判定と重ねないよう
+                  Pressable を入れ子にせず、列に分けて並べる */}
+              <View className="flex-1">
+                <Pressable onPress={() => onToggle(item.id)}>
+                  <Text className={`font-mincho-400 text-[15px] ${item.checked ? "text-muted-light line-through" : "text-ink"}`}>{item.label}</Text>
+                </Pressable>
+                {gear && <AdInlineLink label={gear.label} url={gear.url} />}
               </View>
-            </Pressable>
-            <Pressable className="flex-1" onPress={() => onToggle(item.id)}>
-              <Text className={`font-mincho-400 text-[15px] ${item.checked ? "text-muted-light line-through" : "text-ink"}`}>{item.label}</Text>
-            </Pressable>
-            <Pressable onPress={() => onRemove(item.id)} hitSlop={8}>
-              <Text className="font-gothic-400 text-[16px] text-muted-light">×</Text>
-            </Pressable>
-          </View>
-        ))}
+              <Pressable onPress={() => onRemove(item.id)} hitSlop={8}>
+                <Text className="font-gothic-400 text-[16px] text-muted-light">×</Text>
+              </Pressable>
+            </View>
+          );
+        })}
 
         {/* 全部チェックできたときだけ「準備完了」を出す（1つでも外れたら消える） */}
         {total > 0 && done === total && (
@@ -96,6 +117,9 @@ export function PackingScreen({
             <Text className="font-gothic-500 text-[12px] text-kinari">追加</Text>
           </Pressable>
         </View>
+
+        {/* Amazonアソシエイト規約が掲示を求める定型文。リンクを1つでも出したら必ず置く */}
+        {anyGearLink && <AdDisclosure text={AMAZON_DISCLOSURE} />}
       </ScrollView>
     </View>
   );
