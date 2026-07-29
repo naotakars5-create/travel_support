@@ -256,6 +256,7 @@ export default function Home() {
           error={app.shareState.error}
           onClose={app.closeShare}
           onRetry={app.retryShare}
+          onShareImage={app.shareItineraryImage}
         />
       )}
 

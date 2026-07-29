@@ -300,10 +300,11 @@ export function PlanScreen({
           <View className="mb-4 rounded-[12px] border border-ink/[.15] bg-white/50 px-4 py-3">
             <Text className="font-gothic-500 text-[12px] text-ink">共有された旅程（閲覧のみ）</Text>
             <Text className="mt-1 font-gothic-400 text-[11px] leading-[18px] text-muted">
-              旅程・当日ビュー（残り時間・近くのスポット）を見られます。編集はできません。
+              旅程・当日ビュー（残り時間・近くのスポット）を見られます。取り込むと、
+              まったく同じ内容が自分の旅になり、編集できます。
             </Text>
             <Pressable onPress={onImportShared} className="mt-2 self-start rounded-full bg-ink px-3 py-1.5">
-              <Text className="font-gothic-500 text-[12px] text-kinari">自分のプランに保存して編集</Text>
+              <Text className="font-gothic-500 text-[12px] text-kinari">自分の旅として取り込む</Text>
             </Pressable>
           </View>
         )}

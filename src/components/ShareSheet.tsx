@@ -23,15 +23,19 @@ export function ShareSheet({
   error,
   onClose,
   onRetry,
+  onShareImage,
 }: {
   /** 発行できた共有リンク。作成中は null */
   url: string | null;
   error: string | null;
   onClose: () => void;
   onRetry: () => void;
+  /** 旅程を画像1枚にして共有する（アプリを使っていない相手向け） */
+  onShareImage: () => Promise<"shared" | "cancelled" | "downloaded" | "failed">;
 }) {
   const insets = useSafeAreaInsets();
   const [notice, setNotice] = useState<string | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
 
   useEffect(() => {
     if (!notice) return;
@@ -49,6 +53,19 @@ export function ShareSheet({
     }
     if (res === "failed") setNotice("送信アプリを開けませんでした。コピーしてお使いください");
     if (res === "shared") onClose();
+  };
+
+  const sendImage = async () => {
+    if (imageBusy) return;
+    setImageBusy(true);
+    try {
+      const res = await onShareImage();
+      if (res === "downloaded") setNotice("画像を保存しました。写真から送ってください");
+      if (res === "failed") setNotice("画像を作れませんでした");
+      if (res === "shared") onClose();
+    } finally {
+      setImageBusy(false);
+    }
   };
 
   const copy = async () => {
@@ -87,21 +104,47 @@ export function ShareSheet({
                 </View>
               ) : (
                 <>
-                  <Text className="font-gothic-400 text-[12px] leading-[19px] text-muted">
-                    このリンクを知っている人は、旅程を見られます（編集はできません）。90日で自動的に開けなくなります。
-                  </Text>
-
-                  {/* リンクは必ず文字でも見せる。コピーの仕組みが使えない環境でも手で選べるように */}
-                  <View className="mt-3 rounded-[10px] border border-black/[.12] bg-white/70 px-3 py-2.5">
-                    <Text selectable className="font-gothic-400 text-[12px] leading-[19px] text-ink">
-                      {url}
+                  {/* 相手がこのアプリを使っているかで、渡すものを変える。
+                      リンクは旅程がそのまま開けて取り込めるが、使っていない人には踏まれにくい。
+                      その場合は画像1枚で渡すほうが確実に読んでもらえる。 */}
+                  <View className="rounded-[12px] border border-accent/[.45] bg-accent/[.08] px-4 py-3">
+                    <Text className="font-gothic-700 text-[12px] text-accent">アプリを使っている人へ</Text>
+                    <Text className="mt-1 font-gothic-400 text-[11px] leading-[17px] text-muted">
+                      リンクを開くと、同じ旅程がそのままアプリに表示されます。「自分の旅として取り込む」を押せば、
+                      まったく同じ内容を自分の旅として編集できます。
                     </Text>
+
+                    {/* リンクは必ず文字でも見せる。コピーの仕組みが使えない環境でも手で選べるように */}
+                    <View className="mt-2.5 rounded-[10px] border border-black/[.12] bg-white/70 px-3 py-2.5">
+                      <Text selectable className="font-gothic-400 text-[12px] leading-[19px] text-ink">
+                        {url}
+                      </Text>
+                    </View>
+
+                    <View className="mt-3 gap-2">
+                      <Button label="リンクを送る（LINE・メールなど）" onPress={() => void send()} />
+                      <Button label="リンクをコピー" tone="secondary" onPress={() => void copy()} />
+                    </View>
                   </View>
 
-                  <View className="mt-4 gap-2.5">
-                    <Button label="送る（LINE・メールなど）" size="lg" onPress={() => void send()} />
-                    <Button label="リンクをコピー" tone="secondary" onPress={() => void copy()} />
+                  <View className="mt-3 rounded-[12px] border border-ink/[.15] bg-white/50 px-4 py-3">
+                    <Text className="font-gothic-700 text-[12px] text-ink">アプリを使っていない人へ</Text>
+                    <Text className="mt-1 font-gothic-400 text-[11px] leading-[17px] text-muted">
+                      旅程を画像1枚にして送ります。アプリもリンクも不要で、そのまま読めます。
+                    </Text>
+                    <View className="mt-3">
+                      <Button
+                        label={imageBusy ? "画像を作っています…" : "旅程を画像で送る"}
+                        tone="secondary"
+                        loading={imageBusy}
+                        onPress={() => void sendImage()}
+                      />
+                    </View>
                   </View>
+
+                  <Text className="mt-3 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
+                    リンクを知っている人は旅程を見られます（そのままでは編集できません）。90日で自動的に開けなくなります。
+                  </Text>
 
                   {notice && (
                     <Text className="mt-3 text-center font-gothic-500 text-[12px] text-accent">{notice}</Text>
