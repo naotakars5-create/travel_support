@@ -47,7 +47,17 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Web版をビルド
-        run: npx expo export --platform web
+        # `eas env:exec` で包むのは EXPO_PUBLIC_* をバンドルに焼き込むため。
+        #
+        # EXPO_PUBLIC_* は「ビルド時にbabelが値を直接埋め込む」変数なので、
+        # ビルドしているこのプロセスの環境に値が無いと undefined のまま固まる。
+        # 下の `eas deploy --environment production` が紐付けるのは
+        # サーバー（APIルート）が読む変数だけで、ビルド済みのクライアント
+        # バンドルには後から入らない。
+        #
+        # これが無いと EXPO_PUBLIC_AMAZON_TAG / EXPO_PUBLIC_RAKUTEN_AFFILIATE_ID が
+        # 空のままビルドされ、広告枠が本番で「エラーも出さずに1つも表示されない」。
+        run: eas env:exec --environment production "npx expo export --platform web"
 
       - name: 本番へデプロイ
         # expo-github-action が `eas` コマンドを PATH に入れる。
