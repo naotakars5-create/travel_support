@@ -57,7 +57,12 @@ jobs:
         #
         # これが無いと EXPO_PUBLIC_AMAZON_TAG / EXPO_PUBLIC_RAKUTEN_AFFILIATE_ID が
         # 空のままビルドされ、広告枠が本番で「エラーも出さずに1つも表示されない」。
-        run: eas env:exec --environment production "npx expo export --platform web"
+        #
+        # 環境名は `--environment` フラグではなく**位置引数**で渡す
+        # （`eas env:exec ENVIRONMENT BASH_COMMAND`）。フラグで書くと
+        # "Nonexistent flag: --environment" で落ちる。下の `eas deploy` は
+        # フラグ形式なので、同じ書き方だと思って揃えないこと。
+        run: eas env:exec production "npx expo export --platform web" --non-interactive
 
       - name: 本番へデプロイ
         # expo-github-action が `eas` コマンドを PATH に入れる。
