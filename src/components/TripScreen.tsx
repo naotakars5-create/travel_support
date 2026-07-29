@@ -135,6 +135,8 @@ export function TripScreen({
           onAddSuggestions={app.addSuggestions}
           onShare={app.shareCurrentPlan}
           onImportShared={app.importSharedToOwn}
+          destination={app.tripDestination}
+          now={app.now}
         />
       )}
     </View>

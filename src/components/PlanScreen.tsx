@@ -26,6 +26,9 @@ import { FlowSteps } from "./FlowSteps";
 import { COLORS, dayColor, tint } from "@/lib/palette";
 import { Floater } from "./animations";
 import { Button, SectionHeading } from "./ui";
+import { lodgingAd } from "@/lib/lodgingAd";
+import { useAdFree } from "@/hooks/useAdFree";
+import { AdCard } from "./AdSlot";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
@@ -108,6 +111,8 @@ export function PlanScreen({
   embedded = false,
   canUndoCompose,
   onUndoCompose,
+  destination = "",
+  now,
 }: {
   entries: PlanEntry[];
   totals: PlanTotals;
@@ -151,8 +156,13 @@ export function PlanScreen({
   /** AIの組み直しを取り消せるか。取り消しは組み直した直後の画面に出す */
   canUndoCompose: boolean;
   onUndoCompose: () => void;
+  /** 行き先（例: 香川県 高松・小豆島）。宿探しの検索キーワードに使う */
+  destination?: string;
+  /** 現在時刻。旅行前かどうかの判定に使う */
+  now: Date;
 }) {
   const insets = useSafeAreaInsets();
+  const adFree = useAdFree();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const togglePick = (title: string) =>
     setPicked((prev) => {
@@ -175,6 +185,10 @@ export function PlanScreen({
     (e.fixedTime && e.arriveBy ? e.arriveBy : scheduleByEntry.get(e.id) ?? e.arriveBy) ?? null;
   // 宿泊・レンタカーは「固定枠」として別枠。並び替えの対象外。
   const lodging = entries.filter((e) => e.mode === "stay");
+  // 泊まりなのに宿が未登録なら宿探しの枠を出す。宿を1件入れたら消える（lib/lodgingAd.ts）
+  const lodgingSuggest = adFree
+    ? null
+    : lodgingAd({ entries, destination, tripDate, tripDayCount, now });
   const rentals = entries.filter((e) => e.mode === "rental");
   // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番（固定枠は除外）
   const indexOf = new Map(entries.map((e, i) => [e.id, i]));
@@ -351,12 +365,27 @@ export function PlanScreen({
               </Pressable>
             </View>
             {lodging.length === 0 ? (
-              <View className="mt-1 flex-row items-center gap-3">
-                <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
-                <Text className="flex-1 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
-                  ホテル等はここで固定登録します。旅程の並び替え対象にはなりません。
-                </Text>
-              </View>
+              <>
+                <View className="mt-1 flex-row items-center gap-3">
+                  <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
+                  <Text className="flex-1 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
+                    ホテル等はここで固定登録します。旅程の並び替え対象にはなりません。
+                  </Text>
+                </View>
+                {/* 泊まりなのに宿が空のときだけ出す。外部の予約サイトと「自分で登録」を
+                    必ず並べる（片方だけだと単なる広告になる） */}
+                {lodgingSuggest && (
+                  <AdCard
+                    title={`${lodgingSuggest.nights}泊ぶんの宿が決まっていません`}
+                    sub={`${lodgingSuggest.keyword} · ${lodgingSuggest.rangeLabel}`}
+                    body="予約したら、旅タブの「＋」→「メールから追加」に予約確認メールを貼ると、チェックイン・チェックアウト時刻ごと旅程に入ります。"
+                    actionLabel="宿を探す（楽天トラベル）"
+                    url={lodgingSuggest.url}
+                    secondaryLabel="自分で登録"
+                    onSecondary={onOpenAddLodging}
+                  />
+                )}
+              </>
             ) : (
               <View className="mt-2 gap-2">
                 {lodging.map((e) => (
