@@ -22,6 +22,7 @@ import {
 import { buildDefaultPacking } from "@/lib/packing";
 import { DEFAULT_PROFILE, loadProfile, Profile, saveProfile } from "@/lib/profile";
 import { buildShareUrl, readSharedPlanFromUrl, SHARE_PARAM, SHORT_PARAM } from "@/lib/share";
+import { buildItineraryImageData, renderItineraryImage, shareImageBlob } from "@/lib/shareImage";
 import { BaseMode, CarWindow, EdgeTravel, createPrecomputedEstimator, edgeKey, guessMode } from "@/lib/transit";
 import { createSpotProvider, Spot } from "@/lib/spots";
 import { dateForDay, dayOfIso, todayDateStr } from "@/lib/date";
@@ -1027,6 +1028,20 @@ export function useAppState() {
 
   const closeShare = useCallback(() => setShareState({ open: false, url: null, error: null }), []);
 
+  /**
+   * 旅程を画像1枚にして共有する（アプリを使っていない相手向け）。
+   * リンクを踏んでもらえない相手にも、そのまま読める形で渡せるようにする。
+   */
+  const shareItineraryImage = useCallback(async (): Promise<"shared" | "cancelled" | "downloaded" | "failed"> => {
+    const list = entries ?? [];
+    if (list.length === 0) return "failed";
+    const title = tripName.trim() || defaultTripName(tripDestination, tripDateRef.current);
+    const data = buildItineraryImageData(list, slots, tripDateRef.current, tripDayCount, title);
+    const blob = await renderItineraryImage(data);
+    if (!blob) return "failed";
+    return shareImageBlob(blob, `${data.title}.png`, data.title);
+  }, [entries, slots, tripDayCount, tripName, tripDestination]);
+
   /** 共有リンクで開いたプランを、自分用（編集可）として取り込む。 */
   const importSharedToOwn = useCallback(() => {
     setReadOnly(false);
@@ -1426,6 +1441,7 @@ export function useAppState() {
     retryShare: buildShareLink,
     closeShare,
     importSharedToOwn,
+    shareItineraryImage,
     addEntry,
     addSpot,
     bulkAddFromText,
