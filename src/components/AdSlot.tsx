@@ -96,6 +96,49 @@ export function AdCard({
   );
 }
 
+/**
+ * 送客の主導線。ユーザーが自分から押しに来る機能（宿を探す等）に使う。
+ *
+ * `AdCard` と違って**常設してよい**。押されるまで何もしない受け身の
+ * ボタンなので、押しつけにはならない。そのぶん見つけやすさを優先して
+ * 塗りボタンにしてある。
+ *
+ * `sub` には検索条件（エリア・日付・人数）を必ず入れること。遷移先が
+ * 自分の条件で検索済みだと分かると、押すかどうかの判断ができる。
+ * 何が起きるか分からないボタンは押されないし、押されても失望される。
+ */
+export function AdActionButton({
+  label,
+  sub,
+  url,
+  compact,
+}: {
+  label: string;
+  /** 検索条件など「押した先に何があるか」 */
+  sub?: string;
+  url: string;
+  /** 小さく出す（枠が狭い場所用） */
+  compact?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={() => void Linking.openURL(url)}
+      accessibilityRole="link"
+      accessibilityLabel={`${label}（広告・外部サイトが開きます）`}
+      className={`flex-row items-center justify-center gap-2 rounded-[12px] bg-ink ${compact ? "px-3 py-2" : "px-4 py-3"}`}
+    >
+      <View className="shrink">
+        <Text className={`text-center font-gothic-700 text-kinari ${compact ? "text-[12px]" : "text-[14px]"}`}>{label}</Text>
+        {sub ? <Text className="mt-0.5 text-center font-gothic-400 text-[10px] text-kinari/75">{sub}</Text> : null}
+      </View>
+      {/* 塗りの上なのでクリーム側の枠線にする。PR表記は省略できない */}
+      <View className="shrink-0 rounded-[4px] border border-kinari/50 px-1.5 py-[1px]">
+        <Text className="font-gothic-500 text-[9px] tracking-[.08em] text-kinari/80">{AD_LABEL}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 /** 画面の末尾に置く、収益についてのひとこと。広告を1つでも出した画面には必ず置く。 */
 export function AdDisclosure({ text }: { text: string }) {
   return <Text className="mt-4 font-gothic-400 text-[10px] leading-[16px] text-muted-light">{text}</Text>;

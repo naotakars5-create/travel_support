@@ -1,4 +1,4 @@
-import { lodgingAd, lodgingPrefecture, lodgingSearchUrl, needsLodging } from "../lodgingAd";
+import { lodgingNights, lodgingPrefecture, lodgingProgress, lodgingSearchUrl, nightIndexOf } from "../lodgingAd";
 import { PlanEntry } from "../types";
 
 const AFFILIATE = "1a2b3c4d.5e6f7g8h";
@@ -14,37 +14,18 @@ function entry(over: Partial<PlanEntry> = {}): PlanEntry {
   };
 }
 
-describe("needsLodging", () => {
-  const now = new Date("2026-08-01T10:00:00");
+/** 香川県の宿（n泊目のチェックイン日を指定する） */
+function stay(nth: number, tripDate: string, over: Partial<PlanEntry> = {}): PlanEntry {
+  const d = new Date(`${tripDate}T00:00`);
+  d.setDate(d.getDate() + (nth - 1));
+  return entry({ id: `stay-${nth}`, title: `${nth}泊目のホテル`, mode: "stay", arriveBy: `${d.toISOString().slice(0, 10)}T15:00:00`, ...over });
+}
 
-  it("日帰りには出さない", () => {
-    expect(needsLodging([entry()], 1, "2026-08-10", now)).toBe(false);
-  });
-
-  it("泊まりで宿が無ければ出す", () => {
-    expect(needsLodging([entry()], 2, "2026-08-10", now)).toBe(true);
-  });
-
-  it("宿が1件でも入っていれば出さない", () => {
-    const entries = [entry(), entry({ id: "e2", title: "ホテル", mode: "stay" })];
-    expect(needsLodging(entries, 3, "2026-08-10", now)).toBe(false);
-  });
-
-  it("旅行が始まったら出さない（今から宿を勧めても遅い）", () => {
-    const during = new Date("2026-08-11T10:00:00");
-    expect(needsLodging([entry()], 3, "2026-08-10", during)).toBe(false);
-  });
-
-  it("旅行が終わっていれば出さない", () => {
-    const after = new Date("2026-08-20T10:00:00");
-    expect(needsLodging([entry()], 3, "2026-08-10", after)).toBe(false);
-  });
-});
+const KAGAWA = [entry({ place: "香川県高松市栗林町1-20-16" })];
 
 describe("lodgingPrefecture", () => {
   it("行き先の住所から都道府県を取り、楽天の地域コードに変換する", () => {
-    const entries = [entry({ place: "香川県高松市栗林町1-20-16" })];
-    expect(lodgingPrefecture(entries, "高松・小豆島めぐり")).toEqual({ name: "香川県", code: "kagawa" });
+    expect(lodgingPrefecture(KAGAWA, "高松・小豆島めぐり")).toEqual({ name: "香川県", code: "kagawa" });
   });
 
   it("住所が無ければ行き先の自由文から都道府県を拾う", () => {
@@ -52,7 +33,7 @@ describe("lodgingPrefecture", () => {
   });
 
   it("都道府県が特定できなければ null（自由文を投げると別の県へ送ってしまうため）", () => {
-    expect(lodgingPrefecture([entry()], "高松のあたり")).toBeNull();
+    expect(lodgingPrefecture([entry()], "海の見えるところ")).toBeNull();
     expect(lodgingPrefecture([entry()], "   ")).toBeNull();
   });
 
@@ -104,47 +85,92 @@ describe("lodgingSearchUrl", () => {
   });
 });
 
-describe("lodgingAd", () => {
+describe("nightIndexOf", () => {
+  it("チェックイン日から何泊目かを求める", () => {
+    expect(nightIndexOf(stay(2, "2026-08-10"), "2026-08-10", 2)).toBe(2);
+  });
+
+  it("宿以外は対象外", () => {
+    expect(nightIndexOf(entry(), "2026-08-10", 2)).toBeNull();
+  });
+
+  it("泊数の範囲外なら null（日数を減らしたあとの宿が枠に居座らない）", () => {
+    expect(nightIndexOf(stay(3, "2026-08-10"), "2026-08-10", 2)).toBeNull();
+  });
+});
+
+describe("lodgingNights", () => {
   const now = new Date("2026-08-01T10:00:00");
-  const entries = [entry({ place: "香川県高松市栗林町1-20-16" })];
+  const common = { destination: "高松", tripDate: "2026-08-10", now, affiliateId: AFFILIATE };
 
-  it("2泊3日ならチェックアウトは最終日・泊数は2", () => {
-    const ad = lodgingAd({
-      entries,
-      destination: "高松",
-      tripDate: "2026-08-10",
-      tripDayCount: 3,
-      now,
-      affiliateId: AFFILIATE,
-    })!;
-    expect(ad.checkIn).toBe("2026-08-10");
-    expect(ad.checkOut).toBe("2026-08-12");
-    expect(ad.nights).toBe(2);
-    expect(ad.keyword).toBe("香川県");
-    expect(ad.rangeLabel).toContain("2泊");
+  it("3日間なら2泊ぶんの枠ができる", () => {
+    const nights = lodgingNights({ ...common, entries: KAGAWA, tripDayCount: 3 });
+    expect(nights.map((n) => [n.nth, n.checkIn, n.checkOut])).toEqual([
+      [1, "2026-08-10", "2026-08-11"],
+      [2, "2026-08-11", "2026-08-12"],
+    ]);
   });
 
-  it("条件を満たさなければ null", () => {
-    const common = { entries, destination: "高松", tripDate: "2026-08-10", now, affiliateId: AFFILIATE };
-    expect(lodgingAd({ ...common, tripDayCount: 1 })).toBeNull();
+  it("日帰りは枠ごと出ない", () => {
+    expect(lodgingNights({ ...common, entries: KAGAWA, tripDayCount: 1 })).toEqual([]);
   });
 
-  it("アフィリエイトID未設定なら null", () => {
-    expect(
-      lodgingAd({ entries, destination: "高松", tripDate: "2026-08-10", tripDayCount: 3, now, affiliateId: "" })
-    ).toBeNull();
+  it("各泊のリンクは、その1泊ぶんの日付で検索する", () => {
+    const nights = lodgingNights({ ...common, entries: KAGAWA, tripDayCount: 3 });
+    const target = decodeURIComponent(nights[1].searchUrl!.split("?pc=")[1]);
+    expect(target).toContain("f_hi1=11"); // 2泊目のチェックインは 8/11
+    expect(target).toContain("f_hi2=12");
   });
 
-  it("都道府県が特定できなければ出さない（別の県へ送るより出さないほうがまし）", () => {
-    expect(
-      lodgingAd({
-        entries: [entry({ place: undefined })],
-        destination: "海の見えるところ",
-        tripDate: "2026-08-10",
-        tripDayCount: 3,
-        now,
-        affiliateId: AFFILIATE,
-      })
-    ).toBeNull();
+  it("宿が入っている泊にはリンクを出さない", () => {
+    const entries = [...KAGAWA, stay(1, "2026-08-10")];
+    const nights = lodgingNights({ ...common, entries, tripDayCount: 3 });
+    expect(nights[0].entry?.title).toBe("1泊目のホテル");
+    expect(nights[0].searchUrl).toBeNull();
+    expect(nights[1].searchUrl).not.toBeNull();
+  });
+
+  it("「宿を取らない」と決めた泊にはリンクを出さない", () => {
+    const nights = lodgingNights({ ...common, entries: KAGAWA, tripDayCount: 3, skipped: [1] });
+    expect(nights[0].skipped).toBe(true);
+    expect(nights[0].searchUrl).toBeNull();
+    expect(nights[1].searchUrl).not.toBeNull();
+  });
+
+  it("過ぎた泊にはリンクを出さない（記録としては残す）", () => {
+    const during = new Date("2026-08-12T10:00:00");
+    const nights = lodgingNights({ ...common, entries: KAGAWA, tripDayCount: 3, now: during });
+    expect(nights[0].past).toBe(true);
+    expect(nights[0].searchUrl).toBeNull();
+  });
+
+  it("今夜の泊に印が付く（旅行中の「今夜の宿がまだ」を拾う）", () => {
+    const during = new Date("2026-08-11T18:00:00");
+    const nights = lodgingNights({ ...common, entries: KAGAWA, tripDayCount: 3, now: during });
+    expect(nights[1].tonight).toBe(true);
+    expect(nights[1].searchUrl).not.toBeNull(); // 旅行中でも今夜の宿は探せる
+  });
+
+  it("都道府県が特定できなければリンクは出ないが、枠自体は残る", () => {
+    const nights = lodgingNights({ ...common, entries: [entry()], destination: "海の見えるところ", tripDayCount: 3 });
+    expect(nights).toHaveLength(2);
+    expect(nights.every((n) => n.searchUrl === null)).toBe(true);
+  });
+
+  it("アフィリエイトID未設定でも枠は残る（宿の管理はアプリの機能なので消さない）", () => {
+    const nights = lodgingNights({ ...common, entries: KAGAWA, tripDayCount: 3, affiliateId: "" });
+    expect(nights).toHaveLength(2);
+    expect(nights.every((n) => n.searchUrl === null)).toBe(true);
+  });
+});
+
+describe("lodgingProgress", () => {
+  const now = new Date("2026-08-01T10:00:00");
+  const common = { destination: "高松", tripDate: "2026-08-10", now, affiliateId: AFFILIATE, tripDayCount: 3 };
+
+  it("宿が入った泊と「取らない」と決めた泊を、どちらも決定として数える", () => {
+    expect(lodgingProgress(lodgingNights({ ...common, entries: KAGAWA }))).toEqual({ done: 0, total: 2 });
+    expect(lodgingProgress(lodgingNights({ ...common, entries: [...KAGAWA, stay(1, "2026-08-10")] }))).toEqual({ done: 1, total: 2 });
+    expect(lodgingProgress(lodgingNights({ ...common, entries: KAGAWA, skipped: [1, 2] }))).toEqual({ done: 2, total: 2 });
   });
 });

@@ -33,6 +33,11 @@ export interface PersistedState {
   transitCache?: Record<string, EdgeTravel>;
   /** AIへのお願い（自由文）。旅程を組むときの希望として毎回渡す */
   planRequest?: string;
+  /**
+   * 「宿を取らない」と決めた泊（1始まりの泊番号）。実家・車中泊・夜行バスなど。
+   * 宿泊先の枠を閉じるために使う。未指定は空扱い。
+   */
+  lodgingSkipped?: number[];
   savedAt: string;
 }
 

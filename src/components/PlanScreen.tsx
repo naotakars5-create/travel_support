@@ -26,9 +26,9 @@ import { FlowSteps } from "./FlowSteps";
 import { COLORS, dayColor, tint } from "@/lib/palette";
 import { Floater } from "./animations";
 import { Button, SectionHeading } from "./ui";
-import { lodgingAd } from "@/lib/lodgingAd";
+import { LodgingNight, lodgingNights, lodgingPrefecture, lodgingProgress } from "@/lib/lodgingAd";
 import { useAdFree } from "@/hooks/useAdFree";
-import { AdCard } from "./AdSlot";
+import { AdActionButton } from "./AdSlot";
 
 const TNUM: TextStyle = { fontVariant: ["tabular-nums"] };
 const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
@@ -74,6 +74,142 @@ function WishChip({ entry, disabled, onPress }: { entry: PlanEntry; disabled?: b
   );
 }
 
+/** 登録済みの宿1件の行（宿泊先の枠と、日帰り時の固定枠で共用）。 */
+function LodgingEntryRow({
+  entry,
+  tripDayCount,
+  onEdit,
+  onRemove,
+}: {
+  entry: PlanEntry;
+  tripDayCount: number;
+  onEdit: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <View className="flex-row items-center gap-3">
+      {/* 宿の写真があれば写真、無ければベッドのアイコン */}
+      {entry.photoRef ? (
+        <SpotThumb photoRef={entry.photoRef} attribution={entry.photoAttribution} size={40} />
+      ) : (
+        <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
+      )}
+      <Pressable onPress={() => onEdit(entry.id)} className="flex-1">
+        <Text className="font-mincho-600 text-[13px] text-ink">{entry.title}</Text>
+        <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted" style={TNUM}>
+          {tripDayCount > 1 ? `${entry.day ?? 1}日目 · ` : ""}
+          {entry.arriveBy ? `IN ${formatJstTime(new Date(entry.arriveBy))}` : ""}
+          {entry.checkOut ? ` → OUT ${formatJstTime(new Date(entry.checkOut))}` : ""}
+        </Text>
+        {entry.place && (
+          <Text numberOfLines={1} className="font-gothic-400 text-[11px] text-muted-light">
+            {entry.place}
+          </Text>
+        )}
+      </Pressable>
+      <Pressable onPress={() => onRemove(entry.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`${entry.title || "この項目"}を削除`}>
+        <Text className="font-gothic-400 text-[15px] text-muted-light">×</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * 1泊ぶんの枠。埋まっていれば宿を、空いていれば探す導線を出す。
+ *
+ * 「宿を探す」と「自分で入力」を必ず並べる。外部サイトへの導線だけを置くと
+ * ただの広告になるが、アプリ内で完結する手段と並ぶと
+ * 「未確定の泊を埋める2つの手段」になる。
+ */
+function LodgingNightRow({
+  night,
+  areaLabel,
+  onEdit,
+  onRemove,
+  onAdd,
+  onToggleSkip,
+}: {
+  night: LodgingNight;
+  /** 検索対象のエリア名（例: 香川県） */
+  areaLabel?: string;
+  onEdit: (id: string) => void;
+  onRemove: (id: string) => void;
+  onAdd: () => void;
+  onToggleSkip: (nth: number) => void;
+}) {
+  const head = (
+    <View className="flex-row items-center gap-2">
+      <Text className="font-gothic-700 text-[11px] text-ink">{night.nth}泊目</Text>
+      {night.tonight && (
+        <View className="rounded-full bg-accent px-2 py-[1px]">
+          <Text className="font-gothic-700 text-[9px] text-kinari">今夜</Text>
+        </View>
+      )}
+      <Text className="flex-1 font-gothic-400 text-[10px] text-muted" style={TNUM}>
+        {night.rangeLabel}
+      </Text>
+    </View>
+  );
+
+  // 宿を取らないと決めた泊。閉じてあるだけなので、押せば戻せる
+  if (night.skipped) {
+    return (
+      <View className="rounded-[10px] border border-ink/[.08] px-3 py-2 opacity-60">
+        {head}
+        <Pressable onPress={() => onToggleSkip(night.nth)} hitSlop={6} className="mt-1 self-start">
+          <Text className="font-gothic-400 text-[11px] text-muted-light">宿泊なし · 押すと戻せます</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (night.entry) {
+    return (
+      <View className="rounded-[10px] border border-ink/10 bg-white/50 px-3 py-2">
+        {head}
+        <View className="mt-1.5">
+          <LodgingEntryRow entry={night.entry} tripDayCount={2} onEdit={onEdit} onRemove={onRemove} />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View className="rounded-[10px] border border-ink/10 px-3 py-2">
+      {head}
+      {night.searchUrl ? (
+        <View className="mt-2">
+          <AdActionButton
+            label={areaLabel ? `${areaLabel}の宿を探す` : "宿を探す"}
+            sub={`${night.rangeLabel} · 大人2名で検索`}
+            url={night.searchUrl}
+          />
+          <View className="mt-1.5 flex-row items-center justify-between">
+            <Pressable onPress={onAdd} hitSlop={6}>
+              <Text className="font-gothic-400 text-[11px] text-muted underline">自分で入力</Text>
+            </Pressable>
+            <Pressable onPress={() => onToggleSkip(night.nth)} hitSlop={6}>
+              <Text className="font-gothic-400 text-[11px] text-muted-light">この泊は宿を取らない</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        // 過ぎた泊・提携ID未設定・広告非表示プランでは、自分で入れる導線だけ残す
+        <View className="mt-1.5 flex-row items-center justify-between">
+          <Pressable onPress={onAdd} hitSlop={6}>
+            <Text className="font-gothic-500 text-[11px] text-ink underline">＋ 宿を登録する</Text>
+          </Pressable>
+          {!night.past && (
+            <Pressable onPress={() => onToggleSkip(night.nth)} hitSlop={6}>
+              <Text className="font-gothic-400 text-[11px] text-muted-light">この泊は宿を取らない</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export function PlanScreen({
   entries,
   totals,
@@ -113,6 +249,8 @@ export function PlanScreen({
   onUndoCompose,
   destination = "",
   now,
+  lodgingSkipped = [],
+  onToggleLodgingSkip,
 }: {
   entries: PlanEntry[];
   totals: PlanTotals;
@@ -160,6 +298,9 @@ export function PlanScreen({
   destination?: string;
   /** 現在時刻。旅行前かどうかの判定に使う */
   now: Date;
+  /** 「宿を取らない」と決めた泊（1始まり） */
+  lodgingSkipped?: number[];
+  onToggleLodgingSkip: (nth: number) => void;
 }) {
   const insets = useSafeAreaInsets();
   const adFree = useAdFree();
@@ -185,10 +326,20 @@ export function PlanScreen({
     (e.fixedTime && e.arriveBy ? e.arriveBy : scheduleByEntry.get(e.id) ?? e.arriveBy) ?? null;
   // 宿泊・レンタカーは「固定枠」として別枠。並び替えの対象外。
   const lodging = entries.filter((e) => e.mode === "stay");
-  // 泊まりなのに宿が未登録なら宿探しの枠を出す。宿を1件入れたら消える（lib/lodgingAd.ts）
-  const lodgingSuggest = adFree
-    ? null
-    : lodgingAd({ entries, destination, tripDate, tripDayCount, now });
+  // 宿泊先は「泊ごとの枠」で見せる。3日間なら必ず2泊あるという日程の事実から
+  // 枠を作り、埋まっている泊と空いている泊を並べる（lib/lodgingAd.ts）。
+  // 有料プラン（広告非表示）では宿探しリンクだけ落ちて、枠と登録済みの宿は残る。
+  const lodgingArea = lodgingPrefecture(entries, destination);
+  const nights = lodgingNights({
+    entries,
+    destination,
+    tripDate,
+    tripDayCount,
+    skipped: lodgingSkipped,
+    now,
+    affiliateId: adFree ? "" : undefined,
+  });
+  const nightsDone = lodgingProgress(nights).done;
   const rentals = entries.filter((e) => e.mode === "rental");
   // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番（固定枠は除外）
   const indexOf = new Map(entries.map((e, i) => [e.id, i]));
@@ -355,67 +506,57 @@ export function PlanScreen({
             </View>
           </View>
         )}
-        {/* 宿泊先（固定・並び替え対象外） */}
-        {!readOnly && (
-          <View className="mb-2 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2">
+        {/* 宿泊先。泊ごとの枠にして「あと何泊が未定か」を一目で分かるようにする。
+            宿を決めるのは旅の準備そのものなので、探す導線は条件を絞らず常に置く。
+            埋まった泊・宿を取らないと決めた泊・過ぎた泊では自然に消える。 */}
+        {!readOnly && nights.length > 0 && (
+          <View className="mb-2 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-3">
             <View className="flex-row items-center justify-between">
-              <Text className="font-gothic-500 text-[12px] text-ink">宿泊先（固定）</Text>
-              <Pressable onPress={onOpenAddLodging} className="rounded-full border border-ink/25 px-3 py-1">
-                <Text className="font-gothic-500 text-[11px] text-ink">＋ 宿泊先</Text>
-              </Pressable>
+              <Text className="font-gothic-700 text-[12px] text-ink">宿泊先</Text>
+              <Text className="font-gothic-400 text-[11px] text-muted" style={TNUM}>
+                {nightsDone} / {nights.length} 泊 決定
+              </Text>
             </View>
-            {lodging.length === 0 ? (
-              <>
-                <View className="mt-1 flex-row items-center gap-3">
-                  <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
-                  <Text className="flex-1 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
-                    ホテル等はここで固定登録します。旅程の並び替え対象にはなりません。
-                  </Text>
-                </View>
-                {/* 泊まりなのに宿が空のときだけ出す。外部の予約サイトと「自分で登録」を
-                    必ず並べる（片方だけだと単なる広告になる） */}
-                {lodgingSuggest && (
-                  <AdCard
-                    title={`${lodgingSuggest.nights}泊ぶんの宿が決まっていません`}
-                    sub={`${lodgingSuggest.keyword} · ${lodgingSuggest.rangeLabel}`}
-                    body="予約したら、旅タブの「＋」→「メールから追加」に予約確認メールを貼ると、チェックイン・チェックアウト時刻ごと旅程に入ります。"
-                    actionLabel="宿を探す（楽天トラベル）"
-                    url={lodgingSuggest.url}
-                    secondaryLabel="自分で登録"
-                    onSecondary={onOpenAddLodging}
-                  />
-                )}
-              </>
-            ) : (
-              <View className="mt-2 gap-2">
-                {lodging.map((e) => (
-                  <View key={e.id} className="flex-row items-center gap-3">
-                    {/* 宿の写真があれば写真、無ければベッドのアイコン */}
-                    {e.photoRef ? (
-                      <SpotThumb photoRef={e.photoRef} attribution={e.photoAttribution} size={40} />
-                    ) : (
-                      <Image source={{ uri: illustrationUri("icon-bed") }} style={{ width: 32, height: 32 }} resizeMode="contain" />
-                    )}
-                    <Pressable onPress={() => onEditEntry(e.id)} className="flex-1">
-                      <Text className="font-mincho-600 text-[13px] text-ink">{e.title}</Text>
-                      <Text className="mt-0.5 font-gothic-400 text-[11px] text-muted" style={TNUM}>
-                        {tripDayCount > 1 ? `${e.day ?? 1}日目 · ` : ""}
-                        {e.arriveBy ? `IN ${formatJstTime(new Date(e.arriveBy))}` : ""}
-                        {e.checkOut ? ` → OUT ${formatJstTime(new Date(e.checkOut))}` : ""}
-                      </Text>
-                      {e.place && (
-                        <Text numberOfLines={1} className="font-gothic-400 text-[11px] text-muted-light">
-                          {e.place}
-                        </Text>
-                      )}
-                    </Pressable>
-                    <Pressable onPress={() => onRemoveEntry(e.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`${e.title || "この項目"}を削除`}>
-                      <Text className="font-gothic-400 text-[15px] text-muted-light">×</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
+            {/* 進捗バーは持ち物リストと同じ形。「あと何個」の見せ方をアプリ内で揃える */}
+            <View className="mt-1.5 h-[5px] w-full overflow-hidden rounded-full bg-surface">
+              <View
+                className={`h-full rounded-full ${nightsDone === nights.length ? "bg-highlight" : "bg-ink"}`}
+                style={{ width: `${Math.round((nightsDone / nights.length) * 100)}%` }}
+              />
+            </View>
+
+            <View className="mt-3 gap-2.5">
+              {nights.map((n) => (
+                <LodgingNightRow
+                  key={n.nth}
+                  night={n}
+                  areaLabel={lodgingArea?.name}
+                  onEdit={onEditEntry}
+                  onRemove={onRemoveEntry}
+                  onAdd={onOpenAddLodging}
+                  onToggleSkip={onToggleLodgingSkip}
+                />
+              ))}
+            </View>
+
+            {/* 予約したあと手入力に戻らなくて済むことを一度だけ伝える */}
+            {nights.some((n) => n.searchUrl) && (
+              <Text className="mt-2.5 font-gothic-400 text-[10px] leading-[16px] text-muted-light">
+                予約したら「＋」→「メールから追加」に予約確認メールを貼ると、チェックイン・チェックアウト時刻ごと旅程に入ります。
+              </Text>
             )}
+          </View>
+        )}
+
+        {/* 日帰りでも宿を1件登録できるようにしておく（前泊・後泊など） */}
+        {!readOnly && nights.length === 0 && lodging.length > 0 && (
+          <View className="mb-2 rounded-[12px] border border-ink/10 bg-white/40 px-4 py-2">
+            <Text className="font-gothic-500 text-[12px] text-ink">宿泊先（固定）</Text>
+            <View className="mt-2 gap-2">
+              {lodging.map((e) => (
+                <LodgingEntryRow key={e.id} entry={e} tripDayCount={tripDayCount} onEdit={onEditEntry} onRemove={onRemoveEntry} />
+              ))}
+            </View>
           </View>
         )}
 

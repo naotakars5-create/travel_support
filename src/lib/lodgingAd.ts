@@ -1,58 +1,33 @@
 import { PlanEntry } from "./types";
-import { dateForDay, formatDateStrJa, tripPhase } from "./date";
+import { dateForDay, dayOfIso, formatDateStrJa, tripPhase } from "./date";
 import { prefectureOf, tripRegion } from "./region";
 import { rakutenAffiliateId } from "./ads";
 
 /**
- * 「泊まりの旅なのに、宿がまだ入っていない」ときだけ出す宿探しの枠。
+ * 宿泊先を「泊ごとの枠」として扱う。
  *
- * ## 常時表示にしない理由
+ * ## なぜリストではなく泊ごとの枠なのか
  *
- * 常に出ていれば、それはただの広告になる。出す条件を
- * 「旅程に空いている穴がある」ときに絞ると、**旅程の不足を埋める提案**になり、
- * ユーザーにとっても実際に役に立つ。
+ * 3日間の旅なら必ず2泊ある。これは日程から自動的に決まる事実なのに、
+ * 以前は「宿が0件かN件か」しか分からず、**あと何泊ぶん足りないのかが
+ * 見えなかった**。泊ごとの枠にすると、埋まっている泊と空いている泊が
+ * 一目で分かり、宿の準備が持ち物リストと同じ「あと何個」の形に揃う。
  *
- * その結果、
+ * 副次的に、宿探しリンクを**その1泊ぶんの日付**で飛ばせるようになる。
+ * 以前は旅程全体（初日〜最終日）で検索していたので、2泊目を探したい人は
+ * 遷移先で日付を入れ直す必要があった。
  *
- * - 日帰り（tripDayCount === 1）のユーザーには一度も出ない
- * - 宿を1件登録した瞬間に消える
- * - 旅行が始まったら消える（今から宿を勧めても遅い）
+ * ## 宿探しの導線は常に出す
  *
- * ようになる。**「広告が消えている状態がゴール」** という設計にしてあるので、
- * ここに「そのうち消えるから」と別の広告を足さないこと。
+ * 「宿を探す」はユーザーが自分の意思で押すもので、押しつけの広告ではない。
+ * 宿を決めるのは旅の準備そのものなので、条件を絞らず常に触れる場所に置く。
+ * 埋まった泊・宿を取らないと決めた泊・過ぎた泊では自然に消える。
  *
- * ## 予約したあとの戻り道
- *
- * 送客して終わりにすると、ユーザーは外部で予約したあと宿の情報を
- * 手で入力し直すことになり、体験としてはむしろ悪くなる。
- * このアプリには既に受け皿があり、旅タブの「＋」→「メールから追加」に
- * 予約確認メールを貼れば `/api/parse` が mode:"stay" のエントリ
- * （チェックイン＝arriveBy、チェックアウト＝checkOut）を作る。
- * カードの説明文でそこへ繋いでいるので、文言を削らないこと。
+ * ただし**「宿を取らない」を選べること**は必須（実家・車中泊・夜行バス・
+ * 友人宅）。これが無いと、宿を取る予定のない人にとって消せない広告になる。
  */
 
-/** 宿が必要なのにまだ登録されていないか。 */
-export function needsLodging(
-  entries: PlanEntry[],
-  tripDayCount: number,
-  tripDate: string,
-  now: Date
-): boolean {
-  if (Math.floor(tripDayCount) < 2) return false; // 日帰りには宿が要らない
-  if (entries.some((e) => e.mode === "stay")) return false; // もう入っている
-  return tripPhase(tripDate, tripDayCount, now).phase === "before";
-}
-
-/**
- * 都道府県名 → 楽天トラベルの地域コード（`f_chu`）。
- *
- * 楽天トラベルの検索はキーワード文字列ではなく地域コードで場所を指定する。
- * 自由文を投げても**黙って無視され、既定の地域（北海道）の結果が出る**ので、
- * コードに変換できない場合は枠ごと出さないこと（別の県へ送客するほうが害が大きい）。
- *
- * `kagawa` は実際の検索結果URLで裏取り済み。ほかは同じローマ字表記の規則に
- * 従っているが、ずれが見つかったらここだけ直せばよい。
- */
+/** 都道府県名 → 楽天トラベルの地域コード（`f_chu`）。 */
 const RAKUTEN_PREF_CODE: Record<string, string> = {
   北海道: "hokkaido",
   青森県: "aomori",
@@ -113,9 +88,12 @@ export interface LodgingPrefecture {
 /**
  * 宿探しの対象になる都道府県。地域コードに変換できなければ null。
  *
+ * 楽天トラベルの検索はキーワード文字列ではなく地域コードで場所を指定する。
+ * 自由文を投げても**黙って無視され、既定の地域（北海道）の結果が出る**ので、
+ * コードに変換できない場合はリンクを出さない（別の県へ送るほうが害が大きい）。
+ *
  * 行き先の住所から取れる都道府県を優先し（しおりの表紙写真と同じ考え方・
  * lib/region.ts）、住所がまだ無ければ行き先の自由文から拾う。
- * 「香川県 高松・小豆島」のような書き方でも都道府県だけ取り出せる。
  */
 export function lodgingPrefecture(entries: PlanEntry[], destination: string): LodgingPrefecture | null {
   const name = tripRegion(entries.map((e) => e.place)) ?? prefectureOf(destination);
@@ -126,7 +104,7 @@ export function lodgingPrefecture(entries: PlanEntry[], destination: string): Lo
 
 /**
  * 楽天トラベルの空室検索URL（楽天アフィリエイトのラッパー経由）。
- * アフィリエイトID未設定なら null＝枠ごと出さない。
+ * アフィリエイトID未設定なら null＝リンクを出さない。
  *
  * パラメータは実際の検索結果URLから起こしてある。特に**エンドポイントに注意**:
  * `/ds/yado/japan` に投げると日付もエリアも黙って無視され、既定の地域
@@ -178,57 +156,113 @@ function splitDate(s: string): { y: number; m: number; d: number } | null {
   return { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) };
 }
 
-export interface LodgingAd {
-  /** 対象の都道府県名（カードにも出す） */
-  keyword: string;
+/** Date → YYYY-MM-DD（ローカル）。 */
+function dateStr(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** 旅程の1泊ぶんの枠。 */
+export interface LodgingNight {
+  /** 何泊目か（1始まり） */
+  nth: number;
   /** チェックイン日（YYYY-MM-DD） */
   checkIn: string;
   /** チェックアウト日（YYYY-MM-DD） */
   checkOut: string;
-  /** 泊数 */
-  nights: number;
-  /** カードに出す日付の表記（「8月12日(水) 〜 8月13日(木) · 1泊」） */
+  /** 日付の表記（「8月10日(月) → 8月11日(火)」） */
   rangeLabel: string;
-  /** 遷移先 */
-  url: string;
+  /** この泊に登録済みの宿 */
+  entry?: PlanEntry;
+  /** 「宿を取らない」と決めた泊（実家・車中泊など） */
+  skipped: boolean;
+  /** チェックアウト日を過ぎた泊。記録としては残すが宿探しは出さない */
+  past: boolean;
+  /** 今夜チェックインする泊。旅行中に「今夜の宿がまだ」を拾う */
+  tonight: boolean;
+  /** この泊の宿探しリンク。決定済み・スキップ・過去・提携ID未設定なら null */
+  searchUrl: string | null;
 }
 
 /**
- * 宿探しの枠に出す内容。出す条件を満たさない・提携ID未設定なら null。
- * 画面側はこの戻り値が null かどうかだけを見ればよい。
+ * 何泊目の枠に入る宿かを求める。チェックイン日から逆算する。
+ * 時刻が未入力の宿は「何日目か」（`day`）で拾う。
  */
-export function lodgingAd(opts: {
+export function nightIndexOf(entry: PlanEntry, tripDate: string, nights: number): number | null {
+  if (entry.mode !== "stay") return null;
+  const nth = entry.arriveBy ? dayOfIso(tripDate, entry.arriveBy) : entry.day ?? 1;
+  return nth >= 1 && nth <= nights ? nth : null;
+}
+
+/**
+ * 旅程の全泊ぶんの枠を組み立てる。日帰り（0泊）なら空配列。
+ *
+ * 画面側はこの配列をそのまま並べればよく、「宿を出すかどうか」の
+ * 条件判断を持たなくて済む。
+ */
+export function lodgingNights(opts: {
   entries: PlanEntry[];
   destination: string;
   tripDate: string;
   tripDayCount: number;
+  /** 「宿を取らない」と決めた泊（1始まりの泊番号） */
+  skipped?: number[];
   now: Date;
   affiliateId?: string;
-}): LodgingAd | null {
-  const { entries, destination, tripDate, tripDayCount, now } = opts;
-  if (!needsLodging(entries, tripDayCount, tripDate, now)) return null;
+}): LodgingNight[] {
+  const nights = Math.max(0, Math.floor(opts.tripDayCount) - 1);
+  if (nights === 0) return [];
 
-  // 地域コードに変換できないときは出さない。自由文を投げても黙って無視され、
-  // 関係のない県の宿一覧へ送ってしまうため（出さないほうがまし）
-  const pref = lodgingPrefecture(entries, destination);
-  if (!pref) return null;
+  const pref = lodgingPrefecture(opts.entries, opts.destination);
+  const id = opts.affiliateId ?? rakutenAffiliateId();
+  const skipped = new Set(opts.skipped ?? []);
+  const today = dateStr(opts.now);
 
-  const days = Math.floor(tripDayCount);
-  const checkIn = tripDate;
-  const checkOut = dateForDay(tripDate, days);
-  const url = lodgingSearchUrl(
-    { prefCode: pref.code, checkIn, checkOut },
-    opts.affiliateId ?? rakutenAffiliateId()
-  );
-  if (!url) return null;
+  // 宿を泊番号へ割り当てる（同じ泊に複数あれば先勝ち）
+  const byNight = new Map<number, PlanEntry>();
+  for (const e of opts.entries) {
+    const nth = nightIndexOf(e, opts.tripDate, nights);
+    if (nth !== null && !byNight.has(nth)) byNight.set(nth, e);
+  }
 
-  const nights = days - 1;
+  const result: LodgingNight[] = [];
+  for (let nth = 1; nth <= nights; nth++) {
+    const checkIn = dateForDay(opts.tripDate, nth);
+    const checkOut = dateForDay(opts.tripDate, nth + 1);
+    const entry = byNight.get(nth);
+    const isSkipped = skipped.has(nth);
+    const past = checkOut < today;
+    const decided = Boolean(entry) || isSkipped;
+    result.push({
+      nth,
+      checkIn,
+      checkOut,
+      rangeLabel: `${formatDateStrJa(checkIn)} → ${formatDateStrJa(checkOut)}`,
+      entry,
+      skipped: isSkipped,
+      past,
+      tonight: checkIn === today,
+      searchUrl:
+        decided || past || !pref
+          ? null
+          : lodgingSearchUrl({ prefCode: pref.code, checkIn, checkOut }, id),
+    });
+  }
+  return result;
+}
+
+/** 宿の決定状況。持ち物リストと同じ「あと何個」の見せ方に使う。 */
+export function lodgingProgress(nights: LodgingNight[]): { done: number; total: number } {
   return {
-    keyword: pref.name,
-    checkIn,
-    checkOut,
-    nights,
-    rangeLabel: `${formatDateStrJa(checkIn)} 〜 ${formatDateStrJa(checkOut)} · ${nights}泊`,
-    url,
+    done: nights.filter((n) => Boolean(n.entry) || n.skipped).length,
+    total: nights.length,
   };
+}
+
+/**
+ * 旅がまだ始まっていないか。宿探しを促す文言の出し分けに使う
+ * （旅行中は「今夜の宿」を前に出すなど）。
+ */
+export function beforeTrip(tripDate: string, tripDayCount: number, now: Date): boolean {
+  return tripPhase(tripDate, tripDayCount, now).phase === "before";
 }
