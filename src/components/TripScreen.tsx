@@ -137,6 +137,8 @@ export function TripScreen({
           onImportShared={app.importSharedToOwn}
           destination={app.tripDestination}
           now={app.now}
+          lodgingSkipped={app.lodgingSkipped}
+          onToggleLodgingSkip={app.toggleLodgingSkip}
         />
       )}
     </View>

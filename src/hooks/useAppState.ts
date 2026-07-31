@@ -108,6 +108,9 @@ export function useAppState() {
   const [composedSig, setComposedSig] = useState<string | null>(null);
   // AIへのお願い（自由文）。「1日目はホテルの後は予定を入れない」等のニュアンスを毎回渡す。
   const [planRequest, setPlanRequest] = useState<string>("");
+  // 「宿を取らない」と決めた泊（1始まり）。実家・車中泊・夜行バスなど、
+  // 宿泊先の枠を閉じておきたい泊を覚えておく。
+  const [lodgingSkipped, setLodgingSkipped] = useState<number[]>([]);
   // 旅の名前と行き先。画面の一番上に出し、しおり（＝旅の一覧）でもこの名前で並ぶ。
   const [tripName, setTripName] = useState<string>("");
   const [tripDestination, setTripDestination] = useState<string>("");
@@ -166,6 +169,7 @@ export function useAppState() {
         if (persisted.tripDayCount) setTripDayCountState(persisted.tripDayCount);
         if (persisted.baseMode) setBaseMode(persisted.baseMode);
         if (persisted.planRequest) setPlanRequest(persisted.planRequest);
+        if (persisted.lodgingSkipped) setLodgingSkipped(persisted.lodgingSkipped);
         if (persisted.tripName) setTripName(persisted.tripName);
         if (persisted.tripDestination) setTripDestination(persisted.tripDestination);
         if (persisted.activeTripId) setActiveTripId(persisted.activeTripId);
@@ -203,6 +207,7 @@ export function useAppState() {
       baseMode,
       transitCache: trimmedCache,
       planRequest,
+      lodgingSkipped,
       savedAt: new Date().toISOString(),
     });
     void persistPromise.then((ok) => {
@@ -227,6 +232,7 @@ export function useAppState() {
     baseMode,
     transitCache,
     planRequest,
+    lodgingSkipped,
     tripName,
     tripDestination,
     activeTripId,
@@ -979,6 +985,15 @@ export function useAppState() {
     }
   }, [entries, slots, suggestions, planNotes, tripDayCount, planRequest, baseMode, openTrip]);
 
+  /**
+   * その泊を「宿を取らない」にする／戻す。
+   * 実家・車中泊・夜行バスなど、そもそも宿を取らない泊があるため、
+   * 宿泊先の枠を閉じられないと消せない案内になってしまう。
+   */
+  const toggleLodgingSkip = useCallback((nth: number) => {
+    setLodgingSkipped((prev) => (prev.includes(nth) ? prev.filter((n) => n !== nth) : [...prev, nth].sort((a, b) => a - b)));
+  }, []);
+
   const togglePacking = useCallback((id: string) => {
     setPacking((prev) => prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p)));
   }, []);
@@ -1146,6 +1161,7 @@ export function useAppState() {
           tripDayCount,
           baseMode,
           planRequest,
+          lodgingSkipped,
         };
         const next = existing ? prev.map((t) => (t.id === existing.id ? trip : t)) : [trip, ...prev];
         persistTrips(next);
@@ -1155,7 +1171,7 @@ export function useAppState() {
         return next;
       });
     },
-    [entries, slots, packing, tripDate, tripDayCount, baseMode, planRequest, tripName, tripDestination, activeTripId, persistTrips]
+    [entries, slots, packing, tripDate, tripDayCount, baseMode, planRequest, lodgingSkipped, tripName, tripDestination, activeTripId, persistTrips]
   );
 
   /** しおりの表紙写真を更新する。 */
@@ -1208,6 +1224,7 @@ export function useAppState() {
       setTripDayCountState(trip.tripDayCount);
       setBaseMode(trip.baseMode);
       setPlanRequest(trip.planRequest ?? "");
+      setLodgingSkipped(trip.lodgingSkipped ?? []);
       setTripName(trip.name);
       setTripDestination(trip.destination ?? "");
       setSuggestions([]);
@@ -1238,6 +1255,7 @@ export function useAppState() {
       tripDayCount,
       baseMode,
       planRequest,
+      lodgingSkipped,
       tripName,
       tripDestination,
     ]);
@@ -1260,6 +1278,7 @@ export function useAppState() {
           tripDayCount,
           baseMode,
           planRequest,
+          lodgingSkipped,
         };
         const next = existing ? prev.map((t) => (t.id === id ? trip : t)) : [trip, ...prev];
         persistTrips(next);
@@ -1276,6 +1295,7 @@ export function useAppState() {
     tripDayCount,
     baseMode,
     planRequest,
+    lodgingSkipped,
     tripName,
     tripDestination,
     activeTripId,
@@ -1464,6 +1484,8 @@ export function useAppState() {
     areaRefGeo,
     isOnline,
     suggestOptimize,
+    lodgingSkipped,
+    toggleLodgingSkip,
     togglePacking,
     addPacking,
     removePacking,

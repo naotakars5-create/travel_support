@@ -26,6 +26,8 @@ export interface SavedTrip {
   baseMode: BaseMode;
   /** AIへのお願い（自由文）。旅を読み込んだときに一緒に戻す */
   planRequest?: string;
+  /** 「宿を取らない」と決めた泊（1始まりの泊番号）。宿泊先の枠を閉じるために使う */
+  lodgingSkipped?: number[];
   /** 地域から自動取得した表紙写真（手動設定の coverPhoto が無いときに使う） */
   autoCover?: { url: string; credit: string; creditUrl: string };
   /** 自動表紙を探した地域名（同じ地域を何度も問い合わせないための目印） */
