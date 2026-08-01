@@ -37,6 +37,17 @@ describe("lodgingPrefecture", () => {
     expect(lodgingPrefecture([entry()], "   ")).toBeNull();
   });
 
+  it("市名だけの行き先でも都道府県を出せる（旅の行き先は市名で書くのが普通）", () => {
+    // 実際に「金沢の旅／行き先: 金沢」で宿探しが出なかったケース
+    expect(lodgingPrefecture([entry({ title: "兼六園" })], "金沢")).toEqual({ name: "石川県", code: "ishikawa" });
+    expect(lodgingPrefecture([entry()], "箱根")).toEqual({ name: "神奈川県", code: "kanagawa" });
+  });
+
+  it("ジオコーディングで判明した都道府県を最優先で使う", () => {
+    const entries = [entry({ title: "兼六園", prefecture: "石川県" })];
+    expect(lodgingPrefecture(entries, "北陸ひとり旅")).toEqual({ name: "石川県", code: "ishikawa" });
+  });
+
   it("都・道・府も変換できる", () => {
     expect(lodgingPrefecture([entry({ place: "東京都千代田区" })], "")?.code).toBe("tokyo");
     expect(lodgingPrefecture([entry({ place: "北海道札幌市" })], "")?.code).toBe("hokkaido");

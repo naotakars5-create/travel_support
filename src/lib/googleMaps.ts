@@ -13,7 +13,19 @@ function apiKey(): string {
 }
 
 /** 住所・場所名を座標に変換する（Geocoding API）。 */
-export async function geocodeAddress(query: string): Promise<GeoPoint | null> {
+export interface GeocodeResult {
+  point: GeoPoint;
+  /**
+   * 都道府県（例: 石川県）。Geocoding API の administrative_area_level_1 から取る。
+   *
+   * 「金沢」のような市名で入力されても正しい県が分かるので、宿探しのような
+   * 都道府県単位の機能はこれを使う。住所文字列の正規表現では市名から県を
+   * 割り出せず、行き先の書き方に左右されてしまう。
+   */
+  prefecture?: string;
+}
+
+export async function geocodeAddress(query: string): Promise<GeocodeResult | null> {
   const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
   url.searchParams.set("address", query);
   url.searchParams.set("language", "ja");
@@ -24,9 +36,12 @@ export async function geocodeAddress(query: string): Promise<GeoPoint | null> {
   if (!res.ok) throw new Error(`Geocoding API error ${res.status}`);
   const data = await res.json();
   if (data.status !== "OK" || !data.results?.length) return null;
-  const loc = data.results[0].geometry?.location;
+  const top = data.results[0];
+  const loc = top.geometry?.location;
   if (!loc) return null;
-  return { lat: loc.lat, lng: loc.lng };
+  const comps: { long_name?: string; types?: string[] }[] = top.address_components ?? [];
+  const pref = comps.find((c) => c.types?.includes("administrative_area_level_1"))?.long_name;
+  return { point: { lat: loc.lat, lng: loc.lng }, prefecture: pref };
 }
 
 const DIRECTIONS_MODE: Partial<Record<TransportMode, string>> = {

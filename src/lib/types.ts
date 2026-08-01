@@ -82,6 +82,12 @@ export interface PlanEntry {
   place?: string;
   /** ジオコーディング済み座標（地図・移動時間・周辺提案に使う） */
   placeGeo?: GeoPoint;
+  /**
+   * ジオコーディングで判明した都道府県（例: 石川県）。
+   * 「金沢」のような市名で入力されても正しい県が分かるので、
+   * 宿探しのような都道府県単位の機能はこれを最優先で使う。
+   */
+  prefecture?: string;
   mode: TransportMode;
   /** 重要度。時間が足りない時にAIが optional から外す判断に使う */
   priority: Priority;
