@@ -37,13 +37,23 @@ export function needsRental(
 }
 
 /**
- * 楽天トラベル レンタカーの検索URL（楽天アフィリエイトのラッパー経由）。
+ * 楽天レンタカーの検索URL（楽天アフィリエイトのラッパー経由）。
  * アフィリエイトID未設定・都道府県不明なら null＝ボタンを出さない。
  *
- * 注: 遷移先のクエリ名は**実際の検索結果URLで裏取りするまで暫定**。
- * 宿のときに `/ds/yado/japan` へ投げて日付もエリアも黙って無視され、
- * 既定の北海道の結果が返っていた前例があるので、
- * **必ずブラウザで開いて、指定した県と日付が反映されているか確認すること。**
+ * パラメータは実際の検索結果URLから起こしてある。**宿とは別サイト**なので注意:
+ *
+ *   ドメイン  cars.travel.rakuten.co.jp（travel.rakuten.co.jp/cars/ は 404）
+ *   パス      /cars/rcf010a.do
+ *   gmarea    貸出の都道府県コード（ishikawa）。宿の f_chu と同じローマ字表記
+ *   gsarea    貸出の小エリア（kanazawa）。空にして県全体で探す
+ *   gdatey/gdatem/gdated   借りる日（年・月・日をばらして渡す）
+ *   bdatey/bdatem/bdated   返す日
+ *   gtimeh/gtimem          借りる時刻（既定 10:00）
+ *   btimeh/btimem          返す時刻（既定 17:00）
+ *
+ * 意味の分からないパラメータ（tid・rbt・atmt・searchid など）は、実際の検索が
+ * 発行した値をそのまま残している。宿のときエンドポイントを変えただけで
+ * エリアが既定値（北海道）に化けた前例があるので、動く形からは不用意に削らない。
  *
  * @param affiliateId テスト用に上書きできるようにしてある。
  */
@@ -53,19 +63,49 @@ export function rentalSearchUrl(
 ): string | null {
   const id = affiliateId.trim();
   if (!id) return null;
-  const from = compactDate(opts.pickUp);
-  const to = compactDate(opts.dropOff);
+  const from = splitDate(opts.pickUp);
+  const to = splitDate(opts.dropOff);
   if (!opts.prefCode.trim() || !from || !to) return null;
 
-  const q = [`f_pref=${encodeURIComponent(opts.prefCode.trim())}`, `f_start=${from}`, `f_end=${to}`].join("&");
-  const target = `https://travel.rakuten.co.jp/cars/search/?${q}`;
+  // React Native の URLSearchParams は実装が不完全なので、mapsLink.ts と同じく手で組む
+  const q = [
+    `num=50`,
+    `type=0`,
+    `display=0`,
+    `gdarea=`,
+    `bdarea=`,
+    `gsarea=`,
+    `bsarea=`,
+    `tid=1`,
+    `f_teikei=`,
+    `gdated=${from.d}`,
+    `gdatem=${from.m}`,
+    `gdatey=${from.y}`,
+    `bdated=${to.d}`,
+    `bdatem=${to.m}`,
+    `bdatey=${to.y}`,
+    `subtype=0`,
+    `gmarea=${encodeURIComponent(opts.prefCode.trim())}`,
+    `goflg=0`,
+    `bairport=`,
+    `searchid=1`,
+    `searchid=2`,
+    `searchid=3`,
+    `rbt=6`,
+    `atmt=1`,
+    `gtimeh=10`,
+    `gtimem=00`,
+    `btimeh=17`,
+    `btimem=00`,
+  ].join("&");
+  const target = `https://cars.travel.rakuten.co.jp/cars/rcf010a.do?${q}`;
   return `https://hb.afl.rakuten.co.jp/hgc/${encodeURIComponent(id)}/?pc=${encodeURIComponent(target)}`;
 }
 
-/** YYYY-MM-DD → YYYYMMDD。形式が違えば null。 */
-function compactDate(s: string): string | null {
+/** YYYY-MM-DD を年・月・日（ゼロ埋めのまま）に割る。形式が違えば null。 */
+function splitDate(s: string): { y: string; m: string; d: string } | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
-  return m ? `${m[1]}${m[2]}${m[3]}` : null;
+  return m ? { y: m[1], m: m[2], d: m[3] } : null;
 }
 
 export interface RentalAd {

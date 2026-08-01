@@ -53,11 +53,26 @@ describe("rentalSearchUrl", () => {
     expect(url.startsWith(`https://hb.afl.rakuten.co.jp/hgc/${encodeURIComponent(AFFILIATE)}/?pc=`)).toBe(true);
   });
 
-  it("エリアと日付が遷移先に載る", () => {
+  it("宿とは別サイト（cars.travel.rakuten.co.jp/cars/rcf010a.do）へ飛ぶ", () => {
     const target = decodeURIComponent(rentalSearchUrl(base, AFFILIATE)!.split("?pc=")[1]);
-    expect(target).toContain("f_pref=ishikawa");
-    expect(target).toContain("f_start=20260908");
-    expect(target).toContain("f_end=20260910");
+    // travel.rakuten.co.jp/cars/search/ は 404（実地確認済み）
+    expect(target.startsWith("https://cars.travel.rakuten.co.jp/cars/rcf010a.do?")).toBe(true);
+  });
+
+  it("エリアと日付が実際のパラメータ名で載る", () => {
+    const target = decodeURIComponent(rentalSearchUrl(base, AFFILIATE)!.split("?pc=")[1]);
+    expect(target).toContain("gmarea=ishikawa");
+    expect(target).toContain("gdatey=2026");
+    expect(target).toContain("gdatem=09");
+    expect(target).toContain("gdated=08");
+    expect(target).toContain("bdatey=2026");
+    expect(target).toContain("bdatem=09");
+    expect(target).toContain("bdated=10");
+  });
+
+  it("小エリアは空にして県全体で探す", () => {
+    const target = decodeURIComponent(rentalSearchUrl(base, AFFILIATE)!.split("?pc=")[1]);
+    expect(target).toContain("gsarea=&");
   });
 
   it("日付の形式が違えば null", () => {
