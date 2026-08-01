@@ -21,6 +21,12 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      # 楽天アフィリエイトID。リンクに載って公開される値で、秘匿情報ではない
+      # （.env.example 参照）。expo.dev の環境変数が env:exec から読めない事故が
+      # あったため（visibility Secret は取り出せない）、ここで直接渡す。
+      # EAS 側に同名の変数が正しく設定されている場合はそちらが優先される。
+      EXPO_PUBLIC_RAKUTEN_AFFILIATE_ID: "56296628.90f54f18.56296629.b7d0f033"
     steps:
       - name: リポジトリを取得
         uses: actions/checkout@v4
@@ -46,8 +52,12 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # 焼き込み対象の変数が EAS から読めているかをログに残す。
-      # 値そのものは出さず、文字数だけ出す（0 なら未設定・visibility が secret 等）。
+      # 焼き込み対象の変数がビルドから見えるかをログに残す。
+      # 値そのものは出さず、文字数だけ出す（0 なら届いていない）。
+      #
+      # 実績: expo.dev に登録した値が env:exec で 0 文字だったことがある
+      # （visibility が Secret だと env:exec では取り出せない）。その場合は
+      # 下の env: で直接渡している値が使われる。
       - name: 公開する環境変数が読めているか確認
         run: |
           eas env:exec production 'echo "EXPO_PUBLIC_RAKUTEN_AFFILIATE_ID: ${#EXPO_PUBLIC_RAKUTEN_AFFILIATE_ID} 文字"; echo "EXPO_PUBLIC_AMAZON_TAG: ${#EXPO_PUBLIC_AMAZON_TAG} 文字"' --non-interactive
