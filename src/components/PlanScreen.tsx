@@ -129,14 +129,17 @@ function LodgingNightRow({
   onRemove,
   onAdd,
   onToggleSkip,
+  onOpenTripSettings,
 }: {
   night: LodgingNight;
-  /** 検索対象のエリア名（例: 香川県） */
+  /** 検索対象のエリア名（例: 香川県）。行き先未設定なら undefined */
   areaLabel?: string;
   onEdit: (id: string) => void;
   onRemove: (id: string) => void;
   onAdd: () => void;
   onToggleSkip: (nth: number) => void;
+  /** 行き先を入れてもらうために旅の設定を開く */
+  onOpenTripSettings?: () => void;
 }) {
   const head = (
     <View className="flex-row items-center gap-2">
@@ -196,16 +199,28 @@ function LodgingNightRow({
         </View>
       ) : (
         // 過ぎた泊・提携ID未設定・広告非表示プランでは、自分で入れる導線だけ残す
-        <View className="mt-1.5 flex-row items-center justify-between">
-          <Pressable onPress={onAdd} hitSlop={6}>
-            <Text className="font-gothic-500 text-[11px] text-ink underline">＋ 宿を登録する</Text>
-          </Pressable>
-          {!night.past && (
-            <Pressable onPress={() => onToggleSkip(night.nth)} hitSlop={6}>
-              <Text className="font-gothic-400 text-[11px] text-muted-light">この泊は宿を取らない</Text>
+        <>
+          {/* 行き先が未設定だと都道府県が分からず宿を探せない。
+              黙って消えると「なぜ出ないのか」が分からないので、理由と直し方を出す。
+              条件を満たさないから何も出さない、を無言でやらないこと。 */}
+          {!night.searchUrl && !night.past && !areaLabel && onOpenTripSettings && (
+            <Pressable onPress={onOpenTripSettings} hitSlop={6} className="mt-1.5 self-start">
+              <Text className="font-gothic-400 text-[11px] leading-[17px] text-muted">
+                行き先（例: 金沢）を入れると、この日程で宿を探せます ›
+              </Text>
             </Pressable>
           )}
-        </View>
+          <View className="mt-1.5 flex-row items-center justify-between">
+            <Pressable onPress={onAdd} hitSlop={6}>
+              <Text className="font-gothic-500 text-[11px] text-ink underline">＋ 宿を登録する</Text>
+            </Pressable>
+            {!night.past && (
+              <Pressable onPress={() => onToggleSkip(night.nth)} hitSlop={6}>
+                <Text className="font-gothic-400 text-[11px] text-muted-light">この泊は宿を取らない</Text>
+              </Pressable>
+            )}
+          </View>
+        </>
       )}
     </View>
   );
@@ -252,6 +267,7 @@ export function PlanScreen({
   now,
   lodgingSkipped = [],
   onToggleLodgingSkip,
+  onOpenTripSettings,
 }: {
   entries: PlanEntry[];
   totals: PlanTotals;
@@ -302,6 +318,8 @@ export function PlanScreen({
   /** 「宿を取らない」と決めた泊（1始まり） */
   lodgingSkipped?: number[];
   onToggleLodgingSkip: (nth: number) => void;
+  /** 旅の設定（名前・行き先）を開く。行き先未設定の案内から使う */
+  onOpenTripSettings?: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const adFree = useAdFree();
@@ -547,6 +565,7 @@ export function PlanScreen({
                   onRemove={onRemoveEntry}
                   onAdd={onOpenAddLodging}
                   onToggleSkip={onToggleLodgingSkip}
+                  onOpenTripSettings={onOpenTripSettings}
                 />
               ))}
             </View>
@@ -610,7 +629,7 @@ export function PlanScreen({
                 </Text>
                 {/* アプリ側から既にレンタカーを勧めている場所なので、
                     その隣に「探す」を並べる。宿泊先と同じ対の形にする */}
-                {rentalSuggest && (
+                {rentalSuggest ? (
                   <View className="mt-2">
                     <AdActionButton
                       label={`${rentalSuggest.areaName}でレンタカーを探す`}
@@ -618,6 +637,17 @@ export function PlanScreen({
                       url={rentalSuggest.url}
                     />
                   </View>
+                ) : (
+                  // 行き先が未設定だと貸出エリアが分からず探せない。
+                  // 黙って消えると理由が分からないので、直し方まで書く
+                  !destination.trim() &&
+                  onOpenTripSettings && (
+                    <Pressable onPress={onOpenTripSettings} hitSlop={6} className="mt-1.5 self-start">
+                      <Text className="font-gothic-400 text-[11px] leading-[17px] text-muted">
+                        行き先（例: 金沢）を入れると、この日程でレンタカーを探せます ›
+                      </Text>
+                    </Pressable>
+                  )
                 )}
               </>
             ) : (
