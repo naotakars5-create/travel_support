@@ -1,6 +1,6 @@
 import { PlanEntry } from "./types";
 import { dateForDay, dayOfIso, formatDateStrJa, tripPhase } from "./date";
-import { prefectureOf, tripRegion } from "./region";
+import { prefectureOf, resolvePrefecture, tripRegion } from "./region";
 import { rakutenAffiliateId } from "./ads";
 
 /**
@@ -92,11 +92,24 @@ export interface LodgingPrefecture {
  * 自由文を投げても**黙って無視され、既定の地域（北海道）の結果が出る**ので、
  * コードに変換できない場合はリンクを出さない（別の県へ送るほうが害が大きい）。
  *
- * 行き先の住所から取れる都道府県を優先し（しおりの表紙写真と同じ考え方・
- * lib/region.ts）、住所がまだ無ければ行き先の自由文から拾う。
+ * 判定は確からしい順に4段階。
+ *
+ * 1. 行き先のジオコーディング結果（`PlanEntry.prefecture`）— Google が返す
+ *    都道府県なので最も確実。「金沢」のような市名入力でも正しく出る
+ * 2. 行き先の住所に書かれた都道府県名（`tripRegion`）
+ * 3. 旅の行き先の自由文に書かれた都道府県名（`prefectureOf`）
+ * 4. 市名・観光地名からの推定（`resolvePrefecture`）— 「金沢」→「石川県」。
+ *    ジオコーディング前・APIキー未設定・過去に作った旅のための補完
+ *
+ * 4段構えにしているのは、**旅の行き先を「金沢」「箱根」と市名で書くのが普通**
+ * だから。都道府県名しか読めないと、実際にはほとんどの旅で宿探しが出ない。
  */
 export function lodgingPrefecture(entries: PlanEntry[], destination: string): LodgingPrefecture | null {
-  const name = tripRegion(entries.map((e) => e.place)) ?? prefectureOf(destination);
+  const name =
+    entries.find((e) => e.prefecture)?.prefecture ??
+    tripRegion(entries.map((e) => e.place)) ??
+    prefectureOf(destination) ??
+    resolvePrefecture([destination, ...entries.map((e) => e.place), ...entries.map((e) => e.title)]);
   if (!name) return null;
   const code = RAKUTEN_PREF_CODE[name];
   return code ? { name, code } : null;

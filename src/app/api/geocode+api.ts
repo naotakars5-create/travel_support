@@ -1,7 +1,7 @@
 import { guardRequest, LruCache } from "@/lib/apiGuard";
-import { geocodeAddress, hasGoogleMapsKey } from "@/lib/googleMaps";
+import { GeocodeResult, geocodeAddress, hasGoogleMapsKey } from "@/lib/googleMaps";
 
-const cache = new LruCache<{ lat: number; lng: number } | null>(1000);
+const cache = new LruCache<GeocodeResult | null>(1000);
 
 export async function POST(request: Request): Promise<Response> {
   const denied = guardRequest(request, 150);
@@ -22,13 +22,14 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (cache.has(query)) {
-    return Response.json({ point: cache.get(query) });
+    const hit = cache.get(query);
+    return Response.json({ point: hit?.point ?? null, prefecture: hit?.prefecture });
   }
 
   try {
-    const point = await geocodeAddress(query);
-    cache.set(query, point);
-    return Response.json({ point });
+    const result = await geocodeAddress(query);
+    cache.set(query, result);
+    return Response.json({ point: result?.point ?? null, prefecture: result?.prefecture });
   } catch (err) {
     const message = err instanceof Error ? err.message : "不明なエラーが発生しました";
     return Response.json({ error: `ジオコーディングに失敗しました: ${message}` }, { status: 502 });

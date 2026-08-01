@@ -317,9 +317,13 @@ export function useAppState() {
               body: JSON.stringify({ query: t.text }),
             });
             const data = await res.json();
-            return { ...t, point: (data.point as GeoPoint | null) ?? null };
+            return {
+              ...t,
+              point: (data.point as GeoPoint | null) ?? null,
+              prefecture: (data.prefecture as string | undefined) ?? undefined,
+            };
           } catch {
-            return { ...t, point: null };
+            return { ...t, point: null, prefecture: undefined };
           }
         })
       );
@@ -339,6 +343,8 @@ export function useAppState() {
               const next = { ...e };
               for (const h of mine) {
                 if (h.field === "place" && !next.placeGeo) next.placeGeo = h.point!;
+                // 都道府県は市名入力（例「金沢」）でも正しく取れるので必ず控えておく
+                if (h.field === "place" && h.prefecture && !next.prefecture) next.prefecture = h.prefecture;
                 if (h.field === "from" && !next.placeFromGeo) next.placeFromGeo = h.point!;
                 if (h.field === "to" && !next.placeToGeo) next.placeToGeo = h.point!;
               }
