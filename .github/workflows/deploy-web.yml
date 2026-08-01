@@ -46,6 +46,12 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      # 焼き込み対象の変数が EAS から読めているかをログに残す。
+      # 値そのものは出さず、文字数だけ出す（0 なら未設定・visibility が secret 等）。
+      - name: 公開する環境変数が読めているか確認
+        run: |
+          eas env:exec production 'echo "EXPO_PUBLIC_RAKUTEN_AFFILIATE_ID: ${#EXPO_PUBLIC_RAKUTEN_AFFILIATE_ID} 文字"; echo "EXPO_PUBLIC_AMAZON_TAG: ${#EXPO_PUBLIC_AMAZON_TAG} 文字"' --non-interactive
+
       - name: Web版をビルド
         # `eas env:exec` で包むのは EXPO_PUBLIC_* をバンドルに焼き込むため。
         #
@@ -62,7 +68,12 @@ jobs:
         # （`eas env:exec ENVIRONMENT BASH_COMMAND`）。フラグで書くと
         # "Nonexistent flag: --environment" で落ちる。下の `eas deploy` は
         # フラグ形式なので、同じ書き方だと思って揃えないこと。
-        run: eas env:exec production "npx expo export --platform web" --non-interactive
+        #
+        # --clear で Metro のトランスフォームキャッシュを毎回捨てる。
+        # EXPO_PUBLIC_* はビルド時に値がコードへ焼き込まれるので、
+        # 変数を足す前のキャッシュが残っていると**空のまま固まった結果が再利用される**。
+        # 実際にこれで、提携IDが空のバンドルが本番へ出ていた。
+        run: eas env:exec production "npx expo export --platform web --clear" --non-interactive
 
       - name: 本番へデプロイ
         # expo-github-action が `eas` コマンドを PATH に入れる。
