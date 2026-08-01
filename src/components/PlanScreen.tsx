@@ -346,11 +346,11 @@ export function PlanScreen({
   // baseMode === "car" は「マイカー」なので勧めない（lib/rentalAd.ts）
   const rentalSuggest = rentalAd({
     entries,
+    destination,
     baseMode,
     tripDate,
     tripDayCount,
     now,
-    prefecture: lodgingArea,
     affiliateId: adFree ? "" : undefined,
   });
   // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番（固定枠は除外）
@@ -613,7 +613,7 @@ export function PlanScreen({
                 {rentalSuggest && (
                   <View className="mt-2">
                     <AdActionButton
-                      label={`${rentalSuggest.areaName}のレンタカーを探す`}
+                      label={`${rentalSuggest.areaName}でレンタカーを探す`}
                       sub={`${rentalSuggest.rangeLabel} · 楽天トラベル`}
                       url={rentalSuggest.url}
                     />

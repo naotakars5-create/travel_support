@@ -2,7 +2,6 @@ import { PlanEntry } from "./types";
 import { BaseMode } from "./transit";
 import { dateForDay, formatDateStrJa, tripPhase } from "./date";
 import { rakutenAffiliateId } from "./ads";
-import { LodgingPrefecture } from "./lodgingAd";
 
 /**
  * 「電車・徒歩が基本の旅で、レンタカーがまだ登録されていない」ときに出す探す導線。
@@ -19,8 +18,51 @@ import { LodgingPrefecture } from "./lodgingAd";
  * つまりアプリ側から既にレンタカーを勧めているので、その隣に
  * 「探す」を並べるのは自然な対で、宿泊先と同じ形になる。
  *
- * 宿と同じく、登録されたら消える。
+ * ## 宿と違って「市区」まで要る
+ *
+ * 楽天レンタカーの検索は**小エリア（gsarea）が必須**で、都道府県だけでは
+ * 「入力パラメータが不正です」になる（実地確認済み）。都道府県まで分かれば
+ * 出せた宿とは違い、市区まで特定できたときしか出せない。
+ *
+ * そのため `RENTAL_AREAS` に載っている地名が行き先に含まれるときだけ出す。
+ * **推測でコードを足さないこと。** 間違えるとユーザーはエラー画面に着地する。
+ * 実際に楽天レンタカーで検索して発行されたURLで裏を取ってから足す。
  */
+
+export interface RentalArea {
+  /** 表示用の地名（例: 金沢） */
+  label: string;
+  /** 貸出の都道府県コード（gmarea） */
+  pref: string;
+  /** 貸出の小エリアコード（gsarea） */
+  area: string;
+}
+
+/**
+ * 地名 → 楽天レンタカーのエリアコード。
+ *
+ * **実際の検索URLで裏取りしたものだけを載せる。** 一覧を埋めたくなるが、
+ * コードを間違えると検索が通らずエラー画面になるので、
+ * 「載っていないから出ない」ほうが「出たけれど壊れている」より良い。
+ */
+const RENTAL_AREAS: Record<string, RentalArea> = {
+  // 裏取り済み: cars.travel.rakuten.co.jp の検索結果URL（gmarea=ishikawa&gsarea=kanazawa）
+  金沢: { label: "金沢", pref: "ishikawa", area: "kanazawa" },
+};
+
+// 長い地名から先に照合する（region.ts と同じ考え方）
+const RENTAL_AREA_KEYS = Object.keys(RENTAL_AREAS).sort((a, b) => b.length - a.length);
+
+/** 行き先の文字列から、レンタカーの貸出エリアを特定する。載っていなければ null。 */
+export function rentalArea(texts: (string | undefined)[]): RentalArea | null {
+  for (const t of texts) {
+    const text = t?.trim();
+    if (!text) continue;
+    const key = RENTAL_AREA_KEYS.find((k) => text.includes(k));
+    if (key) return RENTAL_AREAS[key];
+  }
+  return null;
+}
 
 /** レンタカーを探す導線を出してよいか。 */
 export function needsRental(
@@ -38,14 +80,14 @@ export function needsRental(
 
 /**
  * 楽天レンタカーの検索URL（楽天アフィリエイトのラッパー経由）。
- * アフィリエイトID未設定・都道府県不明なら null＝ボタンを出さない。
+ * アフィリエイトID未設定・エリア不明なら null＝ボタンを出さない。
  *
  * パラメータは実際の検索結果URLから起こしてある。**宿とは別サイト**なので注意:
  *
  *   ドメイン  cars.travel.rakuten.co.jp（travel.rakuten.co.jp/cars/ は 404）
  *   パス      /cars/rcf010a.do
- *   gmarea    貸出の都道府県コード（ishikawa）。宿の f_chu と同じローマ字表記
- *   gsarea    貸出の小エリア（kanazawa）。空にして県全体で探す
+ *   gmarea    貸出の都道府県コード（ishikawa）
+ *   gsarea    貸出の小エリアコード（kanazawa）。**空にすると入力エラーになる**
  *   gdatey/gdatem/gdated   借りる日（年・月・日をばらして渡す）
  *   bdatey/bdatem/bdated   返す日
  *   gtimeh/gtimem          借りる時刻（既定 10:00）
@@ -58,14 +100,14 @@ export function needsRental(
  * @param affiliateId テスト用に上書きできるようにしてある。
  */
 export function rentalSearchUrl(
-  opts: { prefCode: string; pickUp: string; dropOff: string },
+  opts: { prefCode: string; areaCode: string; pickUp: string; dropOff: string },
   affiliateId: string = rakutenAffiliateId()
 ): string | null {
   const id = affiliateId.trim();
   if (!id) return null;
   const from = splitDate(opts.pickUp);
   const to = splitDate(opts.dropOff);
-  if (!opts.prefCode.trim() || !from || !to) return null;
+  if (!opts.prefCode.trim() || !opts.areaCode.trim() || !from || !to) return null;
 
   // React Native の URLSearchParams は実装が不完全なので、mapsLink.ts と同じく手で組む
   const q = [
@@ -74,7 +116,7 @@ export function rentalSearchUrl(
     `display=0`,
     `gdarea=`,
     `bdarea=`,
-    `gsarea=`,
+    `gsarea=${encodeURIComponent(opts.areaCode.trim())}`,
     `bsarea=`,
     `tid=1`,
     `f_teikei=`,
@@ -109,7 +151,7 @@ function splitDate(s: string): { y: string; m: string; d: string } | null {
 }
 
 export interface RentalAd {
-  /** 対象の都道府県名（ボタンにも出す） */
+  /** 表示用の地名（例: 金沢） */
   areaName: string;
   /** 借りる日（YYYY-MM-DD） */
   pickUp: string;
@@ -123,32 +165,33 @@ export interface RentalAd {
 
 /**
  * レンタカーを探す導線の内容。条件を満たさない・提携ID未設定・
- * 都道府県不明なら null。画面側はこの戻り値が null かだけを見ればよい。
+ * エリア不明なら null。画面側はこの戻り値が null かだけを見ればよい。
  */
 export function rentalAd(opts: {
   entries: PlanEntry[];
+  destination: string;
   baseMode: BaseMode;
   tripDate: string;
   tripDayCount: number;
   now: Date;
-  /** 宿と同じ判定結果を使い回す（lodgingPrefecture の戻り値） */
-  prefecture: LodgingPrefecture | null;
   affiliateId?: string;
 }): RentalAd | null {
-  const { entries, baseMode, tripDate, tripDayCount, now, prefecture } = opts;
+  const { entries, destination, baseMode, tripDate, tripDayCount, now } = opts;
   if (!needsRental(entries, baseMode, tripDate, tripDayCount, now)) return null;
-  if (!prefecture) return null;
+
+  const area = rentalArea([destination, ...entries.map((e) => e.place), ...entries.map((e) => e.title)]);
+  if (!area) return null;
 
   const pickUp = tripDate;
   const dropOff = dateForDay(tripDate, Math.max(1, Math.floor(tripDayCount)));
   const url = rentalSearchUrl(
-    { prefCode: prefecture.code, pickUp, dropOff },
+    { prefCode: area.pref, areaCode: area.area, pickUp, dropOff },
     opts.affiliateId ?? rakutenAffiliateId()
   );
   if (!url) return null;
 
   return {
-    areaName: prefecture.name,
+    areaName: area.label,
     pickUp,
     dropOff,
     rangeLabel:

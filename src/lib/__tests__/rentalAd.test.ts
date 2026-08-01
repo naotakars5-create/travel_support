@@ -1,9 +1,7 @@
-import { needsRental, rentalAd, rentalSearchUrl } from "../rentalAd";
-import { LodgingPrefecture } from "../lodgingAd";
+import { needsRental, rentalAd, rentalArea, rentalSearchUrl } from "../rentalAd";
 import { PlanEntry } from "../types";
 
 const AFFILIATE = "1a2b3c4d.5e6f7g8h";
-const ISHIKAWA: LodgingPrefecture = { name: "石川県", code: "ishikawa" };
 
 function entry(over: Partial<PlanEntry> = {}): PlanEntry {
   return { id: "e1", title: "兼六園", mode: "activity", priority: "want", source: "手入力", ...over };
@@ -42,7 +40,7 @@ describe("needsRental", () => {
 });
 
 describe("rentalSearchUrl", () => {
-  const base = { prefCode: "ishikawa", pickUp: "2026-09-08", dropOff: "2026-09-10" };
+  const base = { prefCode: "ishikawa", areaCode: "kanazawa", pickUp: "2026-09-08", dropOff: "2026-09-10" };
 
   it("アフィリエイトID未設定なら null", () => {
     expect(rentalSearchUrl(base, "")).toBeNull();
@@ -70,9 +68,10 @@ describe("rentalSearchUrl", () => {
     expect(target).toContain("bdated=10");
   });
 
-  it("小エリアは空にして県全体で探す", () => {
+  it("小エリアは必須（空にすると楽天側が「入力パラメータが不正です」になる）", () => {
     const target = decodeURIComponent(rentalSearchUrl(base, AFFILIATE)!.split("?pc=")[1]);
-    expect(target).toContain("gsarea=&");
+    expect(target).toContain("gsarea=kanazawa");
+    expect(rentalSearchUrl({ ...base, areaCode: "" }, AFFILIATE)).toBeNull();
   });
 
   it("日付の形式が違えば null", () => {
@@ -89,7 +88,7 @@ describe("rentalAd", () => {
     tripDate: "2026-09-08",
     tripDayCount: 3,
     now,
-    prefecture: ISHIKAWA,
+    destination: "金沢",
     affiliateId: AFFILIATE,
   };
 
@@ -97,11 +96,11 @@ describe("rentalAd", () => {
     const ad = rentalAd(common)!;
     expect(ad.pickUp).toBe("2026-09-08");
     expect(ad.dropOff).toBe("2026-09-10");
-    expect(ad.areaName).toBe("石川県");
+    expect(ad.areaName).toBe("金沢");
   });
 
-  it("都道府県が分からなければ出さない（別の県のレンタカーへ送らない）", () => {
-    expect(rentalAd({ ...common, prefecture: null })).toBeNull();
+  it("エリアコードを持たない行き先では出さない（推測で送るとエラー画面になる）", () => {
+    expect(rentalAd({ ...common, destination: "どこか知らない町", entries: [entry()] })).toBeNull();
   });
 
   it("アフィリエイトID未設定なら出さない", () => {
@@ -116,5 +115,17 @@ describe("rentalAd", () => {
     const ad = rentalAd({ ...common, tripDayCount: 1 })!;
     expect(ad.pickUp).toBe(ad.dropOff);
     expect(ad.rangeLabel).not.toContain("→");
+  });
+});
+
+describe("rentalArea", () => {
+  it("裏取り済みの地名だけ引ける", () => {
+    expect(rentalArea(["金沢"])).toEqual({ label: "金沢", pref: "ishikawa", area: "kanazawa" });
+    expect(rentalArea(["金沢の旅"])).not.toBeNull();
+  });
+
+  it("表に無い地名は null（推測でコードを作らない）", () => {
+    expect(rentalArea(["高松"])).toBeNull();
+    expect(rentalArea([undefined, "", "   "])).toBeNull();
   });
 });
