@@ -46,8 +46,74 @@ export interface RentalArea {
  * 「載っていないから出ない」ほうが「出たけれど壊れている」より良い。
  */
 const RENTAL_AREAS: Record<string, RentalArea> = {
-  // 裏取り済み: cars.travel.rakuten.co.jp の検索結果URL（gmarea=ishikawa&gsarea=kanazawa）
-  金沢: { label: "金沢", pref: "ishikawa", area: "kanazawa" },
+  // ▼ 実際の検索結果URLで裏取り済み
+  金沢: { label: "金沢", pref: "ishikawa", area: "kanazawa" }, // gmarea=ishikawa&gsarea=kanazawa
+  帯広: { label: "帯広", pref: "hokkaido", area: "obihiro" }, // gmarea=hokkaido&gsarea=obihiro
+
+  // ▼ 上の2件からコード体系（ヘボン式ローマ字そのまま）を確認したうえで足したもの。
+  //    空港・新幹線駅があってレンタカー営業所が確実にある主要地域に絞ってある。
+  //    エラー画面に着地する報告があれば、その行を消すこと。
+  札幌: { label: "札幌", pref: "hokkaido", area: "sapporo" },
+  函館: { label: "函館", pref: "hokkaido", area: "hakodate" },
+  旭川: { label: "旭川", pref: "hokkaido", area: "asahikawa" },
+  釧路: { label: "釧路", pref: "hokkaido", area: "kushiro" },
+  青森: { label: "青森", pref: "aomori", area: "aomori" },
+  盛岡: { label: "盛岡", pref: "iwate", area: "morioka" },
+  仙台: { label: "仙台", pref: "miyagi", area: "sendai" },
+  秋田: { label: "秋田", pref: "akita", area: "akita" },
+  山形: { label: "山形", pref: "yamagata", area: "yamagata" },
+  郡山: { label: "郡山", pref: "fukushima", area: "koriyama" },
+  水戸: { label: "水戸", pref: "ibaraki", area: "mito" },
+  宇都宮: { label: "宇都宮", pref: "tochigi", area: "utsunomiya" },
+  高崎: { label: "高崎", pref: "gunma", area: "takasaki" },
+  成田: { label: "成田", pref: "chiba", area: "narita" },
+  横浜: { label: "横浜", pref: "kanagawa", area: "yokohama" },
+  新潟: { label: "新潟", pref: "niigata", area: "niigata" },
+  富山: { label: "富山", pref: "toyama", area: "toyama" },
+  福井: { label: "福井", pref: "fukui", area: "fukui" },
+  甲府: { label: "甲府", pref: "yamanashi", area: "kofu" },
+  長野: { label: "長野", pref: "nagano", area: "nagano" },
+  松本: { label: "松本", pref: "nagano", area: "matsumoto" },
+  高山: { label: "高山", pref: "gifu", area: "takayama" },
+  静岡: { label: "静岡", pref: "shizuoka", area: "shizuoka" },
+  浜松: { label: "浜松", pref: "shizuoka", area: "hamamatsu" },
+  名古屋: { label: "名古屋", pref: "aichi", area: "nagoya" },
+  伊勢: { label: "伊勢", pref: "mie", area: "ise" },
+  大津: { label: "大津", pref: "shiga", area: "otsu" },
+  京都: { label: "京都", pref: "kyoto", area: "kyoto" },
+  大阪: { label: "大阪", pref: "osaka", area: "osaka" },
+  神戸: { label: "神戸", pref: "hyogo", area: "kobe" },
+  姫路: { label: "姫路", pref: "hyogo", area: "himeji" },
+  奈良: { label: "奈良", pref: "nara", area: "nara" },
+  和歌山: { label: "和歌山", pref: "wakayama", area: "wakayama" },
+  白浜: { label: "白浜", pref: "wakayama", area: "shirahama" },
+  鳥取: { label: "鳥取", pref: "tottori", area: "tottori" },
+  米子: { label: "米子", pref: "tottori", area: "yonago" },
+  松江: { label: "松江", pref: "shimane", area: "matsue" },
+  出雲: { label: "出雲", pref: "shimane", area: "izumo" },
+  岡山: { label: "岡山", pref: "okayama", area: "okayama" },
+  倉敷: { label: "倉敷", pref: "okayama", area: "kurashiki" },
+  広島: { label: "広島", pref: "hiroshima", area: "hiroshima" },
+  福山: { label: "福山", pref: "hiroshima", area: "fukuyama" },
+  下関: { label: "下関", pref: "yamaguchi", area: "shimonoseki" },
+  徳島: { label: "徳島", pref: "tokushima", area: "tokushima" },
+  高松: { label: "高松", pref: "kagawa", area: "takamatsu" },
+  松山: { label: "松山", pref: "ehime", area: "matsuyama" },
+  高知: { label: "高知", pref: "kochi", area: "kochi" },
+  福岡: { label: "福岡", pref: "fukuoka", area: "fukuoka" },
+  北九州: { label: "北九州", pref: "fukuoka", area: "kitakyushu" },
+  佐賀: { label: "佐賀", pref: "saga", area: "saga" },
+  長崎: { label: "長崎", pref: "nagasaki", area: "nagasaki" },
+  佐世保: { label: "佐世保", pref: "nagasaki", area: "sasebo" },
+  熊本: { label: "熊本", pref: "kumamoto", area: "kumamoto" },
+  阿蘇: { label: "阿蘇", pref: "kumamoto", area: "aso" },
+  大分: { label: "大分", pref: "oita", area: "oita" },
+  別府: { label: "別府", pref: "oita", area: "beppu" },
+  宮崎: { label: "宮崎", pref: "miyazaki", area: "miyazaki" },
+  鹿児島: { label: "鹿児島", pref: "kagoshima", area: "kagoshima" },
+  那覇: { label: "那覇", pref: "okinawa", area: "naha" },
+  石垣: { label: "石垣", pref: "okinawa", area: "ishigaki" },
+  宮古島: { label: "宮古島", pref: "okinawa", area: "miyakojima" },
 };
 
 // 長い地名から先に照合する（region.ts と同じ考え方）

@@ -119,13 +119,19 @@ describe("rentalAd", () => {
 });
 
 describe("rentalArea", () => {
-  it("裏取り済みの地名だけ引ける", () => {
+  it("表に載っている地名を引ける", () => {
     expect(rentalArea(["金沢"])).toEqual({ label: "金沢", pref: "ishikawa", area: "kanazawa" });
+    expect(rentalArea(["帯広"])).toEqual({ label: "帯広", pref: "hokkaido", area: "obihiro" });
     expect(rentalArea(["金沢の旅"])).not.toBeNull();
   });
 
+  it("エリアコードは都道府県とセットで正しく引ける", () => {
+    expect(rentalArea(["那覇"])).toEqual({ label: "那覇", pref: "okinawa", area: "naha" });
+    expect(rentalArea(["高松"])).toEqual({ label: "高松", pref: "kagawa", area: "takamatsu" });
+  });
+
   it("表に無い地名は null（推測でコードを作らない）", () => {
-    expect(rentalArea(["高松"])).toBeNull();
+    expect(rentalArea(["知らない町"])).toBeNull();
     expect(rentalArea([undefined, "", "   "])).toBeNull();
   });
 });
