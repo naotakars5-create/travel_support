@@ -2,6 +2,7 @@ import { PlanEntry } from "./types";
 import { BaseMode } from "./transit";
 import { dateForDay, formatDateStrJa, tripPhase } from "./date";
 import { rakutenAffiliateId } from "./ads";
+import { prefectureNameOfCode } from "./lodgingAd";
 
 /**
  * 「電車・徒歩が基本の旅で、レンタカーがまだ登録されていない」ときに出す探す導線。
@@ -25,8 +26,17 @@ import { rakutenAffiliateId } from "./ads";
  * 出せた宿とは違い、市区まで特定できたときしか出せない。
  *
  * そのため `RENTAL_AREAS` に載っている地名が行き先に含まれるときだけ出す。
- * **推測でコードを足さないこと。** 間違えるとユーザーはエラー画面に着地する。
- * 実際に楽天レンタカーで検索して発行されたURLで裏を取ってから足す。
+ *
+ * ## 無効なエリアコードは県全体の検索に落ちる（実地確認済み）
+ *
+ * `gsarea` を**空**にすると「入力パラメータが不正です」になるが、
+ * **値が入っていれば無効なコードでもエラーにはならず、都道府県全体の検索**
+ * になる（naha / nagoya で確認）。つまり誤ったコードは致命傷ではない。
+ *
+ * ただし裏取りできていないコードで市区名をボタンに出すと、
+ * 「那覇でレンタカーを探す」と書いてあるのに沖縄県全体が出る、という
+ * 小さな嘘になる。そこで `verified` が付いていないエリアは
+ * **都道府県名でボタンを出す**。表示と結果を必ず一致させる。
  */
 
 export interface RentalArea {
@@ -36,24 +46,31 @@ export interface RentalArea {
   pref: string;
   /** 貸出の小エリアコード（gsarea） */
   area: string;
+  /**
+   * 実際の検索結果URLで「出発エリア: ◯◯県 > △△」まで出ることを確認済みか。
+   * 未確認のものは市区が無視されて県全体の検索になるため、
+   * ボタンには市区名ではなく都道府県名を出す。
+   */
+  verified?: boolean;
 }
 
 /**
  * 地名 → 楽天レンタカーのエリアコード。
  *
- * **実際の検索URLで裏取りしたものだけを載せる。** 一覧を埋めたくなるが、
- * コードを間違えると検索が通らずエラー画面になるので、
- * 「載っていないから出ない」ほうが「出たけれど壊れている」より良い。
+ * コードが外れても県全体の検索に落ちるだけなので（上記参照）、主要地域は
+ * ローマ字から推定して載せてある。ただし**裏取りできたものだけ `verified`**
+ * を付け、未確認のエリアはボタンの文言を県名にして実態と合わせる。
  */
 const RENTAL_AREAS: Record<string, RentalArea> = {
-  // ▼ 実際の検索結果URLで裏取り済み
-  金沢: { label: "金沢", pref: "ishikawa", area: "kanazawa" }, // gmarea=ishikawa&gsarea=kanazawa
-  帯広: { label: "帯広", pref: "hokkaido", area: "obihiro" }, // gmarea=hokkaido&gsarea=obihiro
+  // ▼ verified: 実際の検索結果URLで「出発エリア: ◯◯県 > △△」まで出ることを確認済み
+  金沢: { label: "金沢", pref: "ishikawa", area: "kanazawa", verified: true },
+  帯広: { label: "帯広", pref: "hokkaido", area: "obihiro", verified: true },
+  高松: { label: "高松", pref: "kagawa", area: "takamatsu", verified: true },
+  札幌: { label: "札幌", pref: "hokkaido", area: "sapporo", verified: true },
 
-  // ▼ 上の2件からコード体系（ヘボン式ローマ字そのまま）を確認したうえで足したもの。
-  //    空港・新幹線駅があってレンタカー営業所が確実にある主要地域に絞ってある。
-  //    エラー画面に着地する報告があれば、その行を消すこと。
-  札幌: { label: "札幌", pref: "hokkaido", area: "sapporo" },
+  // ▼ 未確認。コード体系（ヘボン式ローマ字）から足したもので、当たれば市区、
+  //    外れても県全体の検索に落ちるだけ（naha / nagoya は外れることを確認済み）。
+  //    確認できたものから verified: true を付けていく。
   函館: { label: "函館", pref: "hokkaido", area: "hakodate" },
   旭川: { label: "旭川", pref: "hokkaido", area: "asahikawa" },
   釧路: { label: "釧路", pref: "hokkaido", area: "kushiro" },
@@ -97,7 +114,6 @@ const RENTAL_AREAS: Record<string, RentalArea> = {
   福山: { label: "福山", pref: "hiroshima", area: "fukuyama" },
   下関: { label: "下関", pref: "yamaguchi", area: "shimonoseki" },
   徳島: { label: "徳島", pref: "tokushima", area: "tokushima" },
-  高松: { label: "高松", pref: "kagawa", area: "takamatsu" },
   松山: { label: "松山", pref: "ehime", area: "matsuyama" },
   高知: { label: "高知", pref: "kochi", area: "kochi" },
   福岡: { label: "福岡", pref: "fukuoka", area: "fukuoka" },
@@ -256,8 +272,12 @@ export function rentalAd(opts: {
   );
   if (!url) return null;
 
+  // 裏取りできていないエリアは市区が無視されて県全体の検索になる。
+  // ボタンの文言も県名にして、表示と結果を一致させる
+  const areaName = area.verified ? area.label : prefectureNameOfCode(area.pref) ?? area.label;
+
   return {
-    areaName: area.label,
+    areaName,
     pickUp,
     dropOff,
     rangeLabel:

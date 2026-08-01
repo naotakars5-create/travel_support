@@ -120,18 +120,47 @@ describe("rentalAd", () => {
 
 describe("rentalArea", () => {
   it("表に載っている地名を引ける", () => {
-    expect(rentalArea(["金沢"])).toEqual({ label: "金沢", pref: "ishikawa", area: "kanazawa" });
-    expect(rentalArea(["帯広"])).toEqual({ label: "帯広", pref: "hokkaido", area: "obihiro" });
+    expect(rentalArea(["金沢"])).toEqual({ label: "金沢", pref: "ishikawa", area: "kanazawa", verified: true });
+    expect(rentalArea(["帯広"])).toEqual({ label: "帯広", pref: "hokkaido", area: "obihiro", verified: true });
     expect(rentalArea(["金沢の旅"])).not.toBeNull();
   });
 
   it("エリアコードは都道府県とセットで正しく引ける", () => {
     expect(rentalArea(["那覇"])).toEqual({ label: "那覇", pref: "okinawa", area: "naha" });
-    expect(rentalArea(["高松"])).toEqual({ label: "高松", pref: "kagawa", area: "takamatsu" });
+    expect(rentalArea(["高松"])).toEqual({ label: "高松", pref: "kagawa", area: "takamatsu", verified: true });
   });
 
   it("表に無い地名は null（推測でコードを作らない）", () => {
     expect(rentalArea(["知らない町"])).toBeNull();
     expect(rentalArea([undefined, "", "   "])).toBeNull();
+  });
+});
+
+describe("ボタンの文言と検索結果を一致させる", () => {
+  const common = {
+    entries: [{ id: "e1", title: "観光", mode: "activity" as const, priority: "want" as const, source: "手入力" }],
+    baseMode: "walk" as const,
+    tripDate: "2026-09-08",
+    tripDayCount: 3,
+    now: new Date("2026-08-01T10:00:00"),
+    affiliateId: AFFILIATE,
+  };
+
+  it("裏取り済みのエリアは市区名を出す", () => {
+    expect(rentalAd({ ...common, destination: "金沢" })!.areaName).toBe("金沢");
+    expect(rentalAd({ ...common, destination: "札幌" })!.areaName).toBe("札幌");
+    expect(rentalAd({ ...common, destination: "高松" })!.areaName).toBe("高松");
+  });
+
+  it("未確認のエリアは県名を出す（市区は無視されて県全体の検索になるため）", () => {
+    // 那覇・名古屋は gsarea が効かず県全体の検索になることを実地確認済み
+    expect(rentalAd({ ...common, destination: "那覇" })!.areaName).toBe("沖縄県");
+    expect(rentalAd({ ...common, destination: "名古屋" })!.areaName).toBe("愛知県");
+  });
+
+  it("エリアコード自体は常に送る（空にすると楽天側が入力エラーになる）", () => {
+    const target = decodeURIComponent(rentalAd({ ...common, destination: "那覇" })!.url.split("?pc=")[1]);
+    expect(target).toContain("gsarea=naha");
+    expect(target).toContain("gmarea=okinawa");
   });
 });

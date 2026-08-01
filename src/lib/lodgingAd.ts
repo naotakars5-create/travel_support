@@ -78,6 +78,12 @@ const RAKUTEN_PREF_CODE: Record<string, string> = {
   沖縄県: "okinawa",
 };
 
+/** 楽天の地域コード（ishikawa 等）から都道府県名を引く。見つからなければ null。 */
+export function prefectureNameOfCode(code: string): string | null {
+  const hit = Object.entries(RAKUTEN_PREF_CODE).find(([, c]) => c === code);
+  return hit ? hit[0] : null;
+}
+
 export interface LodgingPrefecture {
   /** 表示用の都道府県名（例: 香川県） */
   name: string;
