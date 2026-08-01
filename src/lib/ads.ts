@@ -35,9 +35,10 @@ const AD_FREE_KEY = "tabinavi.adfree.v1";
  * 広告枠の識別子。増やすときは必ずここに足す。
  *
  * - `packing-gear`  … 持ち物リストの未チェック項目に添える商品リンク
- * - `plan-lodging`  … 泊まりなのに宿が未登録のときに出す宿探しカード
+ * - `plan-lodging`  … 宿泊先の枠で、まだ宿が決まっていない泊に出す宿探しボタン
+ * - `plan-rental`   … 「車の移動」枠で、レンタカーが未登録のときに出す探すボタン
  */
-export type AdSlotId = "packing-gear" | "plan-lodging";
+export type AdSlotId = "packing-gear" | "plan-lodging" | "plan-rental";
 
 /** 広告であることの明示。すべての枠に必ず添える（省略可能な装飾ではない）。 */
 export const AD_LABEL = "PR";
