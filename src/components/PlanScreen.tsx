@@ -27,6 +27,7 @@ import { COLORS, dayColor, tint } from "@/lib/palette";
 import { Floater } from "./animations";
 import { Button, SectionHeading } from "./ui";
 import { LodgingNight, lodgingNights, lodgingPrefecture, lodgingProgress } from "@/lib/lodgingAd";
+import { rentalAd } from "@/lib/rentalAd";
 import { useAdFree } from "@/hooks/useAdFree";
 import { AdActionButton } from "./AdSlot";
 
@@ -341,6 +342,17 @@ export function PlanScreen({
   });
   const nightsDone = lodgingProgress(nights).done;
   const rentals = entries.filter((e) => e.mode === "rental");
+  // 徒歩・電車が基本の旅でレンタカーが未登録なら、探す導線を出す。
+  // baseMode === "car" は「マイカー」なので勧めない（lib/rentalAd.ts）
+  const rentalSuggest = rentalAd({
+    entries,
+    baseMode,
+    tripDate,
+    tripDayCount,
+    now,
+    prefecture: lodgingArea,
+    affiliateId: adFree ? "" : undefined,
+  });
   // 表示は「並び順（＝行程順）」: 日ごと → 行き先リスト内の順番（固定枠は除外）
   const indexOf = new Map(entries.map((e, i) => [e.id, i]));
   const ordered = entries
@@ -592,9 +604,22 @@ export function PlanScreen({
                 旅行中ずっと車で移動する前提で、区間の所要時間を計算します。
               </Text>
             ) : rentals.length === 0 ? (
-              <Text className="mt-1.5 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
-                近い区間は徒歩、離れた区間は電車・バスとして計算します。途中でレンタカーを借りるなら「＋レンタカー」で借りる〜返す時間を登録すると、その期間だけ車で計算します。
-              </Text>
+              <>
+                <Text className="mt-1.5 font-gothic-400 text-[11px] leading-[17px] text-muted-light">
+                  近い区間は徒歩、離れた区間は電車・バスとして計算します。途中でレンタカーを借りるなら「＋レンタカー」で借りる〜返す時間を登録すると、その期間だけ車で計算します。
+                </Text>
+                {/* アプリ側から既にレンタカーを勧めている場所なので、
+                    その隣に「探す」を並べる。宿泊先と同じ対の形にする */}
+                {rentalSuggest && (
+                  <View className="mt-2">
+                    <AdActionButton
+                      label={`${rentalSuggest.areaName}のレンタカーを探す`}
+                      sub={`${rentalSuggest.rangeLabel} · 楽天トラベル`}
+                      url={rentalSuggest.url}
+                    />
+                  </View>
+                )}
+              </>
             ) : (
               <View className="mt-2 gap-2">
                 {rentals.map((e) => (
