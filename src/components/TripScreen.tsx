@@ -139,6 +139,7 @@ export function TripScreen({
           now={app.now}
           lodgingSkipped={app.lodgingSkipped}
           onToggleLodgingSkip={app.toggleLodgingSkip}
+          onOpenTripSettings={onOpenTripSettings}
         />
       )}
     </View>
