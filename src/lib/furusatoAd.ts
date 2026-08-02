@@ -64,32 +64,33 @@ export interface FurusatoAd {
 }
 
 /**
- * 旅先の県のふるさと納税を探すURL（楽天アフィリエイトのラッパー経由）。
+ * 旅先の県のふるさと納税ページURL（楽天アフィリエイトのラッパー経由）。
  * アフィリエイトID未設定・都道府県不明なら null＝カードを出さない。
  *
- * ## 楽天ふるさと納税は「楽天市場の商品」
+ * ## 楽天ふるさと納税の県別ページへ送る
  *
- * 返礼品は `item.rakuten.co.jp/f304069-susami/...` のように、自治体ショップ
- * （`f` + 自治体コード）が楽天市場に出している商品として存在する。
- * だから宿・レンタカーのような専用サイトではなく、**楽天市場の検索**に送れば
- * よく、楽天アフィリエイトもそのまま効く。
+ * 返礼品そのものは `item.rakuten.co.jp/f304069-susami/...` のように
+ * 自治体ショップ（`f` + 自治体コード）が楽天市場に出している商品なので、
+ * 楽天市場の検索に送ることもできる。だが**公式の県別ページを使う**。
  *
- * ## 個別商品を選ばない
+ * - 検索結果は中身を保証できない（「石川」を含む無関係な商品が混ざりうる）。
+ *   県別ページなら表示されるものが確実に石川県の参加自治体になる
+ * - 旅の直後に出すカードは「ふるさと納税を見てみよう」という気分の入口で、
+ *   いきなり商品を売り込む場面ではない。ランキング・金額・ジャンルの
+ *   絞り込みが揃った公式ページのほうが文脈に合う
  *
- * 検索結果ページへ送れば、そこから何を買っても成果になる（クリック時に
- * 紐付けが成立する）。返礼品は数万件あるので、こちらで商品を選ぶ意味も無い。
- * 宿・レンタカーと同じ「条件を入れた検索結果へ送る」という形に揃える。
+ * 個別商品は選ばない。ページへ送れば、そこから何を寄付しても成果になる。
  *
  * @param affiliateId テスト用に上書きできるようにしてある。
  */
 export function furusatoSearchUrl(
-  prefName: string,
+  prefCode: string,
   affiliateId: string = rakutenAffiliateId()
 ): string | null {
   const id = affiliateId.trim();
-  const name = prefName.trim();
-  if (!id || !name) return null;
-  const target = `https://search.rakuten.co.jp/search/mall/${encodeURIComponent(`ふるさと納税 ${name}`)}/`;
+  const code = prefCode.trim();
+  if (!id || !code) return null;
+  const target = `https://event.rakuten.co.jp/furusato/area/${encodeURIComponent(code)}/`;
   return `https://hb.afl.rakuten.co.jp/hgc/${encodeURIComponent(id)}/?pc=${encodeURIComponent(target)}`;
 }
 
@@ -108,7 +109,7 @@ export function furusatoAd(opts: {
 }): FurusatoAd | null {
   const pref = opts.prefecture;
   if (!pref) return null;
-  const url = furusatoSearchUrl(pref.name, opts.affiliateId ?? rakutenAffiliateId());
+  const url = furusatoSearchUrl(pref.code, opts.affiliateId ?? rakutenAffiliateId());
   if (!url) return null;
 
   const yearEnd = isYearEndSeason(opts.now);

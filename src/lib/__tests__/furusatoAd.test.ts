@@ -19,27 +19,33 @@ describe("isYearEndSeason", () => {
 
 describe("furusatoSearchUrl", () => {
   it("アフィリエイトID未設定なら null（設定しなくてもアプリが成立する）", () => {
-    expect(furusatoSearchUrl("石川県", "")).toBeNull();
+    expect(furusatoSearchUrl("ishikawa", "")).toBeNull();
   });
 
-  it("都道府県名が空なら null", () => {
+  it("都道府県コードが空なら null", () => {
     expect(furusatoSearchUrl("  ", AFFILIATE)).toBeNull();
   });
 
   it("アフィリエイトのラッパー経由になる", () => {
-    const url = furusatoSearchUrl("石川県", AFFILIATE)!;
+    const url = furusatoSearchUrl("ishikawa", AFFILIATE)!;
     expect(url.startsWith(`https://hb.afl.rakuten.co.jp/hgc/${encodeURIComponent(AFFILIATE)}/?pc=`)).toBe(true);
   });
 
-  it("楽天市場の検索へ送る（返礼品は自治体ショップの楽天市場商品）", () => {
-    const target = decodeURIComponent(furusatoSearchUrl("石川県", AFFILIATE)!.split("?pc=")[1]);
-    expect(target.startsWith("https://search.rakuten.co.jp/search/mall/")).toBe(true);
-    expect(decodeURIComponent(target)).toContain("ふるさと納税 石川県");
+  it("楽天ふるさと納税の県別ページへ送る（表示される中身を保証できるため）", () => {
+    const target = decodeURIComponent(furusatoSearchUrl("ishikawa", AFFILIATE)!.split("?pc=")[1]);
+    expect(target).toBe("https://event.rakuten.co.jp/furusato/area/ishikawa/");
   });
 
-  it("個別商品ではなく検索結果に送る（商品を選ばない）", () => {
-    const target = decodeURIComponent(furusatoSearchUrl("石川県", AFFILIATE)!.split("?pc=")[1]);
+  it("個別商品には送らない（返礼品はこちらで選ばない）", () => {
+    const target = decodeURIComponent(furusatoSearchUrl("ishikawa", AFFILIATE)!.split("?pc=")[1]);
     expect(target).not.toContain("item.rakuten.co.jp");
+  });
+
+  it("都道府県コードは宿・レンタカーと同じ表記を使い回せる", () => {
+    for (const code of ["hokkaido", "tokyo", "kyoto", "osaka", "okinawa"]) {
+      const target = decodeURIComponent(furusatoSearchUrl(code, AFFILIATE)!.split("?pc=")[1]);
+      expect(target).toContain(`/furusato/area/${code}/`);
+    }
   });
 });
 
