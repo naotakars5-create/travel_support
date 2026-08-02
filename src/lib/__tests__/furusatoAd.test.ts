@@ -19,21 +19,27 @@ describe("isYearEndSeason", () => {
 
 describe("furusatoSearchUrl", () => {
   it("アフィリエイトID未設定なら null（設定しなくてもアプリが成立する）", () => {
-    expect(furusatoSearchUrl("ishikawa", "")).toBeNull();
+    expect(furusatoSearchUrl("石川県", "")).toBeNull();
   });
 
-  it("都道府県コードが空なら null", () => {
+  it("都道府県名が空なら null", () => {
     expect(furusatoSearchUrl("  ", AFFILIATE)).toBeNull();
   });
 
   it("アフィリエイトのラッパー経由になる", () => {
-    const url = furusatoSearchUrl("ishikawa", AFFILIATE)!;
+    const url = furusatoSearchUrl("石川県", AFFILIATE)!;
     expect(url.startsWith(`https://hb.afl.rakuten.co.jp/hgc/${encodeURIComponent(AFFILIATE)}/?pc=`)).toBe(true);
   });
 
-  it("都道府県が遷移先に載る", () => {
-    const target = decodeURIComponent(furusatoSearchUrl("ishikawa", AFFILIATE)!.split("?pc=")[1]);
-    expect(target).toContain("ishikawa");
+  it("楽天市場の検索へ送る（返礼品は自治体ショップの楽天市場商品）", () => {
+    const target = decodeURIComponent(furusatoSearchUrl("石川県", AFFILIATE)!.split("?pc=")[1]);
+    expect(target.startsWith("https://search.rakuten.co.jp/search/mall/")).toBe(true);
+    expect(decodeURIComponent(target)).toContain("ふるさと納税 石川県");
+  });
+
+  it("個別商品ではなく検索結果に送る（商品を選ばない）", () => {
+    const target = decodeURIComponent(furusatoSearchUrl("石川県", AFFILIATE)!.split("?pc=")[1]);
+    expect(target).not.toContain("item.rakuten.co.jp");
   });
 });
 
