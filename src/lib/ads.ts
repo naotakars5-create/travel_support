@@ -22,8 +22,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * - **accent（ローズレッド）を広告に使わない**。accent は「今・進行中」専用で、
  *   アプリで最も目を引く色。ここを広告へ明け渡すと当日画面の視認性が落ちる。
  *   広告は surface（砂）と muted（補助文字色）だけで組む。
- * - **当日画面（DayOfScreen）には置かない**。「次に何をするかだけを示す」が
- *   この製品の核なので、ここに広告を差し込むと製品価値そのものが壊れる。
+ * - **当日画面（DayOfScreen）には原則として置かない**。「次に何をするかだけを
+ *   示す」がこの製品の核なので、ここに広告を差し込むと製品価値そのものが壊れる。
+ *   唯一の例外が `dayof-furusato` で、**最終日 かつ done**（次のノードが無い＝
+ *   その日の予定を消化しきった状態）に限る。done では案内すべき「次」が
+ *   そもそも存在しないため、核を傷つけない。move / free には絶対に出さない。
  * - **提携IDが未設定なら、枠ごと出さない**。Maps キーや Upstash と同じく、
  *   「設定しなくてもアプリは完全に動く」状態を崩さない。
  */
@@ -37,8 +40,10 @@ const AD_FREE_KEY = "tabinavi.adfree.v1";
  * - `packing-gear`  … 持ち物リストの未チェック項目に添える商品リンク
  * - `plan-lodging`  … 宿泊先の枠で、まだ宿が決まっていない泊に出す宿探しボタン
  * - `plan-rental`   … 「車の移動」枠で、レンタカーが未登録のときに出す探すボタン
+ * - `shiori-furusato` … 旅が終わったしおりの末尾に出すふるさと納税カード
+ * - `dayof-furusato`  … 当日画面。**最終日 かつ done のときだけ**出すふるさと納税カード
  */
-export type AdSlotId = "packing-gear" | "plan-lodging" | "plan-rental";
+export type AdSlotId = "packing-gear" | "plan-lodging" | "plan-rental" | "shiori-furusato" | "dayof-furusato";
 
 /** 広告であることの明示。すべての枠に必ず添える（省略可能な装飾ではない）。 */
 export const AD_LABEL = "PR";
