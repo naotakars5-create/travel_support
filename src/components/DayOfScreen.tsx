@@ -6,10 +6,14 @@ import { formatDurationMin, RailNode } from "@/lib/itinerary";
 import { formatJstTime, formatJstMonthDayJa } from "@/lib/date";
 import { MODE_COLOR, MODE_LABEL } from "@/lib/modeMeta";
 import { createSpotProvider, Spot } from "@/lib/spots";
-import { GeoPoint } from "@/lib/types";
+import { GeoPoint, PlanEntry } from "@/lib/types";
 import { WeatherInfo } from "@/lib/weather";
 import { fetchWeather } from "@/lib/weatherClient";
 import { haversineMeters } from "@/lib/geo";
+import { furusatoAd, isLastTripDay } from "@/lib/furusatoAd";
+import { lodgingPrefecture } from "@/lib/lodgingAd";
+import { useAdFree } from "@/hooks/useAdFree";
+import { AdCard } from "./AdSlot";
 import { LocationPermissionState } from "@/hooks/useLiveLocation";
 import { Blinker } from "./animations";
 
@@ -172,18 +176,44 @@ export function DayOfScreen({
   locationPermission,
   onNavigatePlan,
   onRecordArrival,
+  entries = [],
+  destination = "",
+  tripDate,
+  tripDayCount = 1,
 }: {
   state: DayOfState;
   now: Date;
   /** 旅程の全地点（現在地の選び直しに使う） */
   nodes: RailNode[];
   currentNodeKey: string | null;
+  /** 行き先リスト。旅先の都道府県を割り出すのに使う */
+  entries?: PlanEntry[];
+  /** 旅の行き先（例: 金沢） */
+  destination?: string;
+  /** 旅の開始日（YYYY-MM-DD） */
+  tripDate?: string;
+  /** 旅の日数 */
+  tripDayCount?: number;
   liveLocation: GeoPoint | null;
   locationPermission: LocationPermissionState;
   onNavigatePlan: () => void;
   onRecordArrival: (nodeKey: string, place: string) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const adFree = useAdFree();
+
+  // 旅の締めくくり（最終日 × その日の予定を消化しきった状態）にだけ出す。
+  // done は「次にやること」が存在しない状態なので、当日画面の核
+  // （次に何をするかだけを示す）を傷つけない。move / free では絶対に出さない。
+  const lastDay = tripDate ? isLastTripDay(tripDate, tripDayCount, now) : false;
+  const furusato =
+    adFree || !lastDay
+      ? null
+      : furusatoAd({
+          prefecture: lodgingPrefecture(entries, destination),
+          now,
+          onTripLastDay: true,
+        });
   const gpsActive = locationPermission === "granted" && Boolean(liveLocation);
 
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
@@ -223,6 +253,12 @@ export function DayOfScreen({
           <FreeHero state={state} liveLocation={liveLocation} gpsActive={gpsActive} weather={weather} onRecordArrival={onRecordArrival} />
         )}
         {state.mode === "done" && <DoneHero totalReservations={state.totalReservations} />}
+        {/* 旅の締めくくりに1枚だけ。done 以外では出さない（上のコメント参照） */}
+        {state.mode === "done" && furusato && (
+          <View className="mt-3">
+            <AdCard title={furusato.headline} sub={furusato.sub} actionLabel={furusato.actionLabel} url={furusato.url} />
+          </View>
+        )}
         <CurrentNodePicker nodes={nodes} now={now} currentNodeKey={currentNodeKey} onRecordArrival={onRecordArrival} />
       </ScrollView>
     </View>

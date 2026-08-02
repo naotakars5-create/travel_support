@@ -100,6 +100,10 @@ export default function Home() {
           locationPermission={app.locationPermission}
           onNavigatePlan={() => app.openTrip("list")}
           onRecordArrival={app.recordArrival}
+          entries={app.entries ?? []}
+          destination={app.tripDestination}
+          tripDate={app.tripDate}
+          tripDayCount={app.tripDayCount}
         />
       )}
       {app.tab === "packing" && (

@@ -3,11 +3,15 @@ import { Image, ImageBackground, Modal, Pressable, ScrollView, Text, TextInput, 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SavedTrip, MAX_TRIP_PHOTOS } from "@/lib/trips";
 import { PlanEntry } from "@/lib/types";
-import { dateForDay, formatJstTime } from "@/lib/date";
+import { dateForDay, formatJstTime, tripPhase } from "@/lib/date";
 import { MODE_LABEL } from "@/lib/modeMeta";
 import { PhotoPicker } from "./PhotoPicker";
 import { Illustration, illustrationUri } from "./Illustration";
 import { SlideUp } from "./animations";
+import { furusatoAd } from "@/lib/furusatoAd";
+import { lodgingPrefecture } from "@/lib/lodgingAd";
+import { useAdFree } from "@/hooks/useAdFree";
+import { AdCard } from "./AdSlot";
 
 const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
@@ -304,6 +308,19 @@ function ShioriDetail({
   const detailCover = coverOf(trip);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const photos = trip.photos ?? [];
+  const adFree = useAdFree();
+
+  // 旅が終わったしおりにだけ、その土地のふるさと納税を1枚出す。
+  // これは機能ではなく広告なので常設しない（lib/furusatoAd.ts の判断基準）
+  const now = new Date();
+  const ended = tripPhase(trip.tripDate, trip.tripDayCount, now).phase === "after";
+  const furusato =
+    adFree || !ended
+      ? null
+      : furusatoAd({
+          prefecture: lodgingPrefecture(trip.entries, trip.destination ?? ""),
+          now,
+        });
 
   // 日別に行き先をまとめる
   const byDay = useMemo(() => {
@@ -411,6 +428,18 @@ function ShioriDetail({
                   </View>
                 )}
               </View>
+
+              {/* 旅が終わったあとの余韻として。旅先の県のふるさと納税へ送る */}
+              {furusato && (
+                <View className="mt-3">
+                  <AdCard
+                    title={furusato.headline}
+                    sub={furusato.sub}
+                    actionLabel={furusato.actionLabel}
+                    url={furusato.url}
+                  />
+                </View>
+              )}
             </ScrollView>
 
             {/* 操作 */}
