@@ -4,6 +4,7 @@ import { DayPeriod, GeoPoint, Priority, TimeWishKind, TransportMode } from "@/li
 import { closedDaysLabel, PERIOD_META, PERIOD_ORDER, PlanEntryInput, timeWishOf } from "@/lib/plan";
 import { combineDateAndTime, dateForDay, dayOfIso, timeStrFromIso } from "@/lib/date";
 import { fetchPlacePredictions, fetchPlaceDetails, PlacePrediction } from "@/lib/places";
+import { formatDurationMin } from "@/lib/itinerary";
 import { TimeField } from "./PlainFields";
 
 // 宿泊・レンタカーは計画画面の「固定枠」から専用入力するため、通常の追加からは除外。
@@ -23,7 +24,20 @@ const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
   { value: "optional", label: "余れば" },
 ];
 
-const STAY_OPTIONS = [30, 60, 90, 120];
+/**
+ * 滞在時間の選択肢（分）。
+ *
+ * 以前は 30/60/90/120 だけで、**2時間より長く滞在する行き先を登録できなかった**。
+ * テーマパーク・水族館・登山・美術館のはしごなど、半日〜1日かける行き先は
+ * 珍しくないので、8時間まで用意する。
+ *
+ * ラベルは `formatDurationMin` に任せて「4時間」と出す（「240分」では読めない）。
+ * ここに無い値（45分・7時間など）は「その他」から分単位で入れられる。
+ */
+const STAY_OPTIONS = [30, 60, 90, 120, 180, 240, 300, 360, 480];
+
+/** 滞在時間に入れられる上限（分）。24時間を超える滞在は宿泊として登録する。 */
+const STAY_MAX_MIN = 24 * 60;
 const PLACEHOLDER = "rgba(111, 98, 90, 0.5)"; // muted の薄い版（入力済みと見間違えない濃さ）
 
 const TRANSIT_MODES: TransportMode[] = ["air", "rail", "bus", "car"];
@@ -137,6 +151,11 @@ export function PlanEntryForm({
   const [mode, setMode] = useState<TransportMode>(initial?.mode ?? "activity");
   const [priority, setPriority] = useState<Priority>(initial?.priority ?? "want");
   const [stayMin, setStayMin] = useState<number | null>(initial ? initial.stayMin ?? null : 60);
+  // 選択肢に無い滞在時間（メール取り込みやAIが入れた45分など）も編集できるようにする。
+  // 開いた時点で選択肢に無い値なら「その他」を開いた状態で見せる
+  const [stayCustomOpen, setStayCustomOpen] = useState<boolean>(
+    () => stayMin !== null && !STAY_OPTIONS.includes(stayMin)
+  );
   const [day, setDay] = useState<number>(initial?.day ?? 1);
   const [arriveTime, setArriveTime] = useState<string>(timeStrFromIso(initial?.arriveBy));
   const [departTime, setDepartTime] = useState<string>(timeStrFromIso(initial?.departAt));
@@ -483,10 +502,50 @@ export function PlanEntryForm({
             <Text className="font-gothic-400 text-[11px] text-muted">滞在時間の目安</Text>
             <View className="flex-row flex-wrap gap-2">
               {STAY_OPTIONS.map((m) => (
-                <Chip key={m} active={stayMin === m} label={`${m}分`} onPress={() => setStayMin(m)} />
+                <Chip
+                  key={m}
+                  active={stayMin === m && !stayCustomOpen}
+                  label={formatDurationMin(m)}
+                  onPress={() => {
+                    setStayMin(m);
+                    setStayCustomOpen(false);
+                  }}
+                />
               ))}
-              <Chip active={stayMin === null} label="指定なし" onPress={() => setStayMin(null)} />
+              <Chip
+                active={stayCustomOpen}
+                label="その他"
+                onPress={() => setStayCustomOpen((v) => !v)}
+              />
+              <Chip
+                active={stayMin === null && !stayCustomOpen}
+                label="指定なし"
+                onPress={() => {
+                  setStayMin(null);
+                  setStayCustomOpen(false);
+                }}
+              />
             </View>
+            {/* 45分・7時間など、選択肢に無い時間を分で入れる */}
+            {stayCustomOpen && (
+              <View className="mt-1 flex-row items-center gap-2">
+                <TextInput
+                  value={stayMin === null ? "" : String(stayMin)}
+                  onChangeText={(t) => {
+                    const n = Number(t.replace(/[^0-9]/g, ""));
+                    setStayMin(t.trim() === "" || Number.isNaN(n) ? null : Math.min(n, STAY_MAX_MIN));
+                  }}
+                  keyboardType="number-pad"
+                  placeholder="例: 300"
+                  placeholderTextColor={PLACEHOLDER}
+                  className="w-24 rounded-[10px] border border-black/[.1] bg-white/60 px-3 py-2 font-mincho-400 text-[13px] text-ink"
+                />
+                <Text className="font-gothic-400 text-[12px] text-muted">分</Text>
+                {stayMin !== null && stayMin > 0 && (
+                  <Text className="font-gothic-400 text-[11px] text-muted-light">＝ {formatDurationMin(stayMin)}</Text>
+                )}
+              </View>
+            )}
           </View>
           {/* いつ行くか。行き先リストは「行きたい所を溜める場所」なので、
               決まっている分だけ伝えれば足りる。残りの時刻はAIが埋める。 */}
