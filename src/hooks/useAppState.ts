@@ -904,7 +904,7 @@ export function useAppState() {
 
   /** AIに旅程を組み直してもらう（並べ替え＋時刻割り当て＋おすすめ提案）。 */
   const composeWithAi = useCallback(async () => {
-    const list = entries ?? [];
+    let list = entries ?? [];
     if (list.length === 0) return;
     setComposing(true);
     setComposeError(null);
@@ -934,6 +934,17 @@ export function useAppState() {
       }
       const data = (await res.json()) as PlanApiResponse;
       if (data.kind === "plan") {
+        // 宿だけ決めて観光が未定、というのは実際に多い。その場合、AIの提案を
+        // 「タップして足す候補」ではなく**旅程の本体として自動で組み込む**。
+        // 宿1件だけの旅程が返ってきても、ユーザーから見れば何も起きていないのと同じなので。
+        const onlyLodging =
+          list.some((e) => e.mode === "stay") &&
+          !list.some((e) => e.mode !== "stay" && e.mode !== "rental" && !isTransitMode(e.mode));
+        const autoAdded: PlanEntry[] =
+          onlyLodging && data.suggestions.length > 0
+            ? data.suggestions.map((sg) => suggestionToEntry(genId("entry"), sg))
+            : [];
+        if (autoAdded.length > 0) list = [...list, ...autoAdded];
         // AIが時刻を付けた予定はその時刻をアンカーに採用。宿泊・時刻固定は必ず残す。
         const anchors = new Map(data.schedule.map((s) => [s.entryId, s.arriveAt]));
         const mustKeep = (e: PlanEntry) => e.mode === "stay" || Boolean(e.fixedTime);
@@ -969,18 +980,21 @@ export function useAppState() {
         // AIの順路を採用したので、この構造は「スケジュール済み」として記録し、ローカル再計算で上書きしない。
         scheduleSigRef.current = scheduleSignature(reordered);
         setComposedSig(scheduleSignature(reordered));
-        setSuggestions(data.suggestions);
+        // 自動で旅程へ入れた提案を、さらに「この辺のおすすめ」にも出すと二重になる
+        setSuggestions(autoAdded.length > 0 ? [] : data.suggestions);
         setPlanNotes(data.notes ?? null);
         // 反映が分かるように：旅程タブへ切り替え＋通知
         openTrip("timeline");
         setFlash({
           visible: true,
           text:
-            droppedCount > 0
-              ? `AIが旅程を組みました\n入りきらない予定が${droppedCount}件あります（旅程の下部）`
-              : "AIが旅程を組みました\n旅程を確認してください",
+            autoAdded.length > 0
+              ? `宿の周辺から${autoAdded.length}件を旅程に入れました\n要らないものは削除してください`
+              : droppedCount > 0
+                ? `AIが旅程を組みました\n入りきらない予定が${droppedCount}件あります（旅程の下部）`
+                : "AIが旅程を組みました\n旅程を確認してください",
         });
-        setTimeout(() => setFlash({ visible: false, text: "" }), droppedCount > 0 ? 2600 : 1800);
+        setTimeout(() => setFlash({ visible: false, text: "" }), autoAdded.length > 0 || droppedCount > 0 ? 2600 : 1800);
       } else {
         setComposeError(data.message);
       }
