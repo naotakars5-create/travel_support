@@ -79,3 +79,43 @@ describe("buildPlanUserMessage: 順路の最適化に必要な情報", () => {
     expect(PLAN_SYSTEM_PROMPT).toContain("移動の現実性");
   });
 });
+
+describe("宿泊とAIへの情報の受け渡し", () => {
+  const REF = "2026-07-24T09:00:00+09:00";
+
+  function hotel(over: Partial<PlanEntry> = {}): PlanEntry {
+    return {
+      id: "hotel",
+      title: "ホテル川六",
+      mode: "stay",
+      priority: "must",
+      source: "テスト",
+      arriveBy: "2026-07-24T18:00:00+09:00",
+      checkOut: "2026-07-25T10:00:00+09:00",
+      ...over,
+    };
+  }
+
+  it("チェックアウト時刻をAIに渡す（渡さないと宿泊中を避けようがない）", () => {
+    const msg = buildPlanUserMessage({ entries: [hotel()], referenceDateIso: REF });
+    expect(msg).toContain("チェックアウト: 2026-07-25T10:00:00+09:00");
+    expect(msg).toContain("チェックイン: 2026-07-24T18:00:00+09:00");
+  });
+
+  it("チェックアウト未設定でも、翌朝までは空けるよう伝える", () => {
+    const msg = buildPlanUserMessage({ entries: [hotel({ checkOut: undefined })], referenceDateIso: REF });
+    expect(msg).toContain("チェックアウト: 未設定");
+  });
+
+  it("宿だけで観光が無いときは、周辺スポットを日数ぶん提案するよう伝える", () => {
+    const msg = buildPlanUserMessage({ entries: [hotel()], referenceDateIso: REF, dayCount: 3 });
+    expect(msg).toContain("宿だけを登録していて、観光の行き先はまだ決まっていません");
+    expect(msg).toContain("3日ぶん");
+  });
+
+  it("観光が1件でもあれば、その案内は出さない（勝手に増やさない）", () => {
+    const spot: PlanEntry = { id: "a", title: "兼六園", mode: "activity", priority: "want", source: "テスト" };
+    const msg = buildPlanUserMessage({ entries: [hotel(), spot], referenceDateIso: REF });
+    expect(msg).not.toContain("観光の行き先はまだ決まっていません");
+  });
+});

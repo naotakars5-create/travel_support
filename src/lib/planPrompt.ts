@@ -1,4 +1,4 @@
-import { PlanEntry } from "./types";
+import { isTransitMode, PlanEntry } from "./types";
 import { PRIORITY_META, WEEKDAY_JA, timeWishOf, wishWindowMin, PERIOD_META } from "./plan";
 import { MODE_LABEL } from "./modeMeta";
 
@@ -55,6 +55,11 @@ export const PLAN_SYSTEM_PROMPT = `あなたは日本の個人旅行者のため
 - "schedule" には入力された entryId のみを使う（存在しないIDを作らない）。**到着目安が「なし」の予定にも、順路の中で自然な時刻を自分で割り当て、原則すべての entryId を schedule に含める。** どうしても時間内に収まらない予定だけ除外してよい。
 - "schedule" は arriveAt の昇順で並べる。
 - "suggestions" は、挙がった行き先の近くで空き時間に寄れる実在しそうな観光・食事スポットを2〜4件。入力に既にある場所は挙げない。
+  **ただし「宿だけが登録されていて観光の行き先が無い」と書かれている場合は、宿の周辺で1日あたり3〜4件（合計で日数×3〜4件）を提案する。**
+  この場合の suggestions は「余裕があれば寄る場所」ではなく**旅程の本体**になるので、次を守ること:
+  - 宿の座標・住所を基準に、そこから無理なく回れる範囲の実在の観光地・名所・食事処を挙げる
+  - 同じような施設ばかりにせず、観光・食事をバランスよく混ぜる（昼食・夕食にあたる時間帯の食事を入れる）
+  - "area" には市区町村まで書き、"stayMin" は現実的な滞在時間を入れる（名所60〜90分、食事60分、美術館90〜120分）
 - "notes" は組み方の一言メモ（例: 「昼食の予約に合わせ午前は美術館、午後は買い物を配置しました」）。40〜80字程度。
 - 出力はJSONのみ。マークダウンや説明文は絶対に付けない。`;
 
@@ -117,8 +122,16 @@ export function buildPlanUserMessage(params: {
         ? `定休日: ${e.closedDays.map((d) => WEEKDAY_JA[d] ?? "?").join("・")}曜（この曜日には配置しない）`
         : null,
       e.allowDuringStay ? "宿にチェックイン後でも可（夜の予定として置いてよい）" : null,
+      // 宿泊はチェックイン（arriveBy）だけでなく**チェックアウトも渡す**。
+      // これが無いとシステムプロンプトの「チェックイン〜チェックアウトの間に
+      // 予定を入れない」が守りようがなく、実際に宿泊中へ観光が差し込まれていた。
+      e.mode === "stay" && e.checkOut
+        ? `チェックアウト: ${e.checkOut}（★チェックイン〜この時刻の間には他の予定を置かない）`
+        : e.mode === "stay"
+          ? "チェックアウト: 未設定（★チェックイン後から翌朝までは他の予定を置かない）"
+          : null,
       e.arriveBy
-        ? `到着時刻: ${e.arriveBy}${e.fixedTime ? "（★時刻固定・絶対に変更しない）" : "（目安・調整可）"}`
+        ? `${e.mode === "stay" ? "チェックイン" : "到着時刻"}: ${e.arriveBy}${e.fixedTime ? "（★時刻固定・絶対に変更しない）" : "（目安・調整可）"}`
         : "到着目安: なし（自由に配置してよい）",
     ].filter(Boolean);
     return parts.join(" / ");
@@ -142,6 +155,21 @@ export function buildPlanUserMessage(params: {
         ].join("\n")
       : "上記を1日の順路に組み上げてください。";
 
+  // 宿だけ決めて観光が未定、というのは実際に多い。そのことをAIへ明示的に伝え、
+  // 「余裕があれば寄る場所」ではなく旅程の本体として提案させる。
+  const sightseeingCount = entries.filter(
+    (e) => e.mode !== "stay" && e.mode !== "rental" && !isTransitMode(e.mode)
+  ).length;
+  const lodgingOnlyNote =
+    sightseeingCount === 0 && entries.some((e) => e.mode === "stay")
+      ? [
+          "",
+          "★ このユーザーは**宿だけを登録していて、観光の行き先はまだ決まっていません。**",
+          `宿の場所を基準に、周辺で回れる観光・食事スポットを **suggestions に ${dayCount}日ぶん（1日3〜4件）** 挙げてください。`,
+          "ここで挙げたスポットはそのまま旅程に組み込まれます。実在する場所を、現実的な滞在時間とともに挙げること。",
+        ].join("\n")
+      : "";
+
   const modeNote =
     baseMode === "car"
       ? "移動手段の前提: 車（レンタカー/マイカー）。多少離れた行き先もつなげられる（1日5〜8箇所が目安）。"
@@ -151,6 +179,7 @@ export function buildPlanUserMessage(params: {
     `基準日（1日目・タイムゾーン+09:00）: ${referenceDateIso}`,
     multiDayNote,
     modeNote,
+    ...(lodgingOnlyNote ? [lodgingOnlyNote] : []),
     "",
     "----- 行きたい場所リスト -----",
     ...lines,

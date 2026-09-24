@@ -66,3 +66,42 @@ describe("宿のチェックイン〜チェックアウトには予定を入れ�
     expect(ok).toHaveLength(1);
   });
 });
+
+describe("AIが割り当てた時刻でも宿泊中は避ける", () => {
+  it("AIが宿泊中の時刻を返しても、チェックアウト後へ押し出す", () => {
+    // 以前は anchors がある場合に宿泊中の判定を素通りしていたため、
+    // AIが「22:00に観光」と返すとそのまま泊まっている最中へ差し込まれていた
+    const night = new Date(REF);
+    night.setHours(22, 0, 0, 0);
+    const anchors = new Map([["a", night.toISOString()]]);
+
+    const slots = sequentialSchedule([hotel(), visit("a")], REF, anchors);
+    const a = slots.find((s) => s.entryId === "a")!;
+    const [win] = stayWindows([hotel()]);
+    const at = new Date(a.arriveAt).getTime();
+
+    expect(at >= win.start && at < win.end).toBe(false);
+    expect(at).toBe(win.end); // チェックアウト時刻へ寄る
+  });
+
+  it("「チェックイン後でも可」の行き先はAIの時刻をそのまま使う", () => {
+    const night = new Date(REF);
+    night.setHours(20, 0, 0, 0);
+    const anchors = new Map([["dinner", night.toISOString()]]);
+
+    const slots = sequentialSchedule([hotel(), visit("dinner", { mode: "dining", allowDuringStay: true })], REF, anchors);
+    const d = slots.find((s) => s.entryId === "dinner")!;
+    expect(new Date(d.arriveAt).getTime()).toBe(night.getTime());
+  });
+
+  it("時刻固定（予約・便）は宿泊中でも動かさない", () => {
+    // ユーザーが自分で決めた時刻は、宿泊中に見えても勝手に動かさない
+    const early = new Date(REF.getTime() + 86400000);
+    early.setHours(7, 0, 0, 0);
+    const flight = visit("flight", { mode: "air", fixedTime: true, arriveBy: early.toISOString() });
+
+    const slots = sequentialSchedule([hotel(), flight], REF);
+    const f = slots.find((s) => s.entryId === "flight")!;
+    expect(new Date(f.arriveAt).getTime()).toBe(early.getTime());
+  });
+});

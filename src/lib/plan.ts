@@ -312,11 +312,15 @@ export function sequentialSchedule(
           const abMs = new Date(e.arriveBy).getTime();
           if (!Number.isNaN(abMs) && abMs > start) start = abMs;
         }
-        // 宿のチェックイン〜チェックアウトの間には置かない（許可された行き先だけ例外）
-        if (!e.allowDuringStay) {
-          for (const w of stayWins) {
-            if (start >= w.start && start < w.end) start = w.end;
-          }
+      }
+      // 宿のチェックイン〜チェックアウトの間には置かない（許可された行き先だけ例外）。
+      //
+      // **AIが割り当てた時刻にも効かせる。** 以前はアンカーが無いときだけ見ていたので、
+      // AIが宿泊中の時刻を返すとそのまま通り、泊まっている最中に観光が差し込まれていた。
+      // ただし fixedTime（予約・便）はユーザーが決めた時刻なので動かさない。
+      if (!e.allowDuringStay && !e.fixedTime) {
+        for (const w of stayWins) {
+          if (start >= w.start && start < w.end) start = w.end;
         }
       }
       slots.push({ entryId: e.id, arriveAt: new Date(start).toISOString(), stayMin: entryDurationMin(e) });
