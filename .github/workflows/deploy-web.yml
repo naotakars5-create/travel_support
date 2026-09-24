@@ -34,7 +34,11 @@ jobs:
       - name: Node.js を用意
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # EAS CLI が Node 22 以上を要求する（24.7.0 の依存 @oclif/plugin-autocomplete が
+          # engines: ">=22.0.0"）。20 のままだと「EAS CLI を用意」で
+          # "The engine node is incompatible" となりデプロイできない。
+          # GitHub Actions 側でも Node 20 は非推奨になっている。
+          node-version: 22
           cache: npm
 
       - name: 依存関係をインストール
